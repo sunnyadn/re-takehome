@@ -18,6 +18,8 @@ from .models import ALLOWED_MODELS, PRICE_CEILINGS
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MAX_REQUEST_BYTES = 2_000_000
 MAX_OUTPUT_TOKENS = 32_000
+# Statuses OpenRouter returns before a provider generates anything.
+REFUSED_BEFORE_GENERATION = frozenset({429})
 
 
 class LLMPolicyError(ValueError):
@@ -169,32 +171,42 @@ class LLMClient:
 
         latency_ms = round((time.monotonic() - started) * 1000)
         if response.status_code >= 400:
-            snapshot = self._budget.mark_unknown(reservation)
             error_body = response.text[:4000]
+            if response.status_code not in REFUSED_BEFORE_GENERATION:
+                cost_status = "unknown"
+                snapshot = self._budget.mark_unknown(reservation)
+                detail = "spend is uncertain"
+            else:
+                # A refusal should carry no usage, so the ledger stays open for
+                # a retry. Settle instead if one ever does report a cost.
+                reported = self._reported_cost(response)
+                if reported is None:
+                    cost_status = "none"
+                    snapshot = self._budget.release_unbilled(reservation)
+                    detail = "the request was refused and reported no cost"
+                else:
+                    cost_status = "billed"
+                    snapshot = self._budget.settle(reservation, reported)
+                    detail = f"the request was refused after reporting ${reported:.6f}"
             self._events.emit(
                 "llm_error",
                 call_id=call_id,
                 status_code=response.status_code,
                 message=error_body,
-                cost_status="unknown",
+                cost_status=cost_status,
                 budget=snapshot.__dict__,
                 latency_ms=latency_ms,
             )
             raise LLMCallError(
-                f"OpenRouter returned HTTP {response.status_code}; spend is uncertain: "
+                f"OpenRouter returned HTTP {response.status_code}; {detail}: "
                 f"{error_body[:500]}"
             )
 
         try:
             data = response.json()
             usage = data["usage"]
-            cost = usage["cost"]
-            if (
-                isinstance(cost, bool)
-                or not isinstance(cost, (int, float))
-                or not math.isfinite(float(cost))
-                or float(cost) < 0
-            ):
+            cost = self._coerce_cost(usage["cost"])
+            if cost is None:
                 raise TypeError("usage.cost is not numeric")
             choice = data["choices"][0]
             message = choice.get("message") or {}
@@ -211,7 +223,7 @@ class LLMClient:
             )
             raise LLMCallError(f"OpenRouter response omitted required usage accounting: {exc}") from exc
 
-        snapshot = self._budget.settle(reservation, float(cost))
+        snapshot = self._budget.settle(reservation, cost)
         self._events.emit(
             "llm_response",
             call_id=call_id,
@@ -230,6 +242,22 @@ class LLMClient:
             usage=dict(usage),
             raw=data,
         )
+
+    @staticmethod
+    def _coerce_cost(value: Any) -> float | None:
+        """Return usage.cost as a float, or None if it is not a usable number."""
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        value = float(value)
+        return value if math.isfinite(value) and value >= 0 else None
+
+    @classmethod
+    def _reported_cost(cls, response: httpx.Response) -> float | None:
+        """Read usage.cost out of an error body, if the provider sent one."""
+        try:
+            return cls._coerce_cost(response.json()["usage"]["cost"])
+        except (ValueError, KeyError, TypeError):
+            return None
 
     @staticmethod
     def _validate_messages(messages: Sequence[Mapping[str, Any]]) -> None:

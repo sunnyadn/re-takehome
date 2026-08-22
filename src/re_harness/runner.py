@@ -201,6 +201,7 @@ def _recover_worker(worker: RunningWorker, problem_set: ProblemSet, *, status: s
             "limit_usd": None,
             "spent_usd": round(actual, 10),
             "reserved_usd": 0.0,
+            "unbilled_usd": 0.0,
             "accounting_complete": False,
         },
         "within_time": status != "timed_out",
