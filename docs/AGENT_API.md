@@ -41,8 +41,11 @@ charged to the current problem's single ledger.
 
 There are no hidden retries. Import and catch `re_harness.LLMCallError`
 and decide explicitly whether
-another request is worthwhile. A transport failure makes spend uncertain and
-closes the ledger rather than risking an unreported overspend.
+another request is worthwhile. A rate-limited request leaves the ledger open so
+a retry is allowed, though enough of them will eventually close it. A transport
+failure or any other error makes spend uncertain and closes the ledger rather
+than risking an unreported overspend. Once it is closed, the next call raises
+`BudgetAccountingError`.
 
 ## Lean feedback
 
