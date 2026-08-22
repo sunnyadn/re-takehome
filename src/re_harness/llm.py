@@ -100,10 +100,10 @@ class LLMClient:
             "messages": [dict(message) for message in messages],
             "max_tokens": max_tokens,
             "stream": False,
-            # Applicants cannot opt into alternate endpoints, provider/model
+            # Applicants cannot opt into alternate endpoints, model
             # fallbacks, or providers that silently ignore requested fields.
             "provider": {
-                "allow_fallbacks": False,
+                "allow_fallbacks": True,
                 "require_parameters": True,
                 "max_price": {
                     "prompt": price.input_per_million,

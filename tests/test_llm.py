@@ -21,8 +21,9 @@ async def test_logged_openrouter_call_uses_actual_cost_and_no_secret(tmp_path):
         assert request.headers["authorization"] == f"Bearer {key}"
         body = json.loads(request.content)
         assert "plugins" not in body
+        assert "models" not in body
         assert body["provider"] == {
-            "allow_fallbacks": False,
+            "allow_fallbacks": True,
             "require_parameters": True,
             "max_price": {"prompt": 0.15, "completion": 0.60},
         }
