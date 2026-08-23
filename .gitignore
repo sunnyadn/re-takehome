@@ -4,3 +4,6 @@
 .venv/
 .pytest_cache/
 *.egg-info/
+
+# Working notes and drafts. Research history lives on the research branch.
+notes/
