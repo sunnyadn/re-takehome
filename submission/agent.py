@@ -162,6 +162,45 @@ def declared_names(challenge: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(DECL.findall(challenge)))
 
 
+def statement_headers(source: str) -> dict[str, str]:
+    """Each declaration's text up to its `:=`, whitespace normalised.
+
+    The Comparator requires kernel-level statement equality per declared name,
+    so any edit to a header scores zero however well the proof compiles."""
+
+    headers: dict[str, str] = {}
+    name = None
+    buffer: list[str] = []
+    for line in source.splitlines():
+        match = DECL.match(line)
+        if match:
+            if name and name not in headers:
+                headers[name] = " ".join(" ".join(buffer).split())
+            name, buffer = match.group(1), []
+        if name is None or line.lstrip().startswith("--"):
+            continue
+        head, sep, _rest = line.partition(":=")
+        buffer.append(head)
+        if sep:
+            headers[name] = " ".join(" ".join(buffer).split())
+            name, buffer = None, []
+    return headers
+
+
+def statement_drift(challenge: str, candidate: str) -> list[str]:
+    """Names the candidate dropped or reworded."""
+
+    original = statement_headers(challenge)
+    now = statement_headers(candidate)
+    faults = []
+    for name, header in original.items():
+        if name not in now:
+            faults.append(f"{name} is missing, the grader needs it byte-identical")
+        elif now[name] != header:
+            faults.append(f"{name} was reworded, restore it exactly as the challenge has it")
+    return faults
+
+
 def forbidden_axioms(messages: Sequence[dict[str, Any]]) -> list[str]:
     """Read `#print axioms` output. A denylist cannot work here, because
     `native_decide` and `bv_decide` mint a fresh axiom name per computation."""
@@ -179,10 +218,12 @@ def answer_names(challenge: str) -> tuple[str, ...]:
     return tuple(ANSWER_SLOT.findall(challenge))
 
 
-def scoring_faults(source: str, names: Sequence[str]) -> list[str]:
+def scoring_faults(source: str, names: Sequence[str], challenge: str = "") -> list[str]:
     """What the Comparator would reject even though Lean accepted the file."""
 
     faults = [f"remove {c}, the grader rejects it" for c in banned_constructs(source)]
+    if challenge:
+        faults.extend(statement_drift(challenge, source))
     if names:
         _, errors = numeric_answers_are_literals(source, tuple(names))
         faults.extend(errors)
@@ -344,7 +385,7 @@ class SubmissionAgent:
                 if time_left() <= 0:
                     break
                 check = await services.lean.check_file(candidate)
-                if check.accepted and not scoring_faults(candidate, names):
+                if check.accepted and not scoring_faults(candidate, names, problem.challenge):
                     ledger.events.append({"stage": "sweep", "accepted": True})
                     services.checkpoint(candidate, {"stage": "sweep"})
                     return AgentResult(candidate, {
@@ -427,7 +468,7 @@ class SubmissionAgent:
         check = await services.lean.check_file(
             line.candidate + ("\n\n" + probe if probe else "")
         )
-        faults = scoring_faults(line.candidate, names)
+        faults = scoring_faults(line.candidate, names, problem.challenge)
         faults += [f"{a} is not a permitted axiom, the grader rejects it"
                    for a in forbidden_axioms(check.messages)]
         signature = "\n".join([error_signature(check.messages)] + faults)
