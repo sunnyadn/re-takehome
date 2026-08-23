@@ -176,6 +176,23 @@ To rescore saved solutions, pass the concrete run directory:
 bash scripts/rescore.sh outputs/submission/20260819T120000Z
 ```
 
+## Changes to the provided harness
+
+Two behavioural changes under `src/re_harness/`, both opened as pull requests
+against the kit first.
+
+- **`provider.allow_fallbacks` is on** ([#3]). A sick provider otherwise takes
+  the problem down with it. Through the harness client, 20 identical calls to
+  `gpt-oss-120b`: 3/20 succeeded as shipped, 20/20 patched.
+- **A 429 no longer closes the problem's ledger** ([#5]). It used to force a
+  zero however good the proof was.
+
+Reported spend is still the sum of OpenRouter's returned `usage.cost`.
+`docs/AGENT_API.md` is updated to match.
+
+[#3]: https://github.com/VerifiedMechanisms/re-takehome/pull/3
+[#5]: https://github.com/VerifiedMechanisms/re-takehome/pull/5
+
 ## Scoring
 
 A problem receives one point when all of the following conditions hold:
