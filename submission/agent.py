@@ -58,8 +58,10 @@ class Config:
     verify_reserve_s: float = 120.0
     # A turn started inside this window can be killed mid-call, and a cancelled
     # call closes the ledger, which scores the problem zero however good the
-    # checkpoint is. The slowest call measured through this harness was 471s.
-    stop_margin_s: float = 900.0
+    # checkpoint is. Sized as a share of the limit, because a fixed margin from
+    # the slowest call seen so far was beaten by 2.4x the first time it ran.
+    stop_margin_floor_s: float = 900.0
+    stop_margin_fraction: float = 0.1
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -77,6 +79,10 @@ class Config:
 
         reserve = min(self.verify_reserve_s, self.time_limit_s * 0.25)
         return max(60.0, self.time_limit_s - reserve)
+
+    @property
+    def stop_margin_s(self) -> float:
+        return max(self.stop_margin_floor_s, self.stop_margin_fraction * self.time_limit_s)
 
     @property
     def last_turn_start_s(self) -> float:
