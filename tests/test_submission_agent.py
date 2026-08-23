@@ -1,6 +1,14 @@
 """Tests for the submission agent's search control, not for the harness."""
 
-from submission.agent import COCKTAIL, Line, sweep_files, wrap_tactic
+import asyncio
+
+import pytest
+
+import submission.agent as agent_mod
+from re_harness import LLMCallError
+from submission.agent import (
+    COCKTAIL, Ledger, Line, SubmissionAgent, sweep_files, wrap_tactic,
+)
 
 
 def _walk(errors, accepted=False):
@@ -53,3 +61,68 @@ def test_every_cocktail_alternative_is_parenthesised():
 def test_sweep_declines_a_file_with_a_sorry_outside_a_proof():
     source = "import Mathlib\n\ndef answer : Nat := sorry\n\ntheorem t : True := by\n  sorry\n"
     assert sweep_files(source) == []
+
+
+class _Usage(dict):
+    pass
+
+
+class _Response:
+    def __init__(self):
+        self.content = "ok"
+        self.finish_reason = "stop"
+        self.usage = {"cost": 0.001}
+
+
+class _FlakyLLM:
+    """Refuses `refusals` times with `status`, then answers."""
+
+    def __init__(self, refusals, status=429):
+        self.refusals, self.status, self.calls = refusals, status, 0
+
+    async def complete(self, **kwargs):
+        self.calls += 1
+        if self.calls <= self.refusals:
+            raise LLMCallError(f"HTTP {self.status}", status_code=self.status)
+        return _Response()
+
+
+class _Services:
+    def __init__(self, llm):
+        self.llm = llm
+
+
+def _call_once(llm):
+    agent = SubmissionAgent()
+    ledger = Ledger()
+    out = asyncio.run(agent._call(
+        "qwen/qwen3.5-flash-02-23", "sys", "user", 100,
+        _Services(llm), ledger, 0, "repair", False,
+    ))
+    return out, ledger
+
+
+def test_a_refusal_is_retried_until_it_answers(monkeypatch):
+    monkeypatch.setattr(agent_mod, "RETRY_BACKOFF_S", (0.0, 0.0, 0.0))
+    llm = _FlakyLLM(refusals=2)
+    out, ledger = _call_once(llm)
+    assert out == "ok" and llm.calls == 3
+    assert sum("retry in" in str(e.get("note", "")) for e in ledger.events) == 2
+
+
+def test_retries_are_bounded_and_then_the_error_escapes(monkeypatch):
+    monkeypatch.setattr(agent_mod, "RETRY_BACKOFF_S", (0.0, 0.0, 0.0))
+    llm = _FlakyLLM(refusals=99)
+    with pytest.raises(LLMCallError):
+        _call_once(llm)
+    assert llm.calls == 4
+
+
+def test_an_error_that_poisons_accounting_is_not_retried(monkeypatch):
+    # 500 marks spend unknown, which zeroes the problem however good the proof
+    # is, so repeating the call would only burn time.
+    monkeypatch.setattr(agent_mod, "RETRY_BACKOFF_S", (0.0, 0.0, 0.0))
+    llm = _FlakyLLM(refusals=99, status=500)
+    with pytest.raises(LLMCallError):
+        _call_once(llm)
+    assert llm.calls == 1

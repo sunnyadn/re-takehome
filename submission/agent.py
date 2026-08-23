@@ -14,6 +14,7 @@ turn on that line, inheriting its candidate and its plan.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import time
@@ -22,10 +23,14 @@ from typing import Any, Sequence
 
 from re_harness import AgentResult, LLMCallError, Problem, Services
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
+from re_harness.llm import REFUSED_BEFORE_GENERATION
 from re_harness.config import HarnessSettings
 from re_harness.lean import numeric_answers_are_literals
 from re_harness.models import ALLOWED_MODELS, MODEL_A, MODEL_B
 
+# A refused call releases its reservation, so repeating it is free and the
+# problem stays winnable. Without this a single 429 ends the problem.
+RETRY_BACKOFF_S = (5.0, 20.0, 60.0)
 PLAN_TOKENS = 16000
 FORMALIZE_TOKENS = 16000
 REPAIR_TOKENS = 16000
@@ -373,12 +378,14 @@ def format_messages(messages: Sequence[dict[str, Any]]) -> str:
 
 class SubmissionAgent:
     def __init__(self, config: Config | None = None):
+        self._deadline: float | None = None
         self.config = config or Config.from_env()
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
         cfg = self.config
         started = time.monotonic()
         deadline = started + cfg.last_turn_start_s
+        self._deadline = deadline
         ledger = Ledger()
         names = answer_names(problem.challenge)
         decls = declared_names(problem.challenge)
@@ -519,38 +526,58 @@ class SubmissionAgent:
         })
         return accepted
 
+    def _time_left(self) -> float:
+        return float("inf") if self._deadline is None else self._deadline - time.monotonic()
+
     async def _call(
         self, model: str, system: str, user: str, max_tokens: int,
         services: Services, ledger: Ledger, line: int, stage: str, handoff: bool,
     ) -> str | None:
         """One model call. Returns None when this line can no longer be paid for."""
 
-        try:
-            response = await services.llm.complete(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                max_tokens=max_tokens,
-                temperature=0.4,
-                # Measured: gpt-oss at high effort needs ~42k reasoning tokens
-                # on a hard problem before it emits any proof, above the 32k the
-                # harness allows, and it rejects reasoning.max_tokens with a 400.
-                reasoning={"effort": "medium"},
-            )
-        except BudgetExceeded as exc:
-            # Reservation refused before the request went out, so the ledger is
-            # intact and only this line stops.
-            ledger.events.append({"line": line, "stage": stage, "model": model,
-                                  "note": f"budget: {exc}"[:200]})
-            return None
-        cost = ledger.record(response.usage)
-        ledger.events.append({
-            "line": line, "stage": stage, "model": model, "handoff": handoff,
-            "cost_usd": round(cost, 6), "finish_reason": response.finish_reason,
-        })
-        return response.content
+        for delay in RETRY_BACKOFF_S + (None,):
+            try:
+                response = await services.llm.complete(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                    max_tokens=max_tokens,
+                    temperature=0.4,
+                    # Measured: gpt-oss at high effort needs ~42k reasoning
+                    # tokens on a hard problem before it emits any proof, above
+                    # the 32k the harness allows, and it rejects
+                    # reasoning.max_tokens with a 400.
+                    reasoning={"effort": "medium"},
+                )
+            except BudgetExceeded as exc:
+                # Reservation refused before the request went out, so the
+                # ledger is intact and only this line stops.
+                ledger.events.append({"line": line, "stage": stage, "model": model,
+                                      "note": f"budget: {exc}"[:200]})
+                return None
+            except LLMCallError as exc:
+                # Only a refusal releases its reservation. Every other failure
+                # has already marked spend unknown, which zeroes the problem
+                # however good the proof is, so a retry would buy nothing.
+                if exc.status_code not in REFUSED_BEFORE_GENERATION:
+                    raise
+                if delay is None or self._time_left() <= delay:
+                    raise
+                ledger.events.append({
+                    "line": line, "stage": stage, "model": model,
+                    "note": f"refused HTTP {exc.status_code}, retry in {delay:.0f}s",
+                })
+                await asyncio.sleep(delay)
+                continue
+            cost = ledger.record(response.usage)
+            ledger.events.append({
+                "line": line, "stage": stage, "model": model, "handoff": handoff,
+                "cost_usd": round(cost, 6), "finish_reason": response.finish_reason,
+            })
+            return response.content
+        return None
 
 
 PLANNER_SYSTEM = """You are a competition mathematician preparing a proof for formalisation in Lean 4 with Mathlib.

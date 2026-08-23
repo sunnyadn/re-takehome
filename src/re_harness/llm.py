@@ -27,7 +27,9 @@ class LLMPolicyError(ValueError):
 
 
 class LLMCallError(RuntimeError):
-    pass
+    def __init__(self, message: str, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 @dataclass(frozen=True)
@@ -199,7 +201,8 @@ class LLMClient:
             )
             raise LLMCallError(
                 f"OpenRouter returned HTTP {response.status_code}; {detail}: "
-                f"{error_body[:500]}"
+                f"{error_body[:500]}",
+                status_code=response.status_code,
             )
 
         try:
