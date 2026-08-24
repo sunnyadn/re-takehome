@@ -126,3 +126,30 @@ def test_an_error_that_poisons_accounting_is_not_retried(monkeypatch):
     with pytest.raises(LLMCallError):
         _call_once(llm)
     assert llm.calls == 1
+
+
+def test_the_stop_margin_never_eats_a_quarter_of_a_short_run():
+    # The 8-hour floor used to swallow 47% of a 30-minute run.
+    from submission.agent import Config
+    short, graded = Config(time_limit_s=1800.0), Config(time_limit_s=28800.0)
+    assert short.stop_margin_s <= 0.25 * 1800.0
+    assert short.last_turn_start_s / 1800.0 > 0.6
+    # The graded setting must be untouched by the cap.
+    assert graded.last_turn_start_s == 25800.0
+
+
+def test_retries_are_capped_across_the_whole_problem(monkeypatch):
+    # Each refusal keeps its reservation as permanent exposure, so an
+    # unbounded per-call retry closes the ledger on a long run.
+    monkeypatch.setattr(agent_mod, "RETRY_BACKOFF_S", (0.0, 0.0, 0.0))
+    agent = SubmissionAgent()
+    llm, ledger = _FlakyLLM(refusals=99), Ledger()
+    calls = 0
+    for _ in range(6):
+        try:
+            asyncio.run(agent._call("qwen/qwen3.5-flash-02-23", "s", "u", 100,
+                                    _Services(llm), ledger, 0, "repair", False))
+        except LLMCallError:
+            pass
+    retried = sum("retry in" in str(e.get("note", "")) for e in ledger.events)
+    assert retried == agent_mod.MAX_RETRIES_PER_PROBLEM

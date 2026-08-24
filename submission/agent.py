@@ -31,6 +31,10 @@ from re_harness.models import ALLOWED_MODELS, MODEL_A, MODEL_B
 # A refused call releases its reservation, so repeating it is free and the
 # problem stays winnable. Without this a single 429 ends the problem.
 RETRY_BACKOFF_S = (5.0, 20.0, 60.0)
+# budget.release_unbilled keeps each refused call's reservation as worst-case
+# exposure for the rest of the problem, and the ledger closes when that
+# exposure crosses the limit. Measured: 48 refusals do it at 8 hours.
+MAX_RETRIES_PER_PROBLEM = 8
 PLAN_TOKENS = 16000
 FORMALIZE_TOKENS = 16000
 REPAIR_TOKENS = 16000
@@ -87,7 +91,12 @@ class Config:
 
     @property
     def stop_margin_s(self) -> float:
-        return max(self.stop_margin_floor_s, self.stop_margin_fraction * self.time_limit_s)
+        """Wide enough for a turn already in flight, never a quarter of the run.
+
+        Without the cap the 8-hour floor swallowed 47% of a 30-minute run."""
+
+        want = max(self.stop_margin_floor_s, self.stop_margin_fraction * self.time_limit_s)
+        return min(want, 0.25 * self.time_limit_s)
 
     @property
     def last_turn_start_s(self) -> float:
@@ -379,6 +388,7 @@ def format_messages(messages: Sequence[dict[str, Any]]) -> str:
 class SubmissionAgent:
     def __init__(self, config: Config | None = None):
         self._deadline: float | None = None
+        self._retries_left = MAX_RETRIES_PER_PROBLEM
         self.config = config or Config.from_env()
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
@@ -386,6 +396,7 @@ class SubmissionAgent:
         started = time.monotonic()
         deadline = started + cfg.last_turn_start_s
         self._deadline = deadline
+        self._retries_left = MAX_RETRIES_PER_PROBLEM
         ledger = Ledger()
         names = answer_names(problem.challenge)
         decls = declared_names(problem.challenge)
@@ -563,11 +574,13 @@ class SubmissionAgent:
                 # however good the proof is, so a retry would buy nothing.
                 if exc.status_code not in REFUSED_BEFORE_GENERATION:
                     raise
-                if delay is None or self._time_left() <= delay:
+                if delay is None or self._time_left() <= delay or self._retries_left <= 0:
                     raise
+                self._retries_left -= 1
                 ledger.events.append({
                     "line": line, "stage": stage, "model": model,
-                    "note": f"refused HTTP {exc.status_code}, retry in {delay:.0f}s",
+                    "note": f"refused HTTP {exc.status_code}, retry in {delay:.0f}s,"
+                            f" {self._retries_left} left",
                 })
                 await asyncio.sleep(delay)
                 continue
