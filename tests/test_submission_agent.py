@@ -135,3 +135,44 @@ def test_retries_are_capped_across_the_whole_problem(monkeypatch):
             pass
     retried = sum("retry in" in str(e.get("note", "")) for e in ledger.events)
     assert retried == agent_mod.MAX_RETRIES_PER_PROBLEM
+
+
+def test_surplus_lines_offsets_by_import_count():
+    source = (
+        "import Mathlib\n"      # 1
+        "import Aesop\n"        # 2
+        "\n"                    # 3
+        "theorem t : True := by\n"  # 4
+        "  trivial\n"           # 5
+        "  norm_num\n"          # 6
+    )
+    messages = [{"severity": "error", "pos": {"line": 4},
+                 "data": "No goals to be solved"}]
+    assert agent_mod.surplus_lines(messages, source) == [6]
+
+
+def test_surplus_lines_ignores_other_errors():
+    source = "import Mathlib\ntheorem t : True := by\n  bogus\n"
+    messages = [{"severity": "error", "pos": {"line": 2},
+                 "data": "Unknown identifier `bogus`"}]
+    assert agent_mod.surplus_lines(messages, source) == []
+
+
+def test_drop_lines_removes_only_named_lines():
+    source = "a\nb\nc\nd\n"
+    assert agent_mod.drop_lines(source, [2, 4]) == "a\nc\n"
+
+
+def test_drop_lines_keeps_declarations_below_the_drop():
+    source = (
+        "import Mathlib\n"
+        "theorem helper : True := by\n"
+        "  trivial\n"
+        "  norm_num\n"
+        "\n"
+        "theorem required : True := by\n"
+        "  trivial\n"
+    )
+    mended = agent_mod.drop_lines(source, [4])
+    assert "theorem required" in mended
+    assert "norm_num" not in mended

@@ -261,6 +261,12 @@ COCKTAIL = (
     "refine ⟨?_, ?_⟩ <;> norm_num", "simp_all <;> omega", "zify; omega",
     "push_cast; omega", "ring_nf; omega", "ring_nf; nlinarith",
     "norm_num [Nat.Prime]", "interval_cases <;> omega",
+    "simp_arith", "constructor <;> simp", "refine ⟨?_, ?_, ?_⟩ <;> norm_num",
+    "norm_num [Nat.pow_mod]", "simp [Nat.pow_mod]; omega", "norm_num [Nat.gcd]",
+    "norm_num [Nat.choose]", "norm_num [Nat.ModEq]", "decide <;> norm_num",
+    "simp [Finset.sum_range_succ]; ring", "simp [Finset.sum_range_succ]; norm_num",
+    "simp [Nat.div_add_mod]; omega", "field_simp; nlinarith", "rify; nlinarith",
+    "norm_num [Nat.factorial]; ring", "omega <;> norm_num",
 )
 PREAMBLES = (
     "",
@@ -338,6 +344,33 @@ def sweep_files(source: str, cocktail: Sequence[str] = COCKTAIL) -> list[str]:
             return []
         files.append(normalise_imports(preamble + body, body))
     return files
+
+
+IMPORT_LINE = re.compile(r"^\s*import\s")
+NO_GOALS = "no goals to be solved"
+
+
+def surplus_lines(messages: Sequence[dict[str, Any]], source: str) -> list[int]:
+    """Source lines holding a tactic that ran after its goal was already closed.
+
+    Lean strips import lines before elaborating, so a reported position is
+    offset by the number of imports above it."""
+
+    kept = [i for i, l in enumerate(source.splitlines(), start=1) if not IMPORT_LINE.match(l)]
+    out = set()
+    for m in messages:
+        if m.get("severity") != "error" or NO_GOALS not in str(m.get("data", "")).lower():
+            continue
+        reported = (m.get("pos") or {}).get("line")
+        if reported and 1 <= int(reported) <= len(kept):
+            out.add(kept[int(reported) - 1])
+    return sorted(out)
+
+
+def drop_lines(source: str, drop: Sequence[int]) -> str:
+    removed = set(drop)
+    kept = [l for i, l in enumerate(source.splitlines(), start=1) if i not in removed]
+    return "\n".join(kept) + "\n"
 
 
 def error_messages(messages: Sequence[dict[str, Any]]) -> list[str]:
@@ -492,9 +525,18 @@ class SubmissionAgent:
             return False
 
         probe = "\n".join(f"#print axioms {n}" for n in decls)
-        check = await services.lean.check_file(
-            line.candidate + ("\n\n" + probe if probe else "")
-        )
+        suffix = "\n\n" + probe if probe else ""
+        check = await services.lean.check_file(line.candidate + suffix)
+        # A tactic that reports `no goals` is surplus: the step before it already
+        # closed the goal. Dropping it costs one Lean check and no tokens.
+        surplus = [] if check.accepted else surplus_lines(check.messages, line.candidate)
+        if surplus:
+            mended = drop_lines(line.candidate, surplus)
+            recheck = await services.lean.check_file(mended + suffix)
+            if recheck.accepted and not scoring_faults(mended, names, problem.challenge):
+                ledger.events.append({"line": line.index, "stage": "drop_surplus",
+                                      "lines": surplus, "accepted": True})
+                line.candidate, check = mended, recheck
         faults = scoring_faults(line.candidate, names, problem.challenge)
         faults += [f"{a} is not a permitted axiom, the grader rejects it"
                    for a in forbidden_axioms(check.messages)]
