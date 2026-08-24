@@ -176,3 +176,16 @@ def test_drop_lines_keeps_declarations_below_the_drop():
     mended = agent_mod.drop_lines(source, [4])
     assert "theorem required" in mended
     assert "norm_num" not in mended
+
+
+def test_extract_lean_drops_a_swallowed_fence():
+    text = "```\n\n```lean\n\ntheorem t : True := by trivial\n```"
+    out = agent_mod.extract_lean(text, fallback="import Mathlib\n")
+    assert "```" not in out
+    assert "theorem t" in out
+
+
+def test_extract_lean_keeps_inline_backticks_in_docstrings():
+    text = "```lean\n/-- Helper: `2 ^ 3` is small. -/\ntheorem t : True := by trivial\n```"
+    out = agent_mod.extract_lean(text, fallback="import Mathlib\n")
+    assert "`2 ^ 3`" in out

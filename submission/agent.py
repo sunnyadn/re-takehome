@@ -150,12 +150,24 @@ def normalise_imports(source: str, fallback: str) -> str:
     return "import Mathlib\n\n" + body + "\n"
 
 
+FENCE_LINE = re.compile(r"^\s*```.*$", re.MULTILINE)
+
+
+def strip_fences(block: str) -> str:
+    """Remove fence lines a capture swallowed.
+
+    A stray bare ``` before the real ```lean makes the capture start inside the
+    second fence, and one leftover backtick rejects the whole file."""
+
+    return FENCE_LINE.sub("", block)
+
+
 def extract_lean(text: str, fallback: str) -> str:
     fenced = re.findall(r"```(?:lean|lean4)?\s*\n(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
     for block in reversed(fenced):
-        if block.strip():
-            return normalise_imports(block, fallback)
-    stripped = text.strip()
+        if strip_fences(block).strip():
+            return normalise_imports(strip_fences(block), fallback)
+    stripped = strip_fences(text).strip()
     if "import " in stripped or "theorem " in stripped:
         return normalise_imports(stripped, fallback)
     return fallback
