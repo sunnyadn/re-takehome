@@ -11,44 +11,26 @@ from submission.agent import (
 )
 
 
-def _walk(errors, accepted=False):
+def _walk(errors):
     line = Line(index=0, owner="m")
     seen = []
     for i, e in enumerate(errors):
         line.candidate, line.errors = f"file-{i}", e
         line.signature, line.feedback = f"sig-{e}", f"fb-{e}"
-        line.keep_best(accepted)
         seen.append((line.errors, line.candidate))
     return line, seen
 
 
-def test_regression_is_rolled_back_to_the_best_file():
-    # The trajectory a baseline run actually produced on putnam_2020_a2.
+def test_a_line_keeps_working_from_its_latest_file_even_when_it_got_worse():
+    """Three of 15 model-won problems in the roll-back-free arms passed through
+    an error increase on the way to a proof, including the only known wins on
+    p09_imo1964 and p10_factorial_pow. Fewer Lean errors is not nearer a proof:
+    fixing one error uncovers the ones it was masking."""
+
     line, seen = _walk([5, 2, 16, 17, 7, 7])
-    assert [e for e, _ in seen] == [5, 2, 2, 2, 2, 2]
-    assert all(c == "file-1" for _, c in seen[1:])
-    assert line.rejected
-
-
-def test_monotone_descent_is_never_rolled_back():
-    line, seen = _walk([9, 6, 3, 0])
-    assert [e for e, _ in seen] == [9, 6, 3, 0]
-    assert not line.rejected
-
-
-def test_an_accepted_file_survives_a_higher_error_count():
-    line = Line(index=0, owner="m")
-    line.candidate, line.errors = "good", 1
-    line.keep_best(False)
-    line.candidate, line.errors = "accepted", 3
-    assert line.keep_best(True) is False
-    assert line.candidate == "accepted"
-
-
-def test_the_rejection_memo_stays_short_and_deduplicated():
-    line, _ = _walk([1, 9, 9, 8, 7, 6])
-    assert len(line.rejected) <= 3
-    assert len(set(line.rejected)) == len(line.rejected)
+    assert [e for e, _ in seen] == [5, 2, 16, 17, 7, 7]
+    assert line.candidate == "file-5"
+    assert not hasattr(line, "best")
 
 
 def test_every_cocktail_alternative_is_parenthesised():

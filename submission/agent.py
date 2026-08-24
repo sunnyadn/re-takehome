@@ -119,26 +119,6 @@ class Line:
     stalls: int = 0
     feedback: str = ""
     done: bool = False
-    best: tuple[str, int, str | None, str] | None = None
-    rejected: list[str] = field(default_factory=list)
-
-    def keep_best(self, accepted: bool) -> bool:
-        """Roll back a repair that raised the error count.
-
-        Carrying the worse file forward made the loop a random walk: 36 of 52
-        lines regressed at least once in the baseline run, and none recovered."""
-
-        state = (self.candidate, self.errors or 0, self.signature, self.feedback)
-        if accepted or self.best is None or state[1] <= self.best[1]:
-            self.best = state
-            return False
-        head = (self.signature or "").strip().splitlines()
-        memo = f"{state[1]} errors, starting with: {head[0] if head else 'no message'}"
-        if memo not in self.rejected:
-            self.rejected = (self.rejected + [memo])[-3:]
-        self.candidate, self.errors, self.signature, self.feedback = self.best
-        return True
-
 
 @dataclass
 class Ledger:
@@ -528,12 +508,10 @@ class SubmissionAgent:
         )
         # Lean accepting the file is not the grading condition.
         accepted = check.accepted and not faults
-        reverted = line.keep_best(accepted)
         ledger.events.append({
             "line": line.index, "stage": "lean_check", "model": model,
             "errors": line.errors, "accepted": check.accepted, "handoff": handoff,
             "timed_out": check.timed_out, "scoring_faults": faults,
-            "reverted": reverted,
         })
         return accepted
 
@@ -664,10 +642,6 @@ def repairer_user(problem: Problem, line: Line, handoff: bool) -> str:
         "```lean", line.candidate, "```",
         "", "Lean rejected it with:", "```text", line.feedback or "(no messages)", "```",
     ]
-    if line.rejected:
-        parts += ["", "Rewrites already tried and rolled back for making it worse:"]
-        parts += [f"- {r}" for r in line.rejected]
-        parts += ["Do not repeat them."]
     return "\n".join(parts)
 
 
