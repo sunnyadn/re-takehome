@@ -25,7 +25,7 @@ from re_harness import AgentResult, LLMCallError, Problem, Services
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.llm import REFUSED_BEFORE_GENERATION
 from re_harness.config import HarnessSettings
-from re_harness.lean import numeric_answers_are_literals
+from re_harness.lean import LeanRuntimeError, numeric_answers_are_literals
 from re_harness.models import ALLOWED_MODELS, MODEL_A, MODEL_B
 
 # A refused call releases its reservation, so repeating it is free and the
@@ -379,6 +379,59 @@ def surplus_lines(messages: Sequence[dict[str, Any]], source: str) -> list[int]:
     return sorted(out)
 
 
+DECL_HEAD = re.compile(r"^(theorem|lemma|abbrev|def|example|noncomputable|private|@\[)")
+MISSING_NAME = re.compile(r"unknown (constant|identifier)|environment does not contain", re.I)
+TRY_THIS = "Try this"
+LEMMA_SEARCH_TIMEOUT_S = 60
+MAX_SEARCHES_PER_PROBLEM = 30
+
+
+def source_lines(messages: Sequence[dict[str, Any]], source: str) -> list[int]:
+    """Source line of every positioned error, earliest first."""
+
+    kept = [i for i, l in enumerate(source.splitlines(), start=1) if not IMPORT_LINE.match(l)]
+    out = []
+    for m in messages:
+        if m.get("severity") != "error":
+            continue
+        reported = (m.get("pos") or {}).get("line")
+        if reported and 1 <= int(reported) <= len(kept):
+            out.append(kept[int(reported) - 1])
+    return sorted(set(out))
+
+
+def search_file(source: str, errline: int) -> str | None:
+    """The candidate with `apply?` where the proof first went wrong.
+
+    Everything below the failure is dropped so the search sees that goal, and
+    the cut stays inside one declaration so the others survive for the grader."""
+
+    lines = source.splitlines()
+    starts = [i + 1 for i, l in enumerate(lines) if DECL_HEAD.match(l)]
+    if not starts or not 1 <= errline <= len(lines):
+        return None
+    begin = max((b for b in starts if b <= errline), default=None)
+    if begin is None:
+        return None
+    end = min((b for b in starts if b > errline), default=len(lines) + 1) - 1
+    proof = None
+    for i in range(begin, end + 1):
+        body = lines[i - 1].split("--")[0].rstrip()
+        if body.endswith(" by") or body.endswith(":= by") or body.strip() == "by":
+            proof = i + 1
+            break
+    if proof is None or proof > end:
+        return None
+    at = max(errline, proof)
+    indent = lines[at - 1][: len(lines[at - 1]) - len(lines[at - 1].lstrip())] or "  "
+    return "\n".join(lines[: at - 1] + [f"{indent}all_goals apply?"] + lines[end:]) + "\n"
+
+
+def suggestions(messages: Sequence[dict[str, Any]]) -> list[str]:
+    return [str(m.get("data", "")).strip() for m in messages
+            if m.get("severity") == "info" and TRY_THIS in str(m.get("data", ""))]
+
+
 def drop_lines(source: str, drop: Sequence[int]) -> str:
     removed = set(drop)
     kept = [l for i, l in enumerate(source.splitlines(), start=1) if i not in removed]
@@ -414,6 +467,7 @@ class SubmissionAgent:
     def __init__(self, config: Config | None = None):
         self._deadline: float | None = None
         self._retries_left = MAX_RETRIES_PER_PROBLEM
+        self._searches_left = MAX_SEARCHES_PER_PROBLEM
         self.config = config or Config.from_env()
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
@@ -422,6 +476,7 @@ class SubmissionAgent:
         deadline = started + cfg.last_turn_start_s
         self._deadline = deadline
         self._retries_left = MAX_RETRIES_PER_PROBLEM
+        self._searches_left = MAX_SEARCHES_PER_PROBLEM
         ledger = Ledger()
         names = answer_names(problem.challenge)
         decls = declared_names(problem.challenge)
@@ -556,7 +611,8 @@ class SubmissionAgent:
         line.errors = len(error_messages(check.messages)) + len(faults)
         line.stalls = line.stalls + 1 if signature == line.signature else 0
         line.signature = signature
-        line.feedback = "\n".join(faults + [format_messages(check.messages)]).strip() or (
+        hint = await self._lemma_hint(line.candidate, check, ledger, line.index, services)
+        line.feedback = "\n".join(faults + [format_messages(check.messages)] + hint).strip() or (
             "Lean timed out. Use cheaper tactics and avoid decide or norm_num on large numbers."
             if check.timed_out else ""
         )
@@ -568,6 +624,38 @@ class SubmissionAgent:
             "timed_out": check.timed_out, "scoring_faults": faults,
         })
         return accepted
+
+    async def _lemma_hint(
+        self, source: str, check: Any, ledger: Ledger, index: int, services: Services,
+    ) -> list[str]:
+        """Ask Lean for a real lemma when the model invented one.
+
+        Inventing a name is the largest addressable error class, and the model
+        states them confidently, so the name has to be pushed rather than
+        offered for lookup."""
+
+        if self._searches_left <= 0 or check.accepted:
+            return []
+        if not any(MISSING_NAME.search(m) for m in error_messages(check.messages)):
+            return []
+        lines = source_lines(check.messages, source)
+        candidate = search_file(source, lines[0]) if lines else None
+        if candidate is None or self._time_left() <= LEMMA_SEARCH_TIMEOUT_S:
+            return []
+        self._searches_left -= 1
+        try:
+            found = await services.lean.check_file(
+                normalise_imports(candidate, source), timeout_s=LEMMA_SEARCH_TIMEOUT_S
+            )
+        except LeanRuntimeError:
+            return []
+        hits = suggestions(found.messages)
+        ledger.events.append({"line": index, "stage": "lemma_search",
+                              "at": lines[0], "found": len(hits)})
+        if not hits:
+            return []
+        return ["Lean's own search found these real lemmas for the goal you got wrong. "
+                "The names you used may not exist; these do.", *hits[:3]]
 
     def _time_left(self) -> float:
         return float("inf") if self._deadline is None else self._deadline - time.monotonic()

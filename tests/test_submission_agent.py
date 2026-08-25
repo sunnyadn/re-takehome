@@ -1,6 +1,7 @@
 """Tests for the submission agent's search control, not for the harness."""
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 
@@ -189,3 +190,110 @@ def test_extract_lean_keeps_inline_backticks_in_docstrings():
     text = "```lean\n/-- Helper: `2 ^ 3` is small. -/\ntheorem t : True := by trivial\n```"
     out = agent_mod.extract_lean(text, fallback="import Mathlib\n")
     assert "`2 ^ 3`" in out
+
+
+class _StuckLLM:
+    """Answers with a fresh file each turn, so the loop reaches the Lean check."""
+
+    def __init__(self):
+        self.n = 0
+
+    async def complete(self, **kwargs):
+        self.n += 1
+        response = _Response()
+        response.content = (
+            "```lean\nimport Mathlib\n\nlemma helper : True := by\n"
+            f"  exact Nat.made_up_{self.n}\n\ntheorem required : True := by\n  trivial\n```"
+        )
+        return response
+
+
+_TWO_DECLS = (
+    "import Mathlib\n"          # 1
+    "\n"                        # 2
+    "lemma helper : True := by\n"  # 3
+    "  exact Nat.made_up\n"     # 4
+    "\n"                        # 5
+    "theorem required : True := by\n"  # 6
+    "  trivial\n"               # 7
+)
+
+
+def test_search_file_keeps_the_declarations_below_the_failure():
+    out = agent_mod.search_file(_TWO_DECLS, 4)
+    assert "all_goals apply?" in out
+    assert "theorem required" in out, "the graded declaration was cut away"
+    assert "Nat.made_up" not in out
+
+
+def test_search_file_never_overwrites_the_statement():
+    # An error reported on the `:= by` header must not replace the header.
+    out = agent_mod.search_file(_TWO_DECLS, 3)
+    assert "lemma helper : True := by" in out
+    assert "all_goals apply?" in out
+
+
+def test_suggestions_picks_only_try_this_info():
+    messages = [
+        {"severity": "info", "data": "Try this:\n  exact Nat.sqrt_le k"},
+        {"severity": "info", "data": "some other note"},
+        {"severity": "error", "data": "Try this: not an info"},
+    ]
+    assert agent_mod.suggestions(messages) == ["Try this:\n  exact Nat.sqrt_le k"]
+
+
+class _SearchLean:
+    """Fails the candidate with a missing name, answers the search with a hit."""
+
+    def __init__(self):
+        self.sources = []
+
+    async def check_file(self, source, **kwargs):
+        self.sources.append(source)
+        if "apply?" in source:
+            return SimpleNamespace(
+                accepted=False, has_sorry=False, timed_out=False, container_restarted=False,
+                messages=[{"severity": "info", "data": "Try this:\n  exact Nat.sqrt_le k"}],
+            )
+        return SimpleNamespace(
+            accepted=False, has_sorry=False, timed_out=False, container_restarted=False,
+            messages=[{"severity": "error", "pos": {"line": 3},
+                       "data": "Unknown constant `Nat.made_up`"}],
+        )
+
+
+def _advance_once(lean, challenge=_TWO_DECLS):
+    agent = SubmissionAgent()
+    agent._deadline = None
+    line = Line(index=0, owner="qwen/qwen3.5-flash-02-23")
+    line.candidate = challenge
+    services = _Services(_StuckLLM())
+    services.lean = lean
+    services.checkpoint = lambda *a, **k: None
+    problem = SimpleNamespace(challenge=challenge, description="s", id="t")
+    ledger = Ledger()
+    asyncio.run(agent._advance(problem, line, services, ledger, (), ()))
+    return line, ledger
+
+
+def test_a_missing_name_pulls_a_real_lemma_into_the_feedback():
+    lean = _SearchLean()
+    line, ledger = _advance_once(lean)
+    assert any("apply?" in s for s in lean.sources), "no lemma search was run"
+    assert "Nat.sqrt_le" in line.feedback, "the real lemma never reached the model"
+    assert [e for e in ledger.events if e.get("stage") == "lemma_search"]
+
+
+class _PlainFailLean(_SearchLean):
+    async def check_file(self, source, **kwargs):
+        self.sources.append(source)
+        return SimpleNamespace(
+            accepted=False, has_sorry=False, timed_out=False, container_restarted=False,
+            messages=[{"severity": "error", "pos": {"line": 3}, "data": "unsolved goals"}],
+        )
+
+
+def test_no_search_when_no_name_is_missing():
+    lean = _PlainFailLean()
+    _advance_once(lean)
+    assert not any("apply?" in s for s in lean.sources), "searched without a missing name"
