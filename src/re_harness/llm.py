@@ -18,7 +18,6 @@ from .models import ALLOWED_MODELS, PRICE_CEILINGS
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MAX_REQUEST_BYTES = 2_000_000
 MAX_OUTPUT_TOKENS = 32_000
-# Statuses OpenRouter returns before a provider generates anything.
 REFUSED_BEFORE_GENERATION = frozenset({429})
 
 
@@ -27,9 +26,7 @@ class LLMPolicyError(ValueError):
 
 
 class LLMCallError(RuntimeError):
-    def __init__(self, message: str, status_code: int | None = None):
-        super().__init__(message)
-        self.status_code = status_code
+    pass
 
 
 @dataclass(frozen=True)
@@ -104,8 +101,8 @@ class LLMClient:
             "messages": [dict(message) for message in messages],
             "max_tokens": max_tokens,
             "stream": False,
-            # Applicants cannot opt into alternate endpoints, model
-            # fallbacks, or providers that silently ignore requested fields.
+            # Applicants cannot opt into alternate endpoints, fallback models,
+            # or providers that silently ignore requested fields.
             "provider": {
                 "allow_fallbacks": True,
                 "require_parameters": True,
@@ -174,22 +171,21 @@ class LLMClient:
         latency_ms = round((time.monotonic() - started) * 1000)
         if response.status_code >= 400:
             error_body = response.text[:4000]
-            if response.status_code not in REFUSED_BEFORE_GENERATION:
-                cost_status = "unknown"
-                snapshot = self._budget.mark_unknown(reservation)
-                detail = "spend is uncertain"
-            else:
-                # A refusal should carry no usage, so the ledger stays open for
-                # a retry. Settle instead if one ever does report a cost.
-                reported = self._reported_cost(response)
-                if reported is None:
+            if response.status_code in REFUSED_BEFORE_GENERATION:
+                reported_cost = self._reported_cost(response)
+                if reported_cost is None:
+                    self._budget.release(reservation)
+                    snapshot = self._budget.snapshot()
                     cost_status = "none"
-                    snapshot = self._budget.release_unbilled(reservation)
                     detail = "the request was refused and reported no cost"
                 else:
+                    snapshot = self._budget.settle(reservation, reported_cost)
                     cost_status = "billed"
-                    snapshot = self._budget.settle(reservation, reported)
-                    detail = f"the request was refused after reporting ${reported:.6f}"
+                    detail = f"the request was refused after reporting ${reported_cost:.6f}"
+            else:
+                snapshot = self._budget.mark_unknown(reservation)
+                cost_status = "unknown"
+                detail = "spend is uncertain"
             self._events.emit(
                 "llm_error",
                 call_id=call_id,
@@ -201,8 +197,7 @@ class LLMClient:
             )
             raise LLMCallError(
                 f"OpenRouter returned HTTP {response.status_code}; {detail}: "
-                f"{error_body[:500]}",
-                status_code=response.status_code,
+                f"{error_body[:500]}"
             )
 
         try:
@@ -231,7 +226,7 @@ class LLMClient:
             "llm_response",
             call_id=call_id,
             response=data,
-            actual_cost_usd=float(cost),
+            actual_cost_usd=cost,
             budget=snapshot.__dict__,
             latency_ms=latency_ms,
         )
@@ -248,7 +243,6 @@ class LLMClient:
 
     @staticmethod
     def _coerce_cost(value: Any) -> float | None:
-        """Return usage.cost as a float, or None if it is not a usable number."""
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             return None
         value = float(value)
@@ -256,7 +250,6 @@ class LLMClient:
 
     @classmethod
     def _reported_cost(cls, response: httpx.Response) -> float | None:
-        """Read usage.cost out of an error body, if the provider sent one."""
         try:
             return cls._coerce_cost(response.json()["usage"]["cost"])
         except (ValueError, KeyError, TypeError):

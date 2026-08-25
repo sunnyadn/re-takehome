@@ -129,13 +129,16 @@ async def test_http_error_fails_budget_closed(tmp_path, status):
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_leaves_budget_open_for_retry(tmp_path):
+async def test_rate_limit_without_reported_cost_leaves_budget_open_for_retry(tmp_path):
     attempts = []
 
     def handler(_request):
         attempts.append(1)
         if len(attempts) == 1:
-            return httpx.Response(429, text='{"error":{"code":429,"message":"rate-limited upstream"}}')
+            return httpx.Response(
+                429,
+                json={"error": {"code": 429, "message": "rate-limited upstream"}},
+            )
         return httpx.Response(200, json={
             "id": "gen-2",
             "model": MODEL_A,
@@ -156,12 +159,34 @@ async def test_rate_limit_leaves_budget_open_for_retry(tmp_path):
     assert snapshot.accounting_complete
     assert snapshot.reserved_usd == 0
     assert snapshot.spent_usd == 0
-    assert snapshot.unbilled_usd > 0
 
     response = await client.complete(model=MODEL_A, messages=[{"role": "user", "content": "x"}])
     assert response.content == "recovered"
     assert ledger.snapshot().spent_usd == pytest.approx(0.02)
     assert ledger.snapshot().within_limit
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_with_reported_cost_is_charged(tmp_path):
+    def handler(_request):
+        return httpx.Response(429, json={
+            "error": {"code": 429, "message": "rate-limited after billing"},
+            "usage": {"prompt_tokens": 3, "completion_tokens": 0, "cost": 0.004},
+        })
+
+    ledger = BudgetLedger(1)
+    client = LLMClient(
+        api_key="key",
+        budget=ledger,
+        events=EventLogger(tmp_path / "events", problem_id="p"),
+        transport=httpx.MockTransport(handler),
+    )
+    with pytest.raises(LLMCallError, match="after reporting"):
+        await client.complete(model=MODEL_A, messages=[{"role": "user", "content": "x"}])
+    snapshot = ledger.snapshot()
+    assert snapshot.spent_usd == pytest.approx(0.004)
+    assert snapshot.accounting_complete
     await client.aclose()
 
 
@@ -188,28 +213,4 @@ async def test_cancelled_inflight_call_fails_budget_closed(tmp_path):
     with pytest.raises(asyncio.CancelledError):
         await task
     assert not ledger.snapshot().accounting_complete
-    await client.aclose()
-
-
-@pytest.mark.asyncio
-async def test_rate_limit_that_reports_a_cost_is_charged_not_released(tmp_path):
-    def handler(_request):
-        return httpx.Response(429, json={
-            "error": {"code": 429, "message": "rate-limited after billing"},
-            "usage": {"prompt_tokens": 3, "completion_tokens": 0, "cost": 0.004},
-        })
-
-    ledger = BudgetLedger(1)
-    client = LLMClient(
-        api_key="key",
-        budget=ledger,
-        events=EventLogger(tmp_path / "events", problem_id="p"),
-        transport=httpx.MockTransport(handler),
-    )
-    with pytest.raises(LLMCallError, match="after reporting"):
-        await client.complete(model=MODEL_A, messages=[{"role": "user", "content": "x"}])
-    snapshot = ledger.snapshot()
-    assert snapshot.spent_usd == pytest.approx(0.004)
-    assert snapshot.unbilled_usd == 0
-    assert snapshot.accounting_complete
     await client.aclose()

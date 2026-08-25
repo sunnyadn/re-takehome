@@ -21,7 +21,6 @@ class BudgetSnapshot:
     limit_usd: float
     spent_usd: float
     reserved_usd: float
-    unbilled_usd: float
     accounting_complete: bool
 
     @property
@@ -39,7 +38,6 @@ class BudgetLedger:
             raise ValueError("budget limit must be positive")
         self.limit_usd = float(limit_usd)
         self._spent = 0.0
-        self._unbilled = 0.0
         self._reservations: dict[str, float] = {}
         self._complete = True
         self._lock = threading.Lock()
@@ -68,22 +66,11 @@ class BudgetLedger:
                 raise BudgetAccountingError("unknown budget reservation")
             self._reservations.pop(reservation_id)
             self._spent += float(actual_usd)
-            self._reconcile_unlocked()
             return self._snapshot_unlocked()
 
     def release(self, reservation_id: str) -> None:
         with self._lock:
             self._reservations.pop(reservation_id, None)
-
-    def release_unbilled(self, reservation_id: str) -> BudgetSnapshot:
-        """Drop a reservation for a call the provider reported no cost for,
-        keeping its reserved amount as worst-case exposure."""
-        with self._lock:
-            if reservation_id not in self._reservations:
-                raise BudgetAccountingError("unknown budget reservation")
-            self._unbilled += self._reservations.pop(reservation_id)
-            self._reconcile_unlocked()
-            return self._snapshot_unlocked()
 
     def mark_unknown(self, reservation_id: str) -> BudgetSnapshot:
         with self._lock:
@@ -95,17 +82,10 @@ class BudgetLedger:
         with self._lock:
             return self._snapshot_unlocked()
 
-    def _reconcile_unlocked(self) -> None:
-        """Each unbilled call could have cost its reservation, so close the
-        ledger once that worst case would take the problem over the limit."""
-        if self._spent + self._unbilled > self.limit_usd:
-            self._complete = False
-
     def _snapshot_unlocked(self) -> BudgetSnapshot:
         return BudgetSnapshot(
             limit_usd=self.limit_usd,
             spent_usd=self._spent,
             reserved_usd=sum(self._reservations.values()),
-            unbilled_usd=self._unbilled,
             accounting_complete=self._complete,
         )

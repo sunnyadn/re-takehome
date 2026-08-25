@@ -178,23 +178,25 @@ bash scripts/rescore.sh outputs/submission/20260819T120000Z
 
 ## Changes to the provided harness
 
-Behavioural changes under `src/re_harness/`. The first two were opened as pull
-requests against the kit; the third is local to this repository.
+None. `src/re_harness/`, `docs/`, and the harness tests are byte-identical to
+upstream `main`.
 
-- **`provider.allow_fallbacks` is on** ([#3]). A sick provider otherwise takes
-  the problem down with it. Through the harness client, 20 identical calls to
-  `gpt-oss-120b`: 3/20 succeeded as shipped, 20/20 patched.
-- **A 429 no longer closes the problem's ledger** ([#5]). It used to force a
-  zero however good the proof was.
-- **`LLMCallError` carries the HTTP status.** A refusal leaves the ledger
-  intact and the problem winnable, and every other failure marks spend
-  unknown, which forces a zero. The agent has to tell those apart to know
-  whether repeating the call is worth anything, and the message text is the
-  only other place that distinction appears.
+Two defects found while building this agent were reported and are now fixed
+upstream, so the local patches they justified have been dropped:
 
-Reported spend is still the sum of OpenRouter's returned `usage.cost`.
-`docs/AGENT_API.md` is updated to match.
+- A provider refusal closed the problem's budget ledger permanently, forcing a
+  zero however good the proof was ([#1], [#5]).
+- `provider.allow_fallbacks` was off, so one sick provider took the problem
+  down with it ([#3]). Through the harness client, 20 identical calls to
+  `gpt-oss-120b`: 3/20 succeeded as shipped, 20/20 with fallbacks on.
 
+The agent reads the HTTP status out of `LLMCallError`'s message text, because a
+refusal now leaves the ledger intact and the problem winnable while every other
+failure marks spend unknown and forces a zero. Telling those apart decides
+whether repeating a call is worth anything, and after taking upstream's client
+unchanged the message is the only place that distinction appears.
+
+[#1]: https://github.com/VerifiedMechanisms/re-takehome/issues/1
 [#3]: https://github.com/VerifiedMechanisms/re-takehome/pull/3
 [#5]: https://github.com/VerifiedMechanisms/re-takehome/pull/5
 

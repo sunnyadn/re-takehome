@@ -66,7 +66,11 @@ class _FlakyLLM:
     async def complete(self, **kwargs):
         self.calls += 1
         if self.calls <= self.refusals:
-            raise LLMCallError(f"HTTP {self.status}", status_code=self.status)
+            # The harness reports the status only inside the message.
+            raise LLMCallError(
+                f"OpenRouter returned HTTP {self.status}; the request was refused "
+                f"and reported no cost: body"
+            )
         return _Response()
 
 
@@ -445,3 +449,15 @@ def test_the_retry_pool_scales_with_the_clock():
 def test_the_agent_takes_its_retry_pool_from_its_config():
     agent = SubmissionAgent(agent_mod.Config(time_limit_s=28800.0))
     assert agent._retries_left == 128
+
+
+def test_refused_before_generation_reads_the_harness_message():
+    # The harness raises LLMCallError with the status only in the text, so the
+    # agent must parse it rather than reach for an attribute that is not there.
+    refused = LLMCallError("OpenRouter returned HTTP 429; the request was refused "
+                           "and reported no cost: body")
+    other = LLMCallError("OpenRouter returned HTTP 502; spend is uncertain: body")
+    plain = LLMCallError("connection reset")
+    assert agent_mod.refused_before_generation(refused)
+    assert not agent_mod.refused_before_generation(other)
+    assert not agent_mod.refused_before_generation(plain)

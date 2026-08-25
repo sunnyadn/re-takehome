@@ -458,6 +458,19 @@ def drop_lines(source: str, drop: Sequence[int]) -> str:
     return "\n".join(kept) + "\n"
 
 
+HTTP_STATUS = re.compile(r"OpenRouter returned HTTP (\d{3})")
+
+
+def refused_before_generation(exc: LLMCallError) -> bool:
+    """Whether the provider refused this call before generating anything.
+
+    The harness reports the status only in the message, and it releases the
+    reservation for these, so the ledger survives and a retry is safe."""
+
+    found = HTTP_STATUS.search(str(exc))
+    return bool(found) and int(found.group(1)) in REFUSED_BEFORE_GENERATION
+
+
 def error_messages(messages: Sequence[dict[str, Any]]) -> list[str]:
     return [
         str(m.get("data", "")).strip()
@@ -719,14 +732,14 @@ class SubmissionAgent:
                 # Only a refusal releases its reservation. Every other failure
                 # has already marked spend unknown, which zeroes the problem
                 # however good the proof is, so a retry would buy nothing.
-                if exc.status_code not in REFUSED_BEFORE_GENERATION:
+                if not refused_before_generation(exc):
                     raise
                 if delay is None or self._time_left() <= delay or self._retries_left <= 0:
                     raise
                 self._retries_left -= 1
                 ledger.events.append({
                     "line": line, "stage": stage, "model": model,
-                    "note": f"refused HTTP {exc.status_code}, retry in {delay:.0f}s,"
+                    "note": f"refused before generation, retry in {delay:.0f}s,"
                             f" {self._retries_left} left",
                 })
                 await asyncio.sleep(delay)

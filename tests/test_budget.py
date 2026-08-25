@@ -42,39 +42,3 @@ def test_settle_can_record_provider_overshoot():
     assert snapshot.spent_usd == pytest.approx(1.1)
     assert not snapshot.within_limit
 
-
-def test_unbilled_release_keeps_the_ledger_open():
-    ledger = BudgetLedger(1.0)
-    snapshot = ledger.release_unbilled(ledger.reserve(0.4))
-    assert snapshot.reserved_usd == 0
-    assert snapshot.spent_usd == 0
-    assert snapshot.unbilled_usd == pytest.approx(0.4)
-    assert snapshot.accounting_complete
-    ledger.reserve(0.9)
-
-
-def test_unbilled_releases_alone_can_exhaust_the_budget():
-    ledger = BudgetLedger(1.0)
-    assert ledger.release_unbilled(ledger.reserve(0.6)).accounting_complete
-    snapshot = ledger.release_unbilled(ledger.reserve(0.5))
-    assert snapshot.spent_usd == 0
-    assert snapshot.unbilled_usd == pytest.approx(1.1)
-    assert not snapshot.accounting_complete
-    with pytest.raises(BudgetAccountingError):
-        ledger.reserve(0.01)
-
-
-def test_spend_after_an_unbilled_release_still_trips_the_limit():
-    ledger = BudgetLedger(1.0)
-    assert ledger.release_unbilled(ledger.reserve(0.9)).accounting_complete
-    snapshot = ledger.settle(ledger.reserve(0.2), 0.2)
-    assert snapshot.spent_usd == pytest.approx(0.2)
-    assert not snapshot.accounting_complete
-    assert not snapshot.within_limit
-
-
-def test_unbilled_release_rejects_an_unknown_reservation():
-    ledger = BudgetLedger(1.0)
-    with pytest.raises(BudgetAccountingError):
-        ledger.release_unbilled("not-a-reservation")
-    assert ledger.snapshot().unbilled_usd == 0
