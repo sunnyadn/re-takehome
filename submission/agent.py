@@ -383,6 +383,7 @@ DECL_HEAD = re.compile(r"^(theorem|lemma|abbrev|def|example|noncomputable|privat
 MISSING_NAME = re.compile(r"unknown (constant|identifier)|environment does not contain", re.I)
 TRY_THIS = "Try this"
 LEMMA_SEARCH_TIMEOUT_S = 60
+HINT_CHARS = 1500
 MAX_SEARCHES_PER_PROBLEM = 30
 
 
@@ -654,8 +655,11 @@ class SubmissionAgent:
                               "at": lines[0], "found": len(hits)})
         if not hits:
             return []
+        # A suggestion carries its remaining subgoals, so three of them can be
+        # long. The message cap does not cover this block, so cap it here.
+        block = "\n".join(hits[:3])[:HINT_CHARS]
         return ["Lean's own search found these real lemmas for the goal you got wrong. "
-                "The names you used may not exist; these do.", *hits[:3]]
+                "The names you used may not exist; these do.", block]
 
     def _time_left(self) -> float:
         return float("inf") if self._deadline is None else self._deadline - time.monotonic()

@@ -297,3 +297,25 @@ def test_no_search_when_no_name_is_missing():
     lean = _PlainFailLean()
     _advance_once(lean)
     assert not any("apply?" in s for s in lean.sources), "searched without a missing name"
+
+
+class _HugeHintLean(_SearchLean):
+    async def check_file(self, source, **kwargs):
+        self.sources.append(source)
+        if "apply?" in source:
+            return SimpleNamespace(
+                accepted=False, has_sorry=False, timed_out=False, container_restarted=False,
+                messages=[{"severity": "info", "data": "Try this:\n  exact Nat.sqrt_le k\n"
+                                                       + "  -- goal\n" * 4000}] * 3,
+            )
+        return SimpleNamespace(
+            accepted=False, has_sorry=False, timed_out=False, container_restarted=False,
+            messages=[{"severity": "error", "pos": {"line": 3},
+                       "data": "Unknown constant `Nat.made_up`"}],
+        )
+
+
+def test_the_hint_block_is_capped():
+    line, _ = _advance_once(_HugeHintLean())
+    assert "Nat.sqrt_le" in line.feedback
+    assert len(line.feedback) < agent_mod.FEEDBACK_CHARS + agent_mod.HINT_CHARS + 500
