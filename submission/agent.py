@@ -382,7 +382,9 @@ def surplus_lines(messages: Sequence[dict[str, Any]], source: str) -> list[int]:
 DECL_HEAD = re.compile(r"^(theorem|lemma|abbrev|def|example|noncomputable|private|@\[)")
 MISSING_NAME = re.compile(r"unknown (constant|identifier)|environment does not contain", re.I)
 TRY_THIS = "Try this"
-LEMMA_SEARCH_TIMEOUT_S = 60
+# Every search that ever returned a hit finished within 18s; one that
+# returned nothing ran 131s. Bounds the wasted wait, not the useful one.
+LEMMA_SEARCH_TIMEOUT_S = 30
 HINT_CHARS = 1500
 MAX_SEARCHES_PER_PROBLEM = 30
 
