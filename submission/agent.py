@@ -61,6 +61,10 @@ class Config:
     # is set past anything the deadline and budget can actually allow.
     max_turns_per_line: int = 500
     stall_before_handoff: int = 1
+    # A line repeating one error signature has stopped learning from the
+    # compiler. Past that count it drops the file and replans, which converts
+    # dead turns into fresh samples. 0 disables it.
+    restart_after_stalls: int = 6
     budget_usd: float = 1.00
     time_limit_s: float = 28800.0
     # The worker hands the agent time_limit minus this, then hard-cancels.
@@ -77,6 +81,7 @@ class Config:
         settings = HarnessSettings.from_env(n_workers=1)
         return cls(
             lines=_env_models("VM_LINES", (MODEL_A, MODEL_B)),
+            restart_after_stalls=int(os.environ.get("VM_RESTART_AFTER", cls.restart_after_stalls)),
             budget_usd=settings.budget_usd,
             time_limit_s=settings.time_limit_s,
             verify_reserve_s=float(settings.verify_reserve_s),
@@ -117,8 +122,17 @@ class Line:
     errors: int | None = None
     signature: str | None = None
     stalls: int = 0
+    restarts: int = 0
     feedback: str = ""
     done: bool = False
+
+    def restart(self) -> None:
+        """Drop this attempt and replan. The global checkpoint is unaffected."""
+
+        self.plan = self.candidate = self.feedback = ""
+        self.errors = self.signature = None
+        self.stalls = 0
+        self.restarts += 1
 
 @dataclass
 class Ledger:
@@ -486,6 +500,7 @@ class SubmissionAgent:
             best,
             {
                 "lines": list(cfg.lines),
+                "restarts": [l.restarts for l in lines],
                 "winner_line": winner,
                 "accepted_by_repl": winner is not None,
                 "spend_usd": round(ledger.spent_usd, 6),
@@ -501,6 +516,10 @@ class SubmissionAgent:
         """Take one turn on this line. Returns True if Lean accepted it."""
 
         cfg = self.config
+        if cfg.restart_after_stalls and line.stalls >= cfg.restart_after_stalls:
+            ledger.events.append({"line": line.index, "stage": "restart",
+                                  "after_stalls": line.stalls, "n": line.restarts + 1})
+            line.restart()
         # A stalled line is handed to the other model, carrying its own context.
         other = next((m for m in cfg.lines if m != line.owner), None)
         handoff = line.stalls > cfg.stall_before_handoff and other is not None

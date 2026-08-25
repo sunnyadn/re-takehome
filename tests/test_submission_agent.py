@@ -1,6 +1,7 @@
 """Tests for the submission agent's search control, not for the harness."""
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 
@@ -189,3 +190,76 @@ def test_extract_lean_keeps_inline_backticks_in_docstrings():
     text = "```lean\n/-- Helper: `2 ^ 3` is small. -/\ntheorem t : True := by trivial\n```"
     out = agent_mod.extract_lean(text, fallback="import Mathlib\n")
     assert "`2 ^ 3`" in out
+
+
+def test_restart_clears_the_attempt_but_counts_itself():
+    line = Line(index=0, owner="m")
+    line.plan, line.candidate, line.feedback = "p", "c", "f"
+    line.errors, line.signature, line.stalls = 3, "sig", 6
+    line.restart()
+    assert (line.plan, line.candidate, line.feedback) == ("", "", "")
+    assert line.errors is None and line.signature is None
+    assert line.stalls == 0 and line.restarts == 1
+
+
+def test_restart_after_stalls_reads_the_environment(monkeypatch):
+    monkeypatch.setenv("VM_RESTART_AFTER", "9")
+    assert agent_mod.Config.from_env().restart_after_stalls == 9
+
+
+def test_restart_disabled_by_zero(monkeypatch):
+    monkeypatch.setenv("VM_RESTART_AFTER", "0")
+    assert agent_mod.Config.from_env().restart_after_stalls == 0
+
+
+class _StuckLLM:
+    """Always returns the same file, so the error signature never changes."""
+
+    async def complete(self, **kwargs):
+        return _Response()
+
+
+class _StuckLean:
+    def __init__(self):
+        self.checks = 0
+
+    async def check_file(self, source, **kwargs):
+        self.checks += 1
+        return SimpleNamespace(
+            accepted=False, has_sorry=False, timed_out=False, container_restarted=False,
+            messages=[{"severity": "error", "pos": {"line": 1}, "data": "same failure"}],
+        )
+
+
+def _stuck_services():
+    services = _Services(_StuckLLM())
+    services.lean = _StuckLean()
+    services.checkpoint = lambda *a, **k: None
+    return services
+
+
+def _drive(restart_after, turns=20):
+    """Run one line against a model and a compiler that never change."""
+
+    agent = SubmissionAgent(agent_mod.Config(restart_after_stalls=restart_after))
+    line = Line(index=0, owner="qwen/qwen3.5-flash-02-23")
+    problem = SimpleNamespace(challenge="import Mathlib\n\ntheorem t : True := by\n  sorry\n",
+                              description="s", id="t")
+    services, ledger = _stuck_services(), Ledger()
+    for _ in range(turns):
+        asyncio.run(agent._advance(problem, line, services, ledger, (), ()))
+    return line, ledger
+
+
+def test_a_flatlined_line_restarts_and_keeps_restarting():
+    line, ledger = _drive(restart_after=6, turns=20)
+    fired = [e for e in ledger.events if e.get("stage") == "restart"]
+    assert fired, "a line repeating one signature for 20 turns never restarted"
+    assert line.restarts == len(fired)
+    assert all(e["after_stalls"] >= 6 for e in fired)
+
+
+def test_no_restart_when_disabled():
+    line, ledger = _drive(restart_after=0, turns=20)
+    assert [e for e in ledger.events if e.get("stage") == "restart"] == []
+    assert line.restarts == 0
