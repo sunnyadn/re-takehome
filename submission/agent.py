@@ -386,7 +386,9 @@ TRY_THIS = "Try this"
 # returned nothing ran 131s. Bounds the wasted wait, not the useful one.
 LEMMA_SEARCH_TIMEOUT_S = 30
 HINT_CHARS = 1500
-MAX_SEARCHES_PER_PROBLEM = 30
+# Counting searches measures the wrong thing: 30 of them is about 1% of the
+# graded clock, yet 27 of 33 recorded runs would have wanted more than 30.
+SEARCH_BUDGET_FRACTION = 0.05
 
 
 def source_lines(messages: Sequence[dict[str, Any]], source: str) -> list[int]:
@@ -470,7 +472,7 @@ class SubmissionAgent:
     def __init__(self, config: Config | None = None):
         self._deadline: float | None = None
         self._retries_left = MAX_RETRIES_PER_PROBLEM
-        self._searches_left = MAX_SEARCHES_PER_PROBLEM
+        self._search_spent_s = 0.0
         self.config = config or Config.from_env()
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
@@ -479,7 +481,7 @@ class SubmissionAgent:
         deadline = started + cfg.last_turn_start_s
         self._deadline = deadline
         self._retries_left = MAX_RETRIES_PER_PROBLEM
-        self._searches_left = MAX_SEARCHES_PER_PROBLEM
+        self._search_spent_s = 0.0
         ledger = Ledger()
         names = answer_names(problem.challenge)
         decls = declared_names(problem.challenge)
@@ -637,7 +639,8 @@ class SubmissionAgent:
         states them confidently, so the name has to be pushed rather than
         offered for lookup."""
 
-        if self._searches_left <= 0 or check.accepted:
+        budget = SEARCH_BUDGET_FRACTION * self.config.time_limit_s
+        if self._search_spent_s >= budget or check.accepted:
             return []
         if not any(MISSING_NAME.search(m) for m in error_messages(check.messages)):
             return []
@@ -645,13 +648,15 @@ class SubmissionAgent:
         candidate = search_file(source, lines[0]) if lines else None
         if candidate is None or self._time_left() <= LEMMA_SEARCH_TIMEOUT_S:
             return []
-        self._searches_left -= 1
+        started = time.monotonic()
         try:
             found = await services.lean.check_file(
                 normalise_imports(candidate, source), timeout_s=LEMMA_SEARCH_TIMEOUT_S
             )
         except LeanRuntimeError:
+            self._search_spent_s += time.monotonic() - started
             return []
+        self._search_spent_s += time.monotonic() - started
         hits = suggestions(found.messages)
         ledger.events.append({"line": index, "stage": "lemma_search",
                               "at": lines[0], "found": len(hits)})

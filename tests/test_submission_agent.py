@@ -315,6 +315,50 @@ class _HugeHintLean(_SearchLean):
         )
 
 
+class _SlowSearchLean(_SearchLean):
+    """Each search burns wall-clock, so the time budget is what stops it."""
+
+    async def check_file(self, source, **kwargs):
+        self.sources.append(source)
+        if "apply?" in source:
+            agent_mod.time.sleep(0.02)
+            return SimpleNamespace(
+                accepted=False, has_sorry=False, timed_out=False, container_restarted=False,
+                messages=[{"severity": "info", "data": "Try this:\n  exact Nat.sqrt_le k"}],
+            )
+        return SimpleNamespace(
+            accepted=False, has_sorry=False, timed_out=False, container_restarted=False,
+            messages=[{"severity": "error", "pos": {"line": 3},
+                       "data": "Unknown constant `Nat.made_up`"}],
+        )
+
+
+def test_the_search_budget_scales_with_the_time_limit():
+    # A count cap measures the wrong thing, so the guard is cumulative seconds.
+    small = agent_mod.Config(time_limit_s=1.0)
+    big = agent_mod.Config(time_limit_s=100.0)
+    assert (agent_mod.SEARCH_BUDGET_FRACTION * big.time_limit_s
+            > agent_mod.SEARCH_BUDGET_FRACTION * small.time_limit_s)
+
+
+def test_searching_stops_once_the_time_budget_is_gone():
+    agent = SubmissionAgent(agent_mod.Config(time_limit_s=0.4))
+    agent._deadline = None
+    lean = _SlowSearchLean()
+    services = _Services(_StuckLLM())
+    services.lean = lean
+    services.checkpoint = lambda *a, **k: None
+    problem = SimpleNamespace(challenge=_TWO_DECLS, description="s", id="t")
+    line, ledger = Line(index=0, owner="qwen/qwen3.5-flash-02-23"), Ledger()
+    line.candidate = _TWO_DECLS
+    for _ in range(12):
+        asyncio.run(agent._advance(problem, line, services, ledger, (), ()))
+    fired = [e for e in ledger.events if e.get("stage") == "lemma_search"]
+    assert fired, "no search ran at all"
+    assert len(fired) < 12, "the time budget never stopped the search"
+    assert agent._search_spent_s >= agent_mod.SEARCH_BUDGET_FRACTION * 0.4
+
+
 def test_the_hint_block_is_capped():
     line, _ = _advance_once(_HugeHintLean())
     assert "Nat.sqrt_le" in line.feedback
