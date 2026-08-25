@@ -135,7 +135,7 @@ def test_retries_are_capped_across_the_whole_problem(monkeypatch):
         except LLMCallError:
             pass
     retried = sum("retry in" in str(e.get("note", "")) for e in ledger.events)
-    assert retried == agent_mod.MAX_RETRIES_PER_PROBLEM
+    assert retried == agent.config.max_retries
 
 
 def test_surplus_lines_offsets_by_import_count():
@@ -432,3 +432,16 @@ def test_the_search_targets_the_invented_name_not_the_first_error():
     body = spliced[0].splitlines()
     at = next(i for i, l in enumerate(body, start=1) if "all_goals apply?" in l)
     assert at > 4, f"searched at line {at}, which is the unrelated first error"
+
+
+def test_the_retry_pool_scales_with_the_clock():
+    # Eight was sized for a 30-minute run of ~8 calls; a graded run makes ~35x
+    # that, and exhausting the pool ends the run hours early.
+    assert agent_mod.Config(time_limit_s=1800.0).max_retries == 8
+    assert agent_mod.Config(time_limit_s=28800.0).max_retries == 128
+    assert agent_mod.Config(time_limit_s=60.0).max_retries == 8
+
+
+def test_the_agent_takes_its_retry_pool_from_its_config():
+    agent = SubmissionAgent(agent_mod.Config(time_limit_s=28800.0))
+    assert agent._retries_left == 128

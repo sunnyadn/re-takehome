@@ -34,7 +34,10 @@ RETRY_BACKOFF_S = (5.0, 20.0, 60.0)
 # budget.release_unbilled keeps each refused call's reservation as worst-case
 # exposure for the rest of the problem, and the ledger closes when that
 # exposure crosses the limit. Measured: 48 refusals do it at 8 hours.
-MAX_RETRIES_PER_PROBLEM = 8
+# Retries are a per-problem pool shared by both lines. Eight was sized for a
+# 30-minute run of about 8 calls; a graded run makes roughly 35x that, so a
+# 429 rate invisible at 1800s would exhaust it and end the run hours early.
+RETRIES_PER_1800S = 8
 PLAN_TOKENS = 16000
 FORMALIZE_TOKENS = 16000
 REPAIR_TOKENS = 16000
@@ -81,6 +84,12 @@ class Config:
             time_limit_s=settings.time_limit_s,
             verify_reserve_s=float(settings.verify_reserve_s),
         )
+
+    @property
+    def max_retries(self) -> int:
+        """Scales with the clock, which is what bounds retrying anyway."""
+
+        return max(RETRIES_PER_1800S, round(RETRIES_PER_1800S * self.time_limit_s / 1800.0))
 
     @property
     def agent_deadline_s(self) -> float:
@@ -477,16 +486,16 @@ def format_messages(messages: Sequence[dict[str, Any]]) -> str:
 class SubmissionAgent:
     def __init__(self, config: Config | None = None):
         self._deadline: float | None = None
-        self._retries_left = MAX_RETRIES_PER_PROBLEM
         self._search_spent_s = 0.0
         self.config = config or Config.from_env()
+        self._retries_left = self.config.max_retries
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
         cfg = self.config
         started = time.monotonic()
         deadline = started + cfg.last_turn_start_s
         self._deadline = deadline
-        self._retries_left = MAX_RETRIES_PER_PROBLEM
+        self._retries_left = cfg.max_retries
         self._search_spent_s = 0.0
         ledger = Ledger()
         names = answer_names(problem.challenge)
