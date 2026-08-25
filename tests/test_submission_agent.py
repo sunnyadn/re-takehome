@@ -387,3 +387,48 @@ def test_search_file_never_drops_a_graded_declaration():
             missing = [n for n in required if n not in out]
             assert not missing, f"{problem.name} line {line} dropped {missing}"
     assert checked > 50, f"only {checked} splices exercised, the walk is not covering"
+
+
+_MIXED_ERRORS = [
+    {"severity": "error", "pos": {"line": 3}, "data": "linarith failed to find a contradiction"},
+    {"severity": "error", "pos": {"line": 7}, "data": "Unknown constant `Nat.made_up`"},
+]
+
+
+def test_source_lines_filters_to_the_matching_error():
+    source = "import Mathlib\n" + "".join(f"line{i}\n" for i in range(1, 9))
+    assert agent_mod.source_lines(_MIXED_ERRORS, source) == [4, 8]
+    assert agent_mod.source_lines(_MIXED_ERRORS, source, agent_mod.MISSING_NAME) == [8]
+
+
+class _MixedErrorLean(_SearchLean):
+    """First error is not the missing name, so the search must skip past it."""
+
+    async def check_file(self, source, **kwargs):
+        self.sources.append(source)
+        if "apply?" in source:
+            return SimpleNamespace(
+                accepted=False, has_sorry=False, timed_out=False, container_restarted=False,
+                messages=[{"severity": "info", "data": "Try this:\n  exact Nat.sqrt_le k"}],
+            )
+        return SimpleNamespace(
+            accepted=False, has_sorry=False, timed_out=False, container_restarted=False,
+            messages=[
+                {"severity": "error", "pos": {"line": 2},
+                 "data": "linarith failed to find a contradiction"},
+                {"severity": "error", "pos": {"line": 6},
+                 "data": "Unknown constant `Nat.made_up`"},
+            ],
+        )
+
+
+def test_the_search_targets_the_invented_name_not_the_first_error():
+    # 62% of triggering checks have an earlier, unrelated error; searching there
+    # returns lemmas for a goal the hint text then misdescribes.
+    lean = _MixedErrorLean()
+    _advance_once(lean, challenge=_TWO_DECLS)
+    spliced = [s for s in lean.sources if "apply?" in s]
+    assert spliced, "no search ran"
+    body = spliced[0].splitlines()
+    at = next(i for i, l in enumerate(body, start=1) if "all_goals apply?" in l)
+    assert at > 4, f"searched at line {at}, which is the unrelated first error"

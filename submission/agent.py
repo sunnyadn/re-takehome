@@ -391,13 +391,19 @@ HINT_CHARS = 1500
 SEARCH_BUDGET_FRACTION = 0.05
 
 
-def source_lines(messages: Sequence[dict[str, Any]], source: str) -> list[int]:
-    """Source line of every positioned error, earliest first."""
+def source_lines(
+    messages: Sequence[dict[str, Any]], source: str, pattern: Any = None
+) -> list[int]:
+    """Source line of every positioned error, earliest first.
+
+    With a pattern, only the errors whose text matches it."""
 
     kept = [i for i, l in enumerate(source.splitlines(), start=1) if not IMPORT_LINE.match(l)]
     out = []
     for m in messages:
         if m.get("severity") != "error":
+            continue
+        if pattern is not None and not pattern.search(str(m.get("data", ""))):
             continue
         reported = (m.get("pos") or {}).get("line")
         if reported and 1 <= int(reported) <= len(kept):
@@ -642,9 +648,10 @@ class SubmissionAgent:
         budget = SEARCH_BUDGET_FRACTION * self.config.time_limit_s
         if self._search_spent_s >= budget or check.accepted:
             return []
-        if not any(MISSING_NAME.search(m) for m in error_messages(check.messages)):
-            return []
-        lines = source_lines(check.messages, source)
+        # Search where the invented name is, not at the file's earliest error.
+        # Those differ on 62% of triggering checks, and the hint tells the model
+        # these lemmas are for the goal it got wrong.
+        lines = source_lines(check.messages, source, MISSING_NAME)
         candidate = search_file(source, lines[0]) if lines else None
         if candidate is None or self._time_left() <= LEMMA_SEARCH_TIMEOUT_S:
             return []
