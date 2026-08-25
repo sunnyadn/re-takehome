@@ -319,3 +319,27 @@ def test_the_hint_block_is_capped():
     line, _ = _advance_once(_HugeHintLean())
     assert "Nat.sqrt_le" in line.feedback
     assert len(line.feedback) < agent_mod.FEEDBACK_CHARS + agent_mod.HINT_CHARS + 500
+
+
+def test_search_file_never_drops_a_graded_declaration():
+    """Cutting a file to expose one goal twice destroyed declarations the
+    grader needs byte-identical. This walks every line of every challenge."""
+
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "sample-problems"
+    checked = 0
+    for problem in sorted(p for p in root.iterdir() if p.is_dir()):
+        challenge = problem / "challenge.lean"
+        if not challenge.exists():
+            continue
+        source = challenge.read_text()
+        required = agent_mod.declared_names(source)
+        for line in range(1, len(source.splitlines()) + 1):
+            out = agent_mod.search_file(source, line)
+            if out is None:
+                continue
+            checked += 1
+            missing = [n for n in required if n not in out]
+            assert not missing, f"{problem.name} line {line} dropped {missing}"
+    assert checked > 50, f"only {checked} splices exercised, the walk is not covering"
