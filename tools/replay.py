@@ -1,14 +1,6 @@
 """Replay a recorded run through the agent loop, with no API calls and no Lean.
 
-Every LLM request and response and every Lean check is already in
-`events.jsonl`, so a loop change that reproduces a recorded prompt gets its
-recorded answer for free. Prompts the change invents are misses: the replay
-reports them rather than inventing an answer.
-
-Sampling runs at temperature 0.4 and Lean can time out, so neither
-prompt to completion nor source to verdict is a function: of 10 prompts issued
-twice in one recorded run, 8 came back different. Each key therefore holds its
-recorded answers in order and hands them out one at a time."""
+Prompts the change invents are reported as misses, never answered."""
 from __future__ import annotations
 
 import argparse
@@ -43,10 +35,9 @@ class Cache:
 
     @staticmethod
     def take(table: dict[str, list], key: str):
-        """The next recorded answer for this key.
+        """The next recorded answer for this key, last one repeating at the end.
 
-        The last one repeats once the recording runs out, so a loop that takes
-        more turns than the recording did still gets a verdict."""
+        Sampling and Lean are both nondeterministic, so a key is not a value."""
 
         queue = table.get(key)
         if not queue:
@@ -81,8 +72,7 @@ class Cache:
 
 
 class ReplayExhausted(Exception):
-    """The recording ran out. Not an error: the replay has no real clock, so
-    it keeps taking turns after the recorded run hit its deadline."""
+    """The recording ran out, which a replay with no real clock always does."""
 
 
 class ReplayLLM:
@@ -112,8 +102,7 @@ class ReplayLean:
         found = self.cache.take(self.cache.lean, lean_key(source))
         if found is None:
             self.misses += 1
-            # An unseen file cannot be judged, so report it as a failing check
-            # rather than inventing a verdict.
+            # An unseen file cannot be judged, so it fails rather than guessing.
             return SimpleNamespace(accepted=False, messages=[], has_sorry=False,
                                    timed_out=False, duration_ms=0,
                                    container_restarted=False, replay_miss=True)

@@ -1,16 +1,6 @@
 """Two lines of attack, one per model, arbitrated by the Lean compiler.
 
-Round 1 measured the two models solving overlapping but different problems: the
-union of what either could solve was worth three more points than the better of
-the two alone, and a fixed plan/formalise/repair pipeline captured none of it.
-So this agent stops assigning roles by model and instead runs one independent
-line of attack per model, interleaved under a shared clock. Whichever line the
-compiler accepts first wins.
-
-The collaboration proper is one rule on top: when a line stops making progress,
-measured by its Lean error signature not moving, the other model takes the next
-turn on that line, inheriting its candidate and its plan.
-"""
+A stalled line is handed to the other model. Rationale is in the writeup."""
 
 from __future__ import annotations
 
@@ -31,12 +21,8 @@ from re_harness.models import ALLOWED_MODELS, MODEL_A, MODEL_B
 # A refused call releases its reservation, so repeating it is free and the
 # problem stays winnable. Without this a single 429 ends the problem.
 RETRY_BACKOFF_S = (5.0, 20.0, 60.0)
-# budget.release_unbilled keeps each refused call's reservation as worst-case
-# exposure for the rest of the problem, and the ledger closes when that
-# exposure crosses the limit. Measured: 48 refusals do it at 8 hours.
-# Retries are a per-problem pool shared by both lines. Eight was sized for a
-# 30-minute run of about 8 calls; a graded run makes roughly 35x that, so a
-# 429 rate invisible at 1800s would exhaust it and end the run hours early.
+# A per-problem pool shared by both lines. Eight suited a 30-minute run of
+# about 8 calls; a graded run makes roughly 35x that, so it scales.
 RETRIES_PER_1800S = 8
 PLAN_TOKENS = 16000
 FORMALIZE_TOKENS = 16000
@@ -68,10 +54,8 @@ class Config:
     time_limit_s: float = 28800.0
     # The worker hands the agent time_limit minus this, then hard-cancels.
     verify_reserve_s: float = 120.0
-    # A turn started inside this window can be killed mid-call, and a cancelled
-    # call closes the ledger, which scores the problem zero however good the
-    # checkpoint is. Sized as a share of the limit, because a fixed margin from
-    # the slowest call seen so far was beaten by 2.4x the first time it ran.
+    # A cancelled call closes the ledger and scores the problem zero, so no
+    # turn may start inside this window. A fixed margin was beaten by 2.4x.
     stop_margin_floor_s: float = 900.0
     stop_margin_fraction: float = 0.1
 
@@ -146,10 +130,7 @@ class Ledger:
 def normalise_imports(source: str, fallback: str) -> str:
     """Force a single `import Mathlib` header.
 
-    The REPL strips imports and checks against a full Mathlib environment, while
-    the Comparator compiles the real file. Widening the imports closes that gap,
-    and a direct Comparator run confirmed a widened solution is still accepted.
-    """
+    The REPL checks against a full Mathlib; the Comparator compiles the file."""
 
     body = "\n".join(
         line for line in source.splitlines() if not line.lstrip().startswith("import ")
@@ -165,8 +146,7 @@ FENCE_LINE = re.compile(r"^\s*```.*$", re.MULTILINE)
 def strip_fences(block: str) -> str:
     """Remove fence lines a capture swallowed.
 
-    A stray bare ``` before the real ```lean makes the capture start inside the
-    second fence, and one leftover backtick rejects the whole file."""
+    One leftover backtick rejects the whole file."""
 
     return FENCE_LINE.sub("", block)
 
@@ -205,8 +185,7 @@ def declared_names(challenge: str) -> tuple[str, ...]:
 def statement_headers(source: str) -> dict[str, str]:
     """Each declaration's text up to its `:=`, whitespace normalised.
 
-    The Comparator requires kernel-level statement equality per declared name,
-    so any edit to a header scores zero however well the proof compiles."""
+    Editing a header scores zero however well the proof compiles."""
 
     headers: dict[str, str] = {}
     name = None
@@ -301,8 +280,7 @@ DECL_START = re.compile(r"^\s*(theorem|lemma|abbrev|def|example)\s")
 def splice_tactic(source: str, tactic: str) -> tuple[str, int, int]:
     """Put one tactic block into every theorem body.
 
-    Returns the new source, how many bodies were filled, and how many `sorry`
-    placeholders survive elsewhere (an unfilled answer slot, say)."""
+    Returns the source, bodies filled, and `sorry` placeholders left elsewhere."""
 
     filled = left = 0
     out: list[str] = []
@@ -337,8 +315,7 @@ def wrap_tactic(tactic: str) -> str:
 async def usable_cocktail(services: Services) -> tuple[str, ...]:
     """Drop tactics this Mathlib does not know.
 
-    One unknown name makes the whole `first` block fail to elaborate, so a
-    cocktail that is not version-checked can silently stop working."""
+    One unknown name makes the whole `first` block fail to elaborate."""
 
     usable = []
     for tactic in COCKTAIL:
@@ -352,8 +329,7 @@ async def usable_cocktail(services: Services) -> tuple[str, ...]:
 def sweep_files(source: str, cocktail: Sequence[str] = COCKTAIL) -> list[str]:
     """Deterministic candidates to try before spending a token on the models.
 
-    Empty when a `sorry` survives outside the theorem bodies, since Lean can
-    never accept that file however good the proof is."""
+    Empty when a `sorry` survives outside the bodies: Lean can never accept it."""
 
     # A bare `;` inside an alternative truncates the whole `first` block, so
     # every multi-tactic alternative is parenthesised.
@@ -372,10 +348,9 @@ NO_GOALS = "no goals to be solved"
 
 
 def surplus_lines(messages: Sequence[dict[str, Any]], source: str) -> list[int]:
-    """Source lines holding a tactic that ran after its goal was already closed.
+    """Source lines holding a tactic that ran after its goal was closed.
 
-    Lean strips import lines before elaborating, so a reported position is
-    offset by the number of imports above it."""
+    Lean strips imports first, so a position is offset by the imports above."""
 
     kept = [i for i, l in enumerate(source.splitlines(), start=1) if not IMPORT_LINE.match(l)]
     out = set()
@@ -423,8 +398,7 @@ def source_lines(
 def search_file(source: str, errline: int) -> str | None:
     """The candidate with `apply?` where the proof first went wrong.
 
-    Everything below the failure is dropped so the search sees that goal, and
-    the cut stays inside one declaration so the others survive for the grader."""
+    The cut stays inside one declaration so the graded ones survive."""
 
     lines = source.splitlines()
     starts = [i + 1 for i, l in enumerate(lines) if DECL_HEAD.match(l)]
@@ -464,8 +438,7 @@ HTTP_STATUS = re.compile(r"OpenRouter returned HTTP (\d{3})")
 def refused_before_generation(exc: LLMCallError) -> bool:
     """Whether the provider refused this call before generating anything.
 
-    The harness reports the status only in the message, and it releases the
-    reservation for these, so the ledger survives and a retry is safe."""
+    The harness reports the status only in the message. A retry is safe."""
 
     found = HTTP_STATUS.search(str(exc))
     return bool(found) and int(found.group(1)) in REFUSED_BEFORE_GENERATION
@@ -663,9 +636,7 @@ class SubmissionAgent:
     ) -> list[str]:
         """Ask Lean for a real lemma when the model invented one.
 
-        Inventing a name is the largest addressable error class, and the model
-        states them confidently, so the name has to be pushed rather than
-        offered for lookup."""
+        Models state invented names confidently, so the real one is pushed."""
 
         budget = SEARCH_BUDGET_FRACTION * self.config.time_limit_s
         if self._search_spent_s >= budget or check.accepted:
@@ -716,10 +687,8 @@ class SubmissionAgent:
                     ],
                     max_tokens=max_tokens,
                     temperature=0.4,
-                    # Measured: gpt-oss at high effort needs ~42k reasoning
-                    # tokens on a hard problem before it emits any proof, above
-                    # the 32k the harness allows, and it rejects
-                    # reasoning.max_tokens with a 400.
+                    # Measured: at high effort gpt-oss wants ~42k reasoning
+                    # tokens before emitting a proof, over the harness's 32k.
                     reasoning={"effort": "medium"},
                 )
             except BudgetExceeded as exc:

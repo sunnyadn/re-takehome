@@ -23,10 +23,9 @@ def _walk(errors):
 
 
 def test_a_line_keeps_working_from_its_latest_file_even_when_it_got_worse():
-    """Three of 15 model-won problems in the roll-back-free arms passed through
-    an error increase on the way to a proof, including the only known wins on
-    p09_imo1964 and p10_factorial_pow. Fewer Lean errors is not nearer a proof:
-    fixing one error uncovers the ones it was masking."""
+    """Fewer Lean errors is not nearer a proof: 3 of 15 wins came through an
+    error increase, including the only ones on p09_imo1964 and
+    p10_factorial_pow."""
 
     line, seen = _walk([5, 2, 16, 17, 7, 7])
     assert [e for e, _ in seen] == [5, 2, 16, 17, 7, 7]
@@ -143,17 +142,13 @@ def test_retries_are_capped_across_the_whole_problem(monkeypatch):
 
 
 def test_surplus_lines_offsets_by_import_count():
-    source = (
-        "import Mathlib\n"      # 1
-        "import Aesop\n"        # 2
-        "\n"                    # 3
-        "theorem t : True := by\n"  # 4
-        "  trivial\n"           # 5
-        "  norm_num\n"          # 6
-    )
+    lines = ["import Mathlib", "import Aesop", "", "theorem t : True := by",
+             "  trivial", "  norm_num"]
+    source = "\n".join(lines) + "\n"
+    surplus = lines.index("  norm_num") + 1
     messages = [{"severity": "error", "pos": {"line": 4},
                  "data": "No goals to be solved"}]
-    assert agent_mod.surplus_lines(messages, source) == [6]
+    assert agent_mod.surplus_lines(messages, source) == [surplus]
 
 
 def test_surplus_lines_ignores_other_errors():
@@ -212,15 +207,10 @@ class _StuckLLM:
         return response
 
 
-_TWO_DECLS = (
-    "import Mathlib\n"          # 1
-    "\n"                        # 2
-    "lemma helper : True := by\n"  # 3
-    "  exact Nat.made_up\n"     # 4
-    "\n"                        # 5
-    "theorem required : True := by\n"  # 6
-    "  trivial\n"               # 7
-)
+_TWO_DECL_LINES = ["import Mathlib", "", "lemma helper : True := by",
+                   "  exact Nat.made_up", "", "theorem required : True := by",
+                   "  trivial"]
+_TWO_DECLS = "\n".join(_TWO_DECL_LINES) + "\n"
 
 
 def test_search_file_keeps_the_declarations_below_the_failure():
