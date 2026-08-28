@@ -451,3 +451,47 @@ def test_refused_before_generation_reads_the_harness_message():
     assert agent_mod.refused_before_generation(refused)
     assert not agent_mod.refused_before_generation(other)
     assert not agent_mod.refused_before_generation(plain)
+
+
+_SURRENDER = (
+    "import Mathlib\n\n"
+    "lemma dvd_of_mod_eq_zero {x y : ℕ} (h : y % x = 0) : x ∣ y :=\n"
+    "  Nat.dvd_of_mod_eq_zero h\n"
+)
+
+
+class _SurrenderLLM:
+    """Answers with a file that drops the graded theorem entirely."""
+
+    async def complete(self, **kwargs):
+        response = _Response()
+        response.content = "```lean\n" + _SURRENDER + "```"
+        return response
+
+
+class _NoErrorLean:
+    """Reports no errors and no acceptance, as a file with no goals does."""
+
+    def __init__(self):
+        self.sources = []
+
+    async def check_file(self, source, **kwargs):
+        self.sources.append(source)
+        return SimpleNamespace(accepted=False, has_sorry=False, timed_out=False,
+                               container_restarted=False, messages=[])
+
+
+def test_a_file_that_drops_the_graded_theorem_is_never_kept():
+    """Observed on a real graded run: 7.2h and $0.61 submitted a 141-byte file
+    with the theorem deleted, because deleting it left zero errors to count."""
+
+    challenge = "import Mathlib\n\ntheorem required : True := by\n  sorry\n"
+    agent = SubmissionAgent()
+    services = _Services(_SurrenderLLM())
+    services.lean = _NoErrorLean()
+    kept = []
+    services.checkpoint = lambda source, meta=None: kept.append(source)
+    problem = SimpleNamespace(challenge=challenge, description="s", id="t")
+    result = asyncio.run(agent.solve(problem, services))
+    assert _SURRENDER not in kept, "a file without the graded theorem was checkpointed"
+    assert "theorem required" in result.solution, "returned a file missing the theorem"

@@ -488,27 +488,25 @@ class SubmissionAgent:
         decls = declared_names(problem.challenge)
         lines = [Line(index=i, owner=m) for i, m in enumerate(cfg.lines)]
         best = normalise_imports(problem.challenge, problem.challenge)
-        best_rank = (False, -(10**9))
         winner: int | None = None
 
         def time_left() -> float:
             return deadline - time.monotonic()
 
         def offer(line: Line, accepted: bool) -> bool:
-            """Checkpoint this candidate when it outranks the incumbent."""
+            """Keep a candidate the grader could score; never rank the losers.
 
-            nonlocal best, best_rank, winner
-            if not line.candidate or line.errors is None:
+            Ranking by error count once submitted a file with the theorem deleted."""
+
+            nonlocal best, winner
+            if not line.candidate:
                 return False
-            rank = (accepted, -line.errors)
-            if rank <= best_rank:
+            if not accepted and scoring_faults(line.candidate, names, problem.challenge):
                 return False
-            best, best_rank = line.candidate, rank
+            best = line.candidate
             if accepted:
                 winner = line.index
-            services.checkpoint(
-                best, {"line": line.index, "errors": line.errors, "accepted": accepted}
-            )
+            services.checkpoint(best, {"line": line.index, "accepted": accepted})
             return True
 
         try:
