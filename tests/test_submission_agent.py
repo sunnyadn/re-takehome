@@ -746,3 +746,22 @@ def test_a_mend_that_cuts_a_graded_declaration_is_refused():
     from submission.agent import drop_lines, scoring_faults
     cut = drop_lines(_TWO_DECLS, [6])
     assert scoring_faults(cut, (), _TWO_DECLS), "dropping the statement raised no fault"
+
+
+def test_the_nat_subtraction_warning_is_keyed_on_the_statement():
+    """Truncated subtraction produced 8 `Neg ℕ` errors and 31 omega failures on
+    rmo_2000_2; a statement without it must not pay for the warning."""
+
+    natsub = "theorem t (x : ℕ) (h : 0 < x - 1) : True := by\n  sorry\n"
+    plain = "theorem t (x : ℝ) (h : x + 1 = 2) : True := by\n  sorry\n"
+    assert agent_mod.traps(natsub) and "truncat" not in "".join(agent_mod.traps(plain))
+    assert agent_mod.traps(plain) == []
+
+
+def test_split_candidates_are_only_built_for_a_decomposable_goal():
+    """Twelve extra Lean checks are worth paying only where a split can help."""
+
+    iff = "theorem t : True ↔ True := by\n  sorry\n"
+    flat = "theorem t (x : ℝ) : x = x := by\n  sorry\n"
+    assert len(agent_mod.split_files(iff, ("rfl",))) == len(agent_mod.SPLITTERS)
+    assert agent_mod.split_files(flat, ("rfl",)) == []

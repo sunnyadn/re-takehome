@@ -363,6 +363,26 @@ def sweep_files(source: str, cocktail: Sequence[str] = COCKTAIL) -> list[str]:
     return files
 
 
+# One goal split into two is two easier goals, and `constructor` costs no
+# tokens. Gated on the statement, so the other problems pay nothing.
+SPLITTERS = ("intros", "constructor", "intros\n  constructor", "refine ⟨?_, ?_⟩")
+SPLITTABLE = re.compile(r"↔|∧|∀")
+
+
+def split_files(source: str, cocktail: Sequence[str] = COCKTAIL) -> list[str]:
+    """Sweep candidates that decompose the goal before trying the library."""
+
+    if not SPLITTABLE.search(source):
+        return []
+    alternation = "first\n" + "\n".join(f"      | {wrap_tactic(t)}" for t in cocktail)
+    files = []
+    for splitter in SPLITTERS:
+        body, filled, left = splice_tactic(source, f"{splitter}\n  all_goals {alternation}")
+        if filled and not left:
+            files.append(normalise_imports(body, body))
+    return files
+
+
 IMPORT_LINE = re.compile(r"^\s*import\s")
 NO_GOALS = "no goals to be solved"
 
@@ -586,7 +606,10 @@ class SubmissionAgent:
         try:
             # Free points first. The tactic library is deterministic and costs
             # no tokens, so it runs before any model is asked anything.
-            for candidate in sweep_files(problem.challenge, await usable_cocktail(services)):
+            cocktail = await usable_cocktail(services)
+            deterministic = (sweep_files(problem.challenge, cocktail)
+                             + split_files(problem.challenge, cocktail))
+            for candidate in deterministic:
                 if time_left() <= 0:
                     break
                 check = await services.lean.check_file(candidate)
@@ -907,13 +930,31 @@ Rules:
 - If an approach has failed twice, change strategy rather than adjusting it."""
 
 
+NAT_SUB = re.compile(r"(ℕ|Nat)")
+HAS_SUB = re.compile(r"[\w\)]\s-\s[\w\(]")
+NAT_SUB_WARNING = (
+    "This statement subtracts on ℕ, where `a - b` is 0 when `b > a`, so any "
+    "step that treats it as ordinary subtraction is unsound. Prove the `b ≤ a` "
+    "side condition first and let `omega` remove the subtraction, or move the "
+    "hypothesis to ℤ with `zify [h]` where `h` is that bound."
+)
+
+
+def traps(challenge: str) -> list[str]:
+    """Pitfalls the statement itself makes likely, keyed on its syntax."""
+
+    if NAT_SUB.search(challenge) and HAS_SUB.search(challenge):
+        return ["", "Watch out:", NAT_SUB_WARNING]
+    return []
+
+
 def planner_user(problem: Problem) -> str:
     return "\n".join([
         f"Problem id: {problem.id}", "",
         "Statement:", problem.description, "",
         "The Lean statement that must be proved:",
         "```lean", problem.challenge, "```",
-    ])
+    ] + traps(problem.challenge))
 
 
 def formalizer_user(problem: Problem, plan: str) -> str:
@@ -922,7 +963,7 @@ def formalizer_user(problem: Problem, plan: str) -> str:
         "Statement:", problem.description, "",
         "Challenge file to complete:",
         "```lean", problem.challenge, "```",
-    ]
+    ] + traps(problem.challenge)
     if plan.strip():
         parts += ["", "A mathematician's solution and formalisation notes:", plan.strip()]
     return "\n".join(parts)
@@ -941,7 +982,7 @@ def repairer_user(problem: Problem, line: Line, handoff: bool) -> str:
         "Statement:", problem.description, "",
         "Required names and statements, do not alter them:",
         "```lean", problem.challenge, "```",
-    ]
+    ] + traps(problem.challenge)
     if line.plan.strip():
         parts += ["", "Solution notes for this attempt:", line.plan.strip()]
     parts += [
