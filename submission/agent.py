@@ -692,9 +692,13 @@ class SubmissionAgent:
         if surplus:
             mended = drop_lines(line.candidate, surplus)
             recheck = await services.lean.check_file(mended + suffix)
-            if recheck.accepted and not scoring_faults(mended, names, problem.challenge):
+            _, before = grade(line.candidate, check, names, problem.challenge)
+            faults_after, after = grade(mended, recheck, names, problem.challenge)
+            # Demanding the whole file compile made this unreachable: 44 of 299
+            # rejected checks had surplus lines and none was ever dropped.
+            if not faults_after and after < before:
                 ledger.events.append({"line": line.index, "stage": "drop_surplus",
-                                      "lines": surplus, "accepted": True})
+                                      "lines": surplus, "errors": after})
                 line.candidate, check = mended, recheck
         faults, line.errors = grade(line.candidate, check, names, problem.challenge)
         hint, tactics, at = await self._lemma_hint(

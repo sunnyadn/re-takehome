@@ -708,3 +708,41 @@ def test_the_verified_prefix_reaches_the_repair_prompt():
         SimpleNamespace(id="t", description="s", challenge=_TWO_DECLS), line, False)
     assert "already compiles" in prompt and "⊢ 2 = 2" in prompt
     assert [e for e in ledger.events if e.get("stage") == "resume"]
+
+
+class _SurplusLean(_SearchLean):
+    """One surplus tactic, whose removal clears that error but not the others."""
+
+    def _msgs(self, surplus):
+        out = [{"severity": "error", "pos": {"line": 3},
+                "data": "no goals to be solved"}] if surplus else []
+        out.append({"severity": "error", "pos": {"line": 2}, "data": "still broken"})
+        return SimpleNamespace(accepted=False, has_sorry=False, timed_out=False,
+                               container_restarted=False, messages=out)
+
+    async def check_file(self, source, **kwargs):
+        self.sources.append(source)
+        if "apply?" in source or "sorry" in source:
+            return SimpleNamespace(accepted=False, has_sorry=False, timed_out=False,
+                                   container_restarted=False, messages=[])
+        return self._msgs("Nat.made_up" in source)
+
+
+def test_surplus_tactics_are_dropped_without_the_whole_file_compiling():
+    """44 of 299 rejected checks carried surplus lines and none was dropped,
+    because the mend was only taken when the file then compiled."""
+
+    got, line, ledger = _advance_result(_SurplusLean())
+    assert got is False
+    dropped = [e for e in ledger.events if e.get("stage") == "drop_surplus"]
+    assert dropped, "a mend that strictly reduced the errors was refused"
+    assert "theorem required" in line.candidate, "the graded declaration was cut"
+
+
+def test_a_mend_that_cuts_a_graded_declaration_is_refused():
+    """surplus_lines can point at the statement itself; scoring_faults is the
+    only thing standing between that and a file the grader scores zero."""
+
+    from submission.agent import drop_lines, scoring_faults
+    cut = drop_lines(_TWO_DECLS, [6])
+    assert scoring_faults(cut, (), _TWO_DECLS), "dropping the statement raised no fault"
