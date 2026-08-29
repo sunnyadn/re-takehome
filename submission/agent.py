@@ -438,13 +438,13 @@ def resume_file(source: str, errline: int) -> str | None:
     return splice_at_failure(source, errline, "trace_state\nsorry")
 
 
-TRY_LINE = re.compile(r"^\s*(?:\[[a-z]+\]\s*)?((?:exact|apply|refine)\s+\S.*)$")
+TRY_LINE = re.compile(r"^\s*\[[a-z]+\]\s*(\S.*?)\s*$")
 
 
 def suggested_tactics(hits: Sequence[str]) -> list[str]:
-    """The runnable tactic out of each `Try this:` block, longest last.
+    """The tactic Lean marked in each `Try this:` block.
 
-    A hit is prose plus one indented tactic; only the tactic can be spliced."""
+    Blocks mix lemma terms with tactic advice; the marker picks out both."""
 
     out = []
     for hit in hits:

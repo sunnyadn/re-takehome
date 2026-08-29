@@ -542,3 +542,17 @@ def test_a_lemma_lean_found_is_spliced_in_rather_than_requested():
     assert "Nat.sqrt_le" in line.candidate
     assert "theorem required" in line.candidate, "the graded declaration was cut"
     assert [e for e in ledger.events if e.get("stage") == "substituted"]
+
+
+def test_both_shapes_of_lean_suggestion_yield_a_tactic():
+    """Captured from real runs: a lemma term and a tactic-advice block.
+
+    The advice block is mostly prose, so only Lean's own marker is reliable."""
+
+    lemma = "Try this:\n  [apply] exact lt_of_pow_lt_pow_left' 3 h2"
+    advice = ("Try this:\n  [apply] ring_nf\n  \n  The `ring` tactic failed to "
+              "close the goal. Use `ring_nf` to obtain a normal form.\n    \n  "
+              "Note that `ring` works primarily in *commutative* rings.")
+    assert agent_mod.suggested_tactics([lemma]) == ["exact lt_of_pow_lt_pow_left' 3 h2"]
+    assert agent_mod.suggested_tactics([advice]) == ["ring_nf"]
+    assert len(agent_mod.suggested_tactics([lemma, advice])) == 2
