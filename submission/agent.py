@@ -258,6 +258,16 @@ def scoring_faults(source: str, names: Sequence[str], challenge: str = "") -> li
     return faults
 
 
+def grade(source: str, check: Any, names: Sequence[str],
+          challenge: str) -> tuple[list[str], int]:
+    """What the grader would hold against this file, and how much."""
+
+    faults = scoring_faults(source, names, challenge)
+    faults += [f"{a} is not a permitted axiom, the grader rejects it"
+               for a in forbidden_axioms(check.messages)]
+    return faults, len(error_messages(check.messages)) + len(faults)
+
+
 # Generic tactic library. RULES.md allows these explicitly, and `first`
 # backtracks between alternatives, so the whole cocktail costs one Lean check.
 COCKTAIL = (
@@ -665,22 +675,21 @@ class SubmissionAgent:
                 ledger.events.append({"line": line.index, "stage": "drop_surplus",
                                       "lines": surplus, "accepted": True})
                 line.candidate, check = mended, recheck
-        faults = scoring_faults(line.candidate, names, problem.challenge)
-        faults += [f"{a} is not a permitted axiom, the grader rejects it"
-                   for a in forbidden_axioms(check.messages)]
-        signature = "\n".join([error_signature(check.messages)] + faults)
-        line.errors = len(error_messages(check.messages)) + len(faults)
-        line.stalls = line.stalls + 1 if signature == line.signature else 0
-        line.signature = signature
+        faults, line.errors = grade(line.candidate, check, names, problem.challenge)
         hint, tactics, at = await self._lemma_hint(
             line.candidate, check, ledger, line.index, services)
-        won = await self._substitute(line, at, tactics, services, ledger, names,
-                                     problem.challenge)
-        if won is not None:
-            line.candidate, line.errors = won, 0
-            ledger.events.append({"line": line.index, "stage": "substituted",
-                                  "at": at, "model": model})
-            return True
+        swapped = await self._substitute(line, at, tactics, services, ledger, names,
+                                         problem.challenge)
+        if swapped is not None:
+            line.candidate, check = swapped
+            hint = []
+            faults, line.errors = grade(line.candidate, check, names, problem.challenge)
+            ledger.events.append({"line": line.index, "stage": "substituted", "at": at,
+                                  "model": model, "errors": line.errors,
+                                  "accepted": check.accepted})
+        signature = "\n".join([error_signature(check.messages)] + faults)
+        line.stalls = line.stalls + 1 if signature == line.signature else 0
+        line.signature = signature
         line.feedback = "\n".join(faults + [format_messages(check.messages)] + hint).strip() or (
             "Lean timed out. Use cheaper tactics and avoid decide or norm_num on large numbers."
             if check.timed_out else ""
@@ -697,14 +706,16 @@ class SubmissionAgent:
     async def _substitute(
         self, line: Line, at: int, tactics: Sequence[str], services: Services,
         ledger: Ledger, names: Sequence[str], challenge: str,
-    ) -> str | None:
+    ) -> tuple[str, Any] | None:
         """Splice a lemma Lean actually found, instead of asking for it.
 
-        A correct hint reached the model 3 times on rmo_2000_2 and was used 0."""
+        Requiring the whole file to compile never fired: 0 of 65 recorded
+        searches ran on a file with one error, so take any strict drop."""
 
+        best = None
         for tactic in tactics[:MAX_SUBSTITUTIONS]:
             if self._time_left() <= LEMMA_SEARCH_TIMEOUT_S:
-                return None
+                break
             fixed = splice_at_failure(line.candidate, at, tactic)
             if fixed is None:
                 continue
@@ -714,11 +725,15 @@ class SubmissionAgent:
             try:
                 check = await services.lean.check_file(fixed)
             except LeanRuntimeError:
-                return None
-            if check.accepted and not scoring_faults(fixed, names, challenge) \
-                    and not forbidden_axioms(check.messages):
-                return fixed
-        return None
+                break
+            faults, errors = grade(fixed, check, names, challenge)
+            if faults or errors >= line.errors:
+                continue
+            if best is None or errors < best[1]:
+                best = (fixed, errors, check)
+            if check.accepted:
+                break
+        return (best[0], best[2]) if best else None
 
     async def _lemma_hint(
         self, source: str, check: Any, ledger: Ledger, index: int, services: Services,

@@ -599,3 +599,56 @@ def test_the_slots_run_concurrently_rather_than_taking_turns():
     slots = len(agent_mod.SLOT_TEMPERATURES) * 2
     assert llm.peak > 1, "calls were still serialised"
     assert llm.peak >= slots, f"peak {llm.peak} below the {slots} slots"
+
+
+class _PartiallyFixableLean(_SearchLean):
+    """The spliced lemma clears one error of three and leaves the rest."""
+
+    def _errors(self, n):
+        return SimpleNamespace(
+            accepted=False, has_sorry=False, timed_out=False,
+            container_restarted=False,
+            messages=[{"severity": "error", "pos": {"line": 3 + i},
+                       "data": "Unknown constant `Nat.made_up`"} for i in range(n)])
+
+    async def check_file(self, source, **kwargs):
+        self.sources.append(source)
+        if "apply?" in source:
+            return SimpleNamespace(
+                accepted=False, has_sorry=False, timed_out=False,
+                container_restarted=False,
+                messages=[{"severity": "info",
+                           "data": "Try this:\n  [apply] exact Nat.sqrt_le k"}])
+        return self._errors(1 if "Nat.sqrt_le" in source else 3)
+
+
+def test_a_substitution_that_only_reduces_errors_is_still_taken():
+    """No recorded search ever ran on a one-error file, so demanding the whole
+    file compile made the mechanism unreachable."""
+
+    got, line, ledger = _advance_result(_PartiallyFixableLean())
+    assert got is False, "a file Lean still rejects was reported as solved"
+    assert "Nat.sqrt_le" in line.candidate, "the improvement was discarded"
+    assert line.errors == 1, f"errors not recomputed after the splice: {line.errors}"
+    assert [e for e in ledger.events if e.get("stage") == "substituted"]
+
+
+class _WorseningLean(_PartiallyFixableLean):
+    """The spliced lemma makes the file worse, so it must be refused."""
+
+    async def check_file(self, source, **kwargs):
+        self.sources.append(source)
+        if "apply?" in source:
+            return SimpleNamespace(
+                accepted=False, has_sorry=False, timed_out=False,
+                container_restarted=False,
+                messages=[{"severity": "info",
+                           "data": "Try this:\n  [apply] exact Nat.sqrt_le k"}])
+        return self._errors(5 if "Nat.sqrt_le" in source else 3)
+
+
+def test_a_substitution_that_adds_errors_is_refused():
+    got, line, ledger = _advance_result(_WorseningLean())
+    assert got is False
+    assert "Nat.sqrt_le" not in line.candidate, "a worse file was adopted"
+    assert not [e for e in ledger.events if e.get("stage") == "substituted"]
