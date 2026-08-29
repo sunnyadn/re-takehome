@@ -652,3 +652,59 @@ def test_a_substitution_that_adds_errors_is_refused():
     assert got is False
     assert "Nat.sqrt_le" not in line.candidate, "a worse file was adopted"
     assert not [e for e in ledger.events if e.get("stage") == "substituted"]
+
+
+def test_a_truncated_proof_asks_lean_with_a_bare_sorry():
+    src = ("import Mathlib\n\ntheorem t : True := by\n  have h : 1 = 1 := by\n"
+           "    made_up_tactic\n  trivial\n")
+    cut = agent_mod.resume_file(src, 5)
+    assert cut is not None and "sorry" in cut
+    assert "trace_state" not in cut, "trace_state does not survive the cut"
+
+
+def test_open_goals_refuses_a_prefix_that_still_has_a_real_error():
+    """A prefix is only verified when nothing but the goal is left."""
+
+    messages = [{"severity": "error", "data": "unsolved goals\n⊢ x = 9"},
+                {"severity": "error", "data": "Unknown identifier `foo`"}]
+    assert agent_mod.open_goals(messages) == []
+
+
+def test_open_goals_returns_the_goal_when_only_the_goal_is_left():
+    messages = [{"severity": "error", "data": "unsolved goals\nx : ℕ\n⊢ x = 9"}]
+    assert agent_mod.open_goals(messages) == ["x : ℕ\n⊢ x = 9"]
+
+
+class _ResumableLean(_SearchLean):
+    """Rejects the file, and reports only an open goal once it is truncated."""
+
+    async def check_file(self, source, **kwargs):
+        self.sources.append(source)
+        if "apply?" in source:
+            return SimpleNamespace(accepted=False, has_sorry=False, timed_out=False,
+                                   container_restarted=False, messages=[])
+        if "sorry" in source:
+            return SimpleNamespace(
+                accepted=False, has_sorry=True, timed_out=False,
+                container_restarted=False,
+                messages=[{"severity": "error", "pos": {"line": 3},
+                           "data": "unsolved goals\n⊢ 2 = 2"}])
+        return SimpleNamespace(
+            accepted=False, has_sorry=False, timed_out=False,
+            container_restarted=False,
+            messages=[{"severity": "error", "pos": {"line": 3},
+                       "data": "Unknown constant `Nat.made_up`"}])
+
+
+def test_the_verified_prefix_reaches_the_repair_prompt():
+    """The prefix carries a sorry, so it must never become the candidate."""
+
+    got, line, ledger = _advance_result(_ResumableLean())
+    assert got is False
+    assert line.resume is not None, "the compiled prefix was not kept"
+    assert line.resume[1] == "⊢ 2 = 2"
+    assert "sorry" not in line.candidate, "a file with a sorry became the candidate"
+    prompt = agent_mod.repairer_user(
+        SimpleNamespace(id="t", description="s", challenge=_TWO_DECLS), line, False)
+    assert "already compiles" in prompt and "⊢ 2 = 2" in prompt
+    assert [e for e in ledger.events if e.get("stage") == "resume"]

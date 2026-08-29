@@ -121,6 +121,7 @@ class Line:
     stalls: int = 0
     feedback: str = ""
     done: bool = False
+    resume: tuple[str, str] | None = None
 
 @dataclass
 class Ledger:
@@ -389,6 +390,7 @@ TRY_THIS = "Try this"
 # returned nothing ran 131s. Bounds the wasted wait, not the useful one.
 LEMMA_SEARCH_TIMEOUT_S = 30
 HINT_CHARS = 1500
+RESUME_CHARS = 1500
 # Counting searches measures the wrong thing: 30 of them is about 1% of the
 # graded clock, yet 27 of 33 recorded runs would have wanted more than 30.
 SEARCH_BUDGET_FRACTION = 0.05
@@ -448,11 +450,30 @@ def search_file(source: str, errline: int) -> str | None:
 
 
 def resume_file(source: str, errline: int) -> str | None:
-    """The proof kept only up to its first error, with the goal there printed.
+    """The proof kept only up to its first error.
 
-    Lean states what is left to prove; regenerating the whole file discards it."""
+    A bare `sorry` makes Lean report the goal left there; `trace_state` does
+    not survive the cut inside a nested `have ... := by`."""
 
-    return splice_at_failure(source, errline, "trace_state\nsorry")
+    return splice_at_failure(source, errline, "sorry")
+
+
+UNSOLVED = "unsolved goals"
+
+
+def open_goals(messages: Sequence[dict[str, Any]]) -> list[str]:
+    """The goal Lean says is still open, or nothing if a real error remains.
+
+    A prefix that fails for any other reason has not been verified."""
+
+    goals = []
+    for message in error_messages(messages):
+        if not message.startswith(UNSOLVED):
+            return []
+        body = message[len(UNSOLVED):].strip()
+        if body and body not in goals:
+            goals.append(body)
+    return goals
 
 
 TRY_LINE = re.compile(r"^\s*\[[a-z]+\]\s*(\S.*?)\s*$")
@@ -694,6 +715,10 @@ class SubmissionAgent:
             "Lean timed out. Use cheaper tactics and avoid decide or norm_num on large numbers."
             if check.timed_out else ""
         )
+        line.resume = None if check.accepted else await self._resume(line, check, services)
+        if line.resume is not None:
+            ledger.events.append({"line": line.index, "stage": "resume",
+                                  "goals": len(line.resume[1].split("\n\n"))})
         # Lean accepting the file is not the grading condition.
         accepted = check.accepted and not faults
         ledger.events.append({
@@ -702,6 +727,27 @@ class SubmissionAgent:
             "timed_out": check.timed_out, "scoring_faults": faults,
         })
         return accepted
+
+    async def _resume(
+        self, line: Line, check: Any, services: Services,
+    ) -> tuple[str, str] | None:
+        """Keep the proof up to its first error and ask Lean what is left.
+
+        DeepSeek-Prover-V1.5 takes credit from what compiled, not from what is
+        missing; regenerating the whole file throws the verified prefix away."""
+
+        if check.timed_out or self._time_left() <= LEMMA_SEARCH_TIMEOUT_S:
+            return None
+        lines = source_lines(check.messages, line.candidate)
+        prefix = resume_file(line.candidate, lines[0]) if lines else None
+        if prefix is None:
+            return None
+        try:
+            cut = await services.lean.check_file(normalise_imports(prefix, line.candidate))
+        except LeanRuntimeError:
+            return None
+        goals = open_goals(cut.messages)
+        return (prefix, "\n\n".join(goals)) if goals else None
 
     async def _substitute(
         self, line: Line, at: int, tactics: Sequence[str], services: Services,
@@ -899,6 +945,15 @@ def repairer_user(problem: Problem, line: Line, handoff: bool) -> str:
         "```lean", line.candidate, "```",
         "", "Lean rejected it with:", "```text", line.feedback or "(no messages)", "```",
     ]
+    if line.resume is not None:
+        prefix, goals = line.resume
+        parts += [
+            "", "Everything above the `sorry` below already compiles. Keep it and",
+            "replace only the `sorry`:",
+            "```lean", prefix, "```",
+            "", "Lean says this is all that is left to prove there:",
+            "```text", goals[:RESUME_CHARS], "```",
+        ]
     return "\n".join(parts)
 
 
