@@ -30,6 +30,12 @@ REPAIR_TOKENS = 16000
 FEEDBACK_CHARS = 6000
 # Each substitution costs one Lean check and no tokens.
 MAX_SUBSTITUTIONS = 2
+# Wins are early and cheap: the dearest of 54 recorded ones took 43 calls and
+# $0.05, and none ever came later. Width buys more of that range than depth.
+SLOT_TEMPERATURES = (0.2, 0.7, 1.0)
+# Stop launching while a round still fits, since overshooting the ledger
+# scores zero however good the proof is.
+BUDGET_HEADROOM = 0.9
 
 
 def _env_models(name: str, default: Sequence[str]) -> tuple[str, ...]:
@@ -107,6 +113,7 @@ class Line:
 
     index: int
     owner: str
+    temperature: float = 0.4
     plan: str = ""
     candidate: str = ""
     errors: int | None = None
@@ -520,7 +527,9 @@ class SubmissionAgent:
         ledger = Ledger()
         names = answer_names(problem.challenge)
         decls = declared_names(problem.challenge)
-        lines = [Line(index=i, owner=m) for i, m in enumerate(cfg.lines)]
+        lines = [Line(index=i, owner=m, temperature=t)
+                 for i, (m, t) in enumerate(
+                     (m, t) for t in SLOT_TEMPERATURES for m in cfg.lines)]
         best = normalise_imports(problem.challenge, problem.challenge)
         winner: int | None = None
 
@@ -561,15 +570,29 @@ class SubmissionAgent:
                         "events": ledger.events,
                     })
             for _ in range(cfg.max_turns_per_line):
-                if winner is not None or all(l.done for l in lines) or time_left() <= 0:
+                live = [l for l in lines if not l.done]
+                if winner is not None or not live or time_left() <= 0:
                     break
-                for line in lines:
-                    if line.done or time_left() <= 0:
-                        continue
-                    accepted = await self._advance(problem, line, services, ledger, names, decls)
-                    offer(line, accepted)
-                    if winner is not None:
-                        break
+                if ledger.spent_usd >= BUDGET_HEADROOM * cfg.budget_usd:
+                    ledger.events.append({"stage": "stop", "note": "budget headroom"})
+                    break
+                # A barrier, never a race. Cancelling a call in flight marks
+                # spend unknown, which zeroes a problem already proved.
+                done = await asyncio.gather(
+                    *(self._advance(problem, l, services, ledger, names, decls)
+                      for l in live),
+                    return_exceptions=True,
+                )
+                fatal = next((r for r in done if isinstance(r, BaseException)), None)
+                for line, got in zip(live, done):
+                    if got is True:
+                        offer(line, True)
+                if winner is None:
+                    for line, got in zip(live, done):
+                        if got is False:
+                            offer(line, False)
+                if fatal is not None:
+                    raise fatal
         except (LLMCallError, BudgetAccountingError) as exc:
             # The problem's ledger is closed, so no further call can succeed on
             # any line. Keep the best candidate and stop.
@@ -602,7 +625,7 @@ class SubmissionAgent:
         if not line.candidate:
             plan = await self._call(
                 model, PLANNER_SYSTEM, planner_user(problem), PLAN_TOKENS,
-                services, ledger, line.index, "plan", handoff,
+                services, ledger, line.index, "plan", handoff, line.temperature,
             )
             if plan is None:
                 line.done = True
@@ -610,12 +633,12 @@ class SubmissionAgent:
             line.plan = plan
             content = await self._call(
                 model, FORMALIZER_SYSTEM, formalizer_user(problem, line.plan), FORMALIZE_TOKENS,
-                services, ledger, line.index, "formalize", handoff,
+                services, ledger, line.index, "formalize", handoff, line.temperature,
             )
         else:
             content = await self._call(
                 model, REPAIRER_SYSTEM, repairer_user(problem, line, handoff), REPAIR_TOKENS,
-                services, ledger, line.index, "repair", handoff,
+                services, ledger, line.index, "repair", handoff, line.temperature,
             )
         if content is None:
             line.done = True
@@ -741,6 +764,7 @@ class SubmissionAgent:
     async def _call(
         self, model: str, system: str, user: str, max_tokens: int,
         services: Services, ledger: Ledger, line: int, stage: str, handoff: bool,
+        temperature: float = 0.4,
     ) -> str | None:
         """One model call. Returns None when this line can no longer be paid for."""
 
@@ -753,7 +777,7 @@ class SubmissionAgent:
                         {"role": "user", "content": user},
                     ],
                     max_tokens=max_tokens,
-                    temperature=0.4,
+                    temperature=temperature,
                     # Measured: at high effort gpt-oss wants ~42k reasoning
                     # tokens before emitting a proof, over the harness's 32k.
                     reasoning={"effort": "medium"},

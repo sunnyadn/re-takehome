@@ -556,3 +556,46 @@ def test_both_shapes_of_lean_suggestion_yield_a_tactic():
     assert agent_mod.suggested_tactics([lemma]) == ["exact lt_of_pow_lt_pow_left' 3 h2"]
     assert agent_mod.suggested_tactics([advice]) == ["ring_nf"]
     assert len(agent_mod.suggested_tactics([lemma, advice])) == 2
+
+
+class _CountingLLM:
+    """Records how many calls are in flight at once."""
+
+    def __init__(self):
+        self.live, self.peak, self.n = 0, 0, 0
+
+    async def complete(self, **kwargs):
+        self.live += 1
+        self.peak = max(self.peak, self.live)
+        self.n += 1
+        await asyncio.sleep(0)
+        try:
+            response = _Response()
+            response.content = "```lean\n" + _TWO_DECLS + "```"
+            return response
+        finally:
+            self.live -= 1
+
+
+class _NeverAcceptLean:
+    async def check_file(self, source, **kwargs):
+        return SimpleNamespace(accepted=False, has_sorry=False, timed_out=False,
+                               container_restarted=False,
+                               messages=[{"severity": "error", "pos": {"line": 3},
+                                          "data": "unsolved goals"}])
+
+
+def test_the_slots_run_concurrently_rather_than_taking_turns():
+    """91.5% of wall clock was spent waiting on serial calls, while one line
+    idled through the other's 418-second wait."""
+
+    llm = _CountingLLM()
+    agent = SubmissionAgent(agent_mod.Config(time_limit_s=1800.0, max_turns_per_line=1))
+    services = _Services(llm)
+    services.lean = _NeverAcceptLean()
+    services.checkpoint = lambda *a, **k: None
+    problem = SimpleNamespace(challenge=_TWO_DECLS, description="s", id="t")
+    asyncio.run(agent.solve(problem, services))
+    slots = len(agent_mod.SLOT_TEMPERATURES) * 2
+    assert llm.peak > 1, "calls were still serialised"
+    assert llm.peak >= slots, f"peak {llm.peak} below the {slots} slots"
