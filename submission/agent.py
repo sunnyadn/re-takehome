@@ -28,6 +28,8 @@ PLAN_TOKENS = 16000
 FORMALIZE_TOKENS = 16000
 REPAIR_TOKENS = 16000
 FEEDBACK_CHARS = 6000
+# Each substitution costs one Lean check and no tokens.
+MAX_SUBSTITUTIONS = 2
 
 
 def _env_models(name: str, default: Sequence[str]) -> tuple[str, ...]:
@@ -395,8 +397,8 @@ def source_lines(
     return sorted(set(out))
 
 
-def search_file(source: str, errline: int) -> str | None:
-    """The candidate with `apply?` where the proof first went wrong.
+def splice_at_failure(source: str, errline: int, tactic: str) -> str | None:
+    """Replace the proof from `errline` on with `tactic`.
 
     The cut stays inside one declaration so the graded ones survive."""
 
@@ -418,7 +420,39 @@ def search_file(source: str, errline: int) -> str | None:
         return None
     at = max(errline, proof)
     indent = lines[at - 1][: len(lines[at - 1]) - len(lines[at - 1].lstrip())] or "  "
-    return "\n".join(lines[: at - 1] + [f"{indent}all_goals apply?"] + lines[end:]) + "\n"
+    spliced = [f"{indent}{t}" for t in tactic.split("\n")]
+    return "\n".join(lines[: at - 1] + spliced + lines[end:]) + "\n"
+
+
+def search_file(source: str, errline: int) -> str | None:
+    """The candidate with `apply?` where the proof first went wrong."""
+
+    return splice_at_failure(source, errline, "all_goals apply?")
+
+
+def resume_file(source: str, errline: int) -> str | None:
+    """The proof kept only up to its first error, with the goal there printed.
+
+    Lean states what is left to prove; regenerating the whole file discards it."""
+
+    return splice_at_failure(source, errline, "trace_state\nsorry")
+
+
+TRY_LINE = re.compile(r"^\s*(?:\[[a-z]+\]\s*)?((?:exact|apply|refine)\s+\S.*)$")
+
+
+def suggested_tactics(hits: Sequence[str]) -> list[str]:
+    """The runnable tactic out of each `Try this:` block, longest last.
+
+    A hit is prose plus one indented tactic; only the tactic can be spliced."""
+
+    out = []
+    for hit in hits:
+        for line in hit.splitlines():
+            found = TRY_LINE.match(line)
+            if found and found.group(1) not in out:
+                out.append(found.group(1).strip())
+    return out
 
 
 def suggestions(messages: Sequence[dict[str, Any]]) -> list[str]:
@@ -615,7 +649,15 @@ class SubmissionAgent:
         line.errors = len(error_messages(check.messages)) + len(faults)
         line.stalls = line.stalls + 1 if signature == line.signature else 0
         line.signature = signature
-        hint = await self._lemma_hint(line.candidate, check, ledger, line.index, services)
+        hint, tactics, at = await self._lemma_hint(
+            line.candidate, check, ledger, line.index, services)
+        won = await self._substitute(line, at, tactics, services, ledger, names,
+                                     problem.challenge)
+        if won is not None:
+            line.candidate, line.errors = won, 0
+            ledger.events.append({"line": line.index, "stage": "substituted",
+                                  "at": at, "model": model})
+            return True
         line.feedback = "\n".join(faults + [format_messages(check.messages)] + hint).strip() or (
             "Lean timed out. Use cheaper tactics and avoid decide or norm_num on large numbers."
             if check.timed_out else ""
@@ -629,23 +671,49 @@ class SubmissionAgent:
         })
         return accepted
 
+    async def _substitute(
+        self, line: Line, at: int, tactics: Sequence[str], services: Services,
+        ledger: Ledger, names: Sequence[str], challenge: str,
+    ) -> str | None:
+        """Splice a lemma Lean actually found, instead of asking for it.
+
+        A correct hint reached the model 3 times on rmo_2000_2 and was used 0."""
+
+        for tactic in tactics[:MAX_SUBSTITUTIONS]:
+            if self._time_left() <= LEMMA_SEARCH_TIMEOUT_S:
+                return None
+            fixed = splice_at_failure(line.candidate, at, tactic)
+            if fixed is None:
+                continue
+            fixed = normalise_imports(fixed, line.candidate)
+            if banned_constructs(fixed):
+                continue
+            try:
+                check = await services.lean.check_file(fixed)
+            except LeanRuntimeError:
+                return None
+            if check.accepted and not scoring_faults(fixed, names, challenge) \
+                    and not forbidden_axioms(check.messages):
+                return fixed
+        return None
+
     async def _lemma_hint(
         self, source: str, check: Any, ledger: Ledger, index: int, services: Services,
-    ) -> list[str]:
+    ) -> tuple[list[str], list[str], int]:
         """Ask Lean for a real lemma when the model invented one.
 
         Models state invented names confidently, so the real one is pushed."""
 
         budget = SEARCH_BUDGET_FRACTION * self.config.time_limit_s
         if self._search_spent_s >= budget or check.accepted:
-            return []
+            return [], [], 0
         # Search where the invented name is, not at the file's earliest error.
         # Those differ on 62% of triggering checks, and the hint tells the model
         # these lemmas are for the goal it got wrong.
         lines = source_lines(check.messages, source, MISSING_NAME)
         candidate = search_file(source, lines[0]) if lines else None
         if candidate is None or self._time_left() <= LEMMA_SEARCH_TIMEOUT_S:
-            return []
+            return [], [], 0
         started = time.monotonic()
         try:
             found = await services.lean.check_file(
@@ -653,18 +721,19 @@ class SubmissionAgent:
             )
         except LeanRuntimeError:
             self._search_spent_s += time.monotonic() - started
-            return []
+            return [], [], 0
         self._search_spent_s += time.monotonic() - started
         hits = suggestions(found.messages)
         ledger.events.append({"line": index, "stage": "lemma_search",
                               "at": lines[0], "found": len(hits)})
         if not hits:
-            return []
+            return [], [], 0
         # A suggestion carries its remaining subgoals, so three of them can be
         # long. The message cap does not cover this block, so cap it here.
         block = "\n".join(hits[:3])[:HINT_CHARS]
-        return ["Lean's own search found these real lemmas for the goal you got wrong. "
-                "The names you used may not exist; these do.", block]
+        return (["Lean's own search found these real lemmas for the goal you got wrong. "
+                 "The names you used may not exist; these do.", block],
+                suggested_tactics(hits), lines[0])
 
     def _time_left(self) -> float:
         return float("inf") if self._deadline is None else self._deadline - time.monotonic()

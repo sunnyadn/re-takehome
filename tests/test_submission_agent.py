@@ -495,3 +495,50 @@ def test_a_file_that_drops_the_graded_theorem_is_never_kept():
     result = asyncio.run(agent.solve(problem, services))
     assert _SURRENDER not in kept, "a file without the graded theorem was checkpointed"
     assert "theorem required" in result.solution, "returned a file missing the theorem"
+
+
+class _FixableLean(_SearchLean):
+    """Fails on an invented name, and accepts the file once the real one is in."""
+
+    async def check_file(self, source, **kwargs):
+        self.sources.append(source)
+        ok = SimpleNamespace(accepted=True, has_sorry=False, timed_out=False,
+                             container_restarted=False, messages=[])
+        if "apply?" in source:
+            return SimpleNamespace(
+                accepted=False, has_sorry=False, timed_out=False,
+                container_restarted=False,
+                messages=[{"severity": "info",
+                           "data": "Try this:\n  [apply] exact Nat.sqrt_le k"}])
+        if "Nat.sqrt_le" in source:
+            return ok
+        return SimpleNamespace(
+            accepted=False, has_sorry=False, timed_out=False,
+            container_restarted=False,
+            messages=[{"severity": "error", "pos": {"line": 3},
+                       "data": "Unknown constant `Nat.made_up`"}])
+
+
+def _advance_result(lean, challenge=_TWO_DECLS):
+    agent = SubmissionAgent()
+    agent._deadline = None
+    line = Line(index=0, owner="qwen/qwen3.5-flash-02-23")
+    line.candidate = challenge
+    services = _Services(_StuckLLM())
+    services.lean = lean
+    services.checkpoint = lambda *a, **k: None
+    problem = SimpleNamespace(challenge=challenge, description="s", id="t")
+    ledger = Ledger()
+    got = asyncio.run(agent._advance(problem, line, services, ledger, (), ()))
+    return got, line, ledger
+
+
+def test_a_lemma_lean_found_is_spliced_in_rather_than_requested():
+    """The correct hint reached the model 3 times on rmo_2000_2 and was used 0
+    times, so the tactic is applied instead of suggested."""
+
+    got, line, ledger = _advance_result(_FixableLean())
+    assert got is True, "a substitution that Lean accepts was not taken"
+    assert "Nat.sqrt_le" in line.candidate
+    assert "theorem required" in line.candidate, "the graded declaration was cut"
+    assert [e for e in ledger.events if e.get("stage") == "substituted"]
