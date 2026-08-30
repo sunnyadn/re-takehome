@@ -49,6 +49,7 @@ class Slot:
     answer: str | None = None
     goal: str = ""
     tried: set[str] = field(default_factory=set)
+    last: tuple[str, str] = ("", "")
 
     @property
     def is_answer(self) -> bool:
@@ -147,8 +148,11 @@ def ask_user(problem: Problem, slot: Slot, goal: str) -> str:
         "Challenge file:", "```lean", problem.challenge, "```", "",
         "Already proved for this slot:", "```lean", proved, "```", "",
         "The goal Lean still reports open:", "```", goal, "```",
-        "", *( [f"Already tried and rejected: {', '.join(sorted(slot.tried)[:8])}"]
-               if slot.tried else [] ),
+        *( ["", "Your last attempt and what Lean said about it:",
+            "```", slot.last[0][:400], "```", "```", slot.last[1], "```"]
+           if slot.last[1] else [] ),
+        *( [f"", f"Already rejected: {'; '.join(sorted(slot.tried)[:6])}"]
+           if slot.tried else [] ),
     ])
 
 
@@ -266,12 +270,14 @@ class Blackboard:
         inside = [l for l in error_lines(check.messages) if lo <= l <= hi]
         ok = not inside if closer is None else (check.accepted and not inside)
         if not ok:
+            slot.last = (offered, "\n".join(error_messages(check.messages)[:2])[:600])
             if events is not None:
                 events.append({"stage": "rejected", "line": slot.line,
                                "kind": "closer" if closer is not None else "step",
                                "inside": len(inside), "accepted": bool(check.accepted)})
             slot.steps, slot.closer = before_steps, before_closer
             return False
+        slot.last = ("", "")
         if closer is not None:
             services.checkpoint(source, {"line": slot.line, "closer": True})
         return True
