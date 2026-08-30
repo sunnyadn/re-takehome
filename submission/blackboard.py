@@ -132,7 +132,7 @@ accepts it on its own. Every step that compiles is kept permanently, so a long
 guess costs nothing but a short correct prefix is worth a lot.
 
 Rules:
-- A HAVE must be a step you are confident Lean accepts on its own. Small is better.
+- Keep each step small enough to stand on its own; small is better.
 - Never write sorry, admit, axiom, native_decide, or unsafe.
 - Prefer omega, decide, interval_cases, norm_num, linarith, nlinarith, ring, simp.
 - ℕ subtraction truncates. Prove the side condition and let omega restate the
