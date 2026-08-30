@@ -23,6 +23,7 @@ ANSWER_SORRY = re.compile(r"^(\s*(?:abbrev|def)\s+\S+.*:=\s*)sorry\s*$")
 STEP = re.compile(r"HAVE\s*:\s*(.+?)\s*:=\s*by\s+(.+)", re.I)
 CLOSE = re.compile(r"CLOSE\s*:\s*(.+)", re.I)
 ANSWER = re.compile(r"^\s*ANSWER\s*:\s*(\S+)\s*$", re.M)
+HAVE_HEAD = re.compile(r"^\s*have\s+(.+?)\s*:=\s*by\s*(.*)$")
 UNSOLVED = "unsolved goals"
 STEP_TOKENS = 6000
 # A turn that parses nothing is common, so one barren pass must not end the run.
@@ -125,13 +126,10 @@ def goals_of(messages: Sequence[dict[str, Any]]) -> list[str]:
 
 SYSTEM = """You extend a Lean 4 proof one step at a time against a full Mathlib.
 
-You are shown one open goal and every step already proved for it. Think as briefly as you
-like, then end your reply with exactly one of these two lines, on its own line:
-
-HAVE: <statement> := by <tactic>
-CLOSE: <tactic that closes the goal you were shown>
-
-The last such line in your reply is the one that will be used.
+You are shown one open goal and every step already proved for it. Write the rest of the proof as a
+chain of `have` steps in one ```lean block, each step small enough that Lean
+accepts it on its own. Every step that compiles is kept permanently, so a long
+guess costs nothing but a short correct prefix is worth a lot.
 
 Rules:
 - A HAVE must be a step you are confident Lean accepts on its own. Small is better.
@@ -154,6 +152,38 @@ def ask_user(problem: Problem, slot: Slot, goal: str) -> str:
         *( [f"", f"Already rejected: {'; '.join(sorted(slot.tried)[:6])}"]
            if slot.tried else [] ),
     ])
+
+
+def offered_steps(reply: str, indent: str) -> tuple[list[tuple[str, str]], str]:
+    """Split a whole proof into top-level `have` steps and whatever closes it.
+
+    Models write the entire proof, so harvest its longest compiling prefix."""
+
+    block = re.search(r"```(?:lean)?\n(.*?)```", reply, re.S)
+    body = block.group(1) if block else reply
+    lines = [l for l in body.splitlines() if l.strip()]
+    base = min((len(l) - len(l.lstrip()) for l in lines), default=0)
+    steps, tail, current = [], [], None
+    for line in lines:
+        depth = len(line) - len(line.lstrip())
+        head = HAVE_HEAD.match(line) if depth <= base else None
+        if head:
+            if current:
+                steps.append(current)
+            current = (head.group(1).strip(), head.group(2).strip())
+            continue
+        if current and depth > base:
+            current = (current[0], f"{current[1]}\n{indent}  {line.strip()}")
+            continue
+        if current:
+            steps.append(current)
+            current = None
+        if depth <= base and not line.lstrip().startswith(("theorem", "import", "--")):
+            tail.append(line.strip())
+    if current:
+        steps.append(current)
+    return steps, " ".join(tail[-1:])
+
 
 
 @dataclass
@@ -283,28 +313,31 @@ class Blackboard:
         return True
 
     async def _ask(self, problem, slots, slot, services, events, names, turn) -> bool:
+        """Keep the longest prefix of the model's proof that Lean accepts."""
+
         model = self.config.lines[turn % len(self.config.lines)]
         reply = await self._call(model, SYSTEM, ask_user(problem, slot, slot.goal),
                                  services, events)
         if reply is None:
             return False
+        steps, tail = offered_steps(reply, slot.indent)
+        gained = 0
+        for step in steps:
+            if self._left() <= TURN_RESERVE_S:
+                break
+            if not await self._try(problem, slots, slot, services, names, events, step=step):
+                slot.tried.add(step[0][:60])
+                break
+            gained += 1
+            events.append({"stage": "step", "line": slot.line, "model": model,
+                           "steps": len(slot.steps)})
         close = _last(CLOSE, reply)
-        step = _last(STEP, reply)
-        if close is not None and (step is None or close.start() > step.start()):
-            tactic = close.group(1).strip().splitlines()[0]
-            if await self._try(problem, slots, slot, services, names, events, closer=tactic):
-                events.append({"stage": "closed", "line": slot.line, "model": model})
-                return True
-            slot.tried.add(tactic)
-            return False
-        if step is not None:
-            kind, tactic = step.group(1).strip(), " ".join(step.group(2).split())
-            if await self._try(problem, slots, slot, services, names, events, step=(kind, tactic)):
-                events.append({"stage": "step", "line": slot.line, "model": model,
-                               "steps": len(slot.steps)})
-                return True
-            slot.tried.add(kind)
-        return False
+        closer = close.group(1).strip().splitlines()[0] if close else tail
+        if closer and await self._try(problem, slots, slot, services, names,
+                                      events, closer=closer):
+            events.append({"stage": "closed", "line": slot.line, "model": model})
+            return True
+        return gained > 0
 
     async def _answer(self, problem, slots, slot, services, events, names, turn) -> bool:
         model = self.config.lines[turn % len(self.config.lines)]
