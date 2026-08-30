@@ -195,7 +195,8 @@ def offered_steps(reply: str, indent: str) -> tuple[list[tuple[str, str]], str]:
             current = (head.group(1).strip(), head.group(2).strip())
             continue
         if current is not None and depth > base:
-            current = (current[0], f"{current[1]}\n{indent}  {line.strip()}")
+            keep = " " * (depth - base)
+            current = (current[0], f"{current[1]}\n{indent}  {keep}{line.strip()}")
             continue
         if current:
             steps.append(current)

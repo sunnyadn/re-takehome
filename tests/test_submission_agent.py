@@ -823,3 +823,16 @@ def test_steps_are_harvested_from_a_whole_file_reply():
     steps, tail = bb.offered_steps(reply, "  ")
     assert [k for k, _ in steps] == ["a : 1 ≤ x + 1", "b : 0 < x + 1"]
     assert tail == "trivial"
+
+
+def test_a_nested_tactic_keeps_its_own_indentation():
+    """Flattening every continuation line produced Lean that could not parse."""
+
+    import submission.blackboard as bb
+    reply = ("```lean\n  have a : True := by\n    by_cases h : 1 = 1\n"
+             "    · trivial\n    · trivial\n```")
+    steps, _ = bb.offered_steps(reply, "  ")
+    body = steps[0][1]
+    lines = [l for l in body.splitlines() if l.strip()]
+    depths = [len(l) - len(l.lstrip()) for l in lines]
+    assert len(set(depths)) == 1 and depths[0] > 2
