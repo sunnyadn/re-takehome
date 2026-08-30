@@ -459,6 +459,19 @@ def splice_at_failure(source: str, errline: int, tactic: str) -> str | None:
     return "\n".join(lines[: at - 1] + spliced + lines[end:]) + "\n"
 
 
+def swap_line(source: str, errline: int, tactic: str) -> str | None:
+    """Replace only the failing line, so the proof after it survives.
+
+    Splicing the whole tail discarded 26 to 106 lines of a real candidate."""
+
+    lines = source.splitlines()
+    if not 1 <= errline <= len(lines):
+        return None
+    old = lines[errline - 1]
+    indent = old[: len(old) - len(old.lstrip())] or "  "
+    return "\n".join(lines[: errline - 1] + [indent + tactic] + lines[errline:]) + "\n"
+
+
 def search_file(source: str, errline: int) -> str | None:
     """The candidate with `apply?` where the proof first went wrong."""
 
@@ -778,14 +791,15 @@ class SubmissionAgent:
     ) -> tuple[str, Any] | None:
         """Splice a lemma Lean actually found, instead of asking for it.
 
-        Requiring the whole file to compile never fired: 0 of 65 recorded
-        searches ran on a file with one error, so take any strict drop."""
+        The tail form fired 0 times on 65 recorded hits; swapping one line first."""
 
         best = None
-        for tactic in tactics[:MAX_SUBSTITUTIONS]:
+        forms = [f for t in tactics[:MAX_SUBSTITUTIONS]
+                 for f in (swap_line(line.candidate, at, t),
+                           splice_at_failure(line.candidate, at, t))]
+        for fixed in forms:
             if self._time_left() <= LEMMA_SEARCH_TIMEOUT_S:
                 break
-            fixed = splice_at_failure(line.candidate, at, tactic)
             if fixed is None:
                 continue
             fixed = normalise_imports(fixed, line.candidate)

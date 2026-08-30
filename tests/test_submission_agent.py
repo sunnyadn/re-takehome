@@ -765,3 +765,18 @@ def test_split_candidates_are_only_built_for_a_decomposable_goal():
     flat = "theorem t (x : ℝ) : x = x := by\n  sorry\n"
     assert len(agent_mod.split_files(iff, ("rfl",))) == len(agent_mod.SPLITTERS)
     assert agent_mod.split_files(flat, ("rfl",)) == []
+
+
+def test_a_swap_keeps_the_proof_after_the_failing_line():
+    source = "import Mathlib\ntheorem t : True := by\n  have a := 1\n  bogus_name\n  trivial\n"
+    swapped = agent_mod.swap_line(source, 4, "exact rfl")
+    assert swapped is not None
+    assert "have a := 1" in swapped and "trivial" in swapped
+    assert "bogus_name" not in swapped and "exact rfl" in swapped
+    assert len(swapped.splitlines()) == len(source.splitlines())
+
+
+def test_the_tail_form_is_what_discarded_the_proof():
+    source = "import Mathlib\ntheorem t : True := by\n  have a := 1\n  bogus_name\n  trivial\n"
+    tail = agent_mod.splice_at_failure(source, 4, "exact rfl")
+    assert tail is not None and "trivial" not in tail
