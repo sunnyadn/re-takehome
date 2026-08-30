@@ -173,14 +173,20 @@ def ask_user(problem: Problem, slot: Slot, goal: str) -> str:
 def offered_steps(reply: str, indent: str) -> tuple[list[tuple[str, str]], str]:
     """Split a whole proof into top-level `have` steps and whatever closes it.
 
-    Models write the entire proof, so harvest its longest compiling prefix."""
+    The base indent comes from the first `have`, since models emit the whole
+    file and a minimum over all lines then sits at the import."""
 
     block = re.search(r"```(?:lean)?\n(.*?)```", reply, re.S)
     body = block.group(1) if block else reply
     lines = [l for l in body.splitlines() if l.strip()]
-    base = min((len(l) - len(l.lstrip()) for l in lines), default=0)
-    steps, tail, current = [], [], None
-    for line in lines:
+    first = next((i for i, l in enumerate(lines) if l.lstrip().startswith("have ")), None)
+    if first is None:
+        return [], ""
+    base = len(lines[first]) - len(lines[first].lstrip())
+    steps: list[tuple[str, str]] = []
+    tail = ""
+    current: tuple[str, str] | None = None
+    for line in lines[first:]:
         depth = len(line) - len(line.lstrip())
         head = HAVE_HEAD.match(line) if depth <= base else None
         if head:
@@ -188,18 +194,17 @@ def offered_steps(reply: str, indent: str) -> tuple[list[tuple[str, str]], str]:
                 steps.append(current)
             current = (head.group(1).strip(), head.group(2).strip())
             continue
-        if current and depth > base:
+        if current is not None and depth > base:
             current = (current[0], f"{current[1]}\n{indent}  {line.strip()}")
             continue
         if current:
             steps.append(current)
             current = None
-        if depth <= base and not line.lstrip().startswith(("theorem", "import", "--")):
-            tail.append(line.strip())
+        if depth <= base:
+            tail = line.strip()
     if current:
         steps.append(current)
-    return steps, " ".join(tail[-1:])
-
+    return steps, tail
 
 
 @dataclass
