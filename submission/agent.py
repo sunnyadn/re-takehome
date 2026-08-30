@@ -30,6 +30,9 @@ REPAIR_TOKENS = 16000
 FEEDBACK_CHARS = 6000
 # Each substitution costs one Lean check and no tokens.
 MAX_SUBSTITUTIONS = 2
+# Longest excursion above its own best that any of 32 winning lines ever took
+# was 9 turns, and an 1800s line only gets about 6, so this never fires there.
+RESTART_AFTER = 10
 # Wins are early and cheap: the dearest of 54 recorded ones took 43 calls and
 # $0.05, and none ever came later. Width buys more of that range than depth.
 SLOT_TEMPERATURES = (0.2, 0.7, 1.0)
@@ -122,6 +125,9 @@ class Line:
     feedback: str = ""
     done: bool = False
     resume: tuple[str, str] | None = None
+    best: str = ""
+    best_errors: int | None = None
+    adrift: int = 0
 
 @dataclass
 class Ledger:
@@ -430,6 +436,24 @@ def source_lines(
         if reported and 1 <= int(reported) <= len(kept):
             out.append(kept[int(reported) - 1])
     return sorted(set(out))
+
+
+def keep_best(line: Line, ledger: Ledger) -> tuple[str, int | None]:
+    """Return a line to its best file once it has drifted far from it.
+
+    Every line of a 3.9-hour run ended worse than its own best, by 32."""
+
+    if line.errors is not None and (line.best_errors is None
+                                    or line.errors < line.best_errors):
+        line.best, line.best_errors, line.adrift = line.candidate, line.errors, 0
+        return line.candidate, line.errors
+    line.adrift += 1
+    if line.adrift < RESTART_AFTER or not line.best:
+        return line.candidate, line.errors
+    ledger.events.append({"line": line.index, "stage": "restart",
+                          "from_errors": line.errors, "to_errors": line.best_errors})
+    line.adrift = 0
+    return line.best, line.best_errors
 
 
 def splice_at_failure(source: str, errline: int, tactic: str) -> str | None:
@@ -753,6 +777,7 @@ class SubmissionAgent:
             ledger.events.append({"line": line.index, "stage": "substituted", "at": at,
                                   "model": model, "errors": line.errors,
                                   "accepted": check.accepted})
+        line.candidate, line.errors = keep_best(line, ledger)
         signature = "\n".join([error_signature(check.messages)] + faults)
         line.stalls = line.stalls + 1 if signature == line.signature else 0
         line.signature = signature

@@ -14,12 +14,14 @@ from submission.agent import (
 
 def _walk(errors):
     line = Line(index=0, owner="m")
+    ledger = agent_mod.Ledger()
     seen = []
     for i, e in enumerate(errors):
         line.candidate, line.errors = f"file-{i}", e
         line.signature, line.feedback = f"sig-{e}", f"fb-{e}"
+        line.candidate, line.errors = agent_mod.keep_best(line, ledger)
         seen.append((line.errors, line.candidate))
-    return line, seen
+    return line, seen, ledger
 
 
 def test_a_line_keeps_working_from_its_latest_file_even_when_it_got_worse():
@@ -27,10 +29,19 @@ def test_a_line_keeps_working_from_its_latest_file_even_when_it_got_worse():
     error increase, including the only ones on p09_imo1964 and
     p10_factorial_pow."""
 
-    line, seen = _walk([5, 2, 16, 17, 7, 7])
+    line, seen, ledger = _walk([5, 2, 16, 17, 7, 7])
     assert [e for e, _ in seen] == [5, 2, 16, 17, 7, 7]
     assert line.candidate == "file-5"
-    assert not hasattr(line, "best")
+    assert not [e for e in ledger.events if e.get("stage") == "restart"]
+
+
+def test_a_line_that_drifts_for_ten_turns_returns_to_its_best():
+    """An 1800s line takes about 6 turns, so this only reaches long runs."""
+
+    line, seen, ledger = _walk([5, 2] + [9] * 10)
+    restarts = [e for e in ledger.events if e.get("stage") == "restart"]
+    assert len(restarts) == 1 and restarts[0]["to_errors"] == 2
+    assert line.candidate == "file-1" and line.errors == 2
 
 
 def test_every_cocktail_alternative_is_parenthesised():
