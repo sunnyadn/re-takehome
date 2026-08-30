@@ -20,12 +20,21 @@ from submission.agent import (
 
 SORRY = re.compile(r"^(\s*)sorry\s*$")
 ANSWER_SORRY = re.compile(r"^(\s*(?:abbrev|def)\s+\S+.*:=\s*)sorry\s*$")
-STEP = re.compile(r"^\s*HAVE\s*:\s*(.+?)\s*:=\s*by\s+(.+)$", re.S)
-CLOSE = re.compile(r"^\s*CLOSE\s*:\s*(.+)$", re.S)
+STEP = re.compile(r"HAVE\s*:\s*(.+?)\s*:=\s*by\s+(.+)", re.I)
+CLOSE = re.compile(r"CLOSE\s*:\s*(.+)", re.I)
 ANSWER = re.compile(r"^\s*ANSWER\s*:\s*(\S+)\s*$", re.M)
 UNSOLVED = "unsolved goals"
-STEP_TOKENS = 3000
+STEP_TOKENS = 6000
+# A turn that parses nothing is common, so one barren pass must not end the run.
+STUCK_LIMIT = 12
 TURN_RESERVE_S = 90.0
+
+
+def _last(pattern: re.Pattern[str], text: str) -> re.Match[str] | None:
+    """The final directive in a reply that reasoned before answering."""
+
+    found = list(pattern.finditer(text))
+    return found[-1] if found else None
 
 
 @dataclass
@@ -115,11 +124,13 @@ def goals_of(messages: Sequence[dict[str, Any]]) -> list[str]:
 
 SYSTEM = """You extend a Lean 4 proof one step at a time against a full Mathlib.
 
-You are shown one open goal and every step already proved for it. Reply with
-exactly one of these two lines and nothing else:
+You are shown one open goal and every step already proved for it. Think as briefly as you
+like, then end your reply with exactly one of these two lines, on its own line:
 
 HAVE: <statement> := by <tactic>
 CLOSE: <tactic that closes the goal you were shown>
+
+The last such line in your reply is the one that will be used.
 
 Rules:
 - A HAVE must be a step you are confident Lean accepts on its own. Small is better.
@@ -168,6 +179,7 @@ class Blackboard:
         slots = find_slots(problem.challenge)
         events: list[dict[str, Any]] = []
         model_turn = 0
+        stuck = 0
 
         source, _ = render(problem.challenge, slots)
         try:
@@ -183,7 +195,8 @@ class Blackboard:
                                               events, names, model_turn)
                     model_turn += 1
                     progressed = progressed or got
-                if not progressed:
+                stuck = 0 if progressed else stuck + 1
+                if stuck >= STUCK_LIMIT:
                     events.append({"stage": "stop", "note": "no slot advanced"})
                     break
             source, _ = render(problem.challenge, slots)
@@ -260,16 +273,16 @@ class Blackboard:
                                  services, events)
         if reply is None:
             return False
-        close = CLOSE.match(reply.strip())
-        if close:
+        close = _last(CLOSE, reply)
+        step = _last(STEP, reply)
+        if close is not None and (step is None or close.start() > step.start()):
             tactic = close.group(1).strip().splitlines()[0]
             if await self._try(problem, slots, slot, services, names, closer=tactic):
                 events.append({"stage": "closed", "line": slot.line, "model": model})
                 return True
             slot.tried.add(tactic)
             return False
-        step = STEP.match(reply.strip())
-        if step:
+        if step is not None:
             kind, tactic = step.group(1).strip(), " ".join(step.group(2).split())
             if await self._try(problem, slots, slot, services, names, step=(kind, tactic)):
                 events.append({"stage": "step", "line": slot.line, "model": model,
