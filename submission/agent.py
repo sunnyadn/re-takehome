@@ -929,6 +929,11 @@ Produce, in this order:
 2. PROOF: a complete, rigorous argument in English. Every step must be justified and no case may be skipped.
 3. LEAN NOTES: the Mathlib lemma names and tactics the formalisation will need, and any step you expect to be hard in Lean.
 
+Choose a plan Lean can check cheaply:
+- Reduce the infinite to the finite. Bound the unknown between two explicit values, or use periodicity modulo a small number, or induct. State the bound.
+- Leave the finite part to interval_cases, decide, or omega. Do not hand-prove what enumeration closes.
+- Stay in the type the statement uses. Changing the ambient type costs one cast lemma at every later step, so take that route only if no omega or nlinarith route exists.
+
 Be concrete. The reader writes Lean directly from this and cannot consult you again."""
 
 FORMALIZER_SYSTEM = """You write Lean 4 files that compile against a full Mathlib.
@@ -955,9 +960,12 @@ NAT_SUB = re.compile(r"(ℕ|Nat)")
 HAS_SUB = re.compile(r"[\w\)]\s-\s[\w\(]")
 NAT_SUB_WARNING = (
     "This statement subtracts on ℕ, where `a - b` is 0 when `b > a`, so any "
-    "step that treats it as ordinary subtraction is unsound. Prove the `b ≤ a` "
-    "side condition first and let `omega` remove the subtraction, or move the "
-    "hypothesis to ℤ with `zify [h]` where `h` is that bound."
+    "step that treats it as ordinary subtraction is unsound. Do not cast to ℤ: "
+    "every later step would then need a cast lemma. Prove the `b ≤ a` side "
+    "condition, then have `omega` restate the hypothesis with the subtracted "
+    "term added to the other side instead, so that no `-` is left anywhere: "
+    "turn `L = a - b + c` into `L + b = a + c`. Keeping `(a - b)` as a subterm "
+    "is not enough, because nlinarith cannot see through it."
 )
 
 
