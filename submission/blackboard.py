@@ -230,7 +230,7 @@ class Blackboard:
         for tactic in self._free_closers():
             if tactic in slot.tried:
                 continue
-            if await self._try(problem, slots, slot, services, names, closer=tactic):
+            if await self._try(problem, slots, slot, services, names, events, closer=tactic):
                 events.append({"stage": "closed_free", "line": slot.line, "tactic": tactic[:60]})
                 return True
             slot.tried.add(tactic)
@@ -243,17 +243,22 @@ class Blackboard:
 
         return ["first " + " ".join(wrap_tactic(t) for t in COCKTAIL)]
 
-    async def _try(self, problem, slots, slot, services, names,
+    async def _try(self, problem, slots, slot, services, names, events=None,
                    step=None, closer=None) -> bool:
-        """Accept only when nothing inside this slot errors."""
+        """Accept only when nothing inside this slot errors.
 
+        The placeholder `sorry` is banned, so only the offered text is screened."""
+
+        offered = " ".join(step or ()) if step is not None else (closer or "")
+        if banned_constructs(offered):
+            return False
         before_steps, before_closer = list(slot.steps), slot.closer
         if step is not None:
             slot.steps = before_steps + [step]
         if closer is not None:
             slot.closer = closer
         source, spans = render(problem.challenge, slots)
-        if banned_constructs(source) or statement_drift(problem.challenge, source):
+        if statement_drift(problem.challenge, source):
             slot.steps, slot.closer = before_steps, before_closer
             return False
         check = await services.lean.check_file(source)
@@ -261,6 +266,10 @@ class Blackboard:
         inside = [l for l in error_lines(check.messages) if lo <= l <= hi]
         ok = not inside if closer is None else (check.accepted and not inside)
         if not ok:
+            if events is not None:
+                events.append({"stage": "rejected", "line": slot.line,
+                               "kind": "closer" if closer is not None else "step",
+                               "inside": len(inside), "accepted": bool(check.accepted)})
             slot.steps, slot.closer = before_steps, before_closer
             return False
         if closer is not None:
@@ -277,14 +286,14 @@ class Blackboard:
         step = _last(STEP, reply)
         if close is not None and (step is None or close.start() > step.start()):
             tactic = close.group(1).strip().splitlines()[0]
-            if await self._try(problem, slots, slot, services, names, closer=tactic):
+            if await self._try(problem, slots, slot, services, names, events, closer=tactic):
                 events.append({"stage": "closed", "line": slot.line, "model": model})
                 return True
             slot.tried.add(tactic)
             return False
         if step is not None:
             kind, tactic = step.group(1).strip(), " ".join(step.group(2).split())
-            if await self._try(problem, slots, slot, services, names, step=(kind, tactic)):
+            if await self._try(problem, slots, slot, services, names, events, step=(kind, tactic)):
                 events.append({"stage": "step", "line": slot.line, "model": model,
                                "steps": len(slot.steps)})
                 return True
