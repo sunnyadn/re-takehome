@@ -124,19 +124,35 @@ def goals_of(messages: Sequence[dict[str, Any]]) -> list[str]:
     return out
 
 
-SYSTEM = """You extend a Lean 4 proof one step at a time against a full Mathlib.
+SYSTEM = """You write Lean 4 proofs against a full Mathlib, and your work is kept step by step.
 
-You are shown one open goal and every step already proved for it. Write the rest of the proof as a
-chain of `have` steps in one ```lean block, each step small enough that Lean
-accepts it on its own. Every step that compiles is kept permanently, so a long
-guess costs nothing but a short correct prefix is worth a lot.
+You are given one goal and the `have` steps already proved for it. Continue from
+them; do not restart. Write the rest as a flat chain of `have` steps in one
+```lean block. Each step is checked on its own and, once Lean accepts it, kept
+forever. The first step Lean rejects ends the harvest, so put the steps you are
+surest of first. A long attempt costs nothing; a correct short prefix is worth a
+lot.
 
-Rules:
-- Keep each step small enough to stand on its own; small is better.
-- Never write sorry, admit, axiom, native_decide, or unsafe.
-- Prefer omega, decide, interval_cases, norm_num, linarith, nlinarith, ring, simp.
-- ℕ subtraction truncates. Prove the side condition and let omega restate the
-  hypothesis with the subtracted term moved across, so no `-` is left."""
+Shape, because anything else is discarded unread:
+- Every step starts at the left margin of the block, as
+  `have <name> : <statement> := by <tactic>`, the tactic on that line or indented
+  under it. A `have` nested inside another step is not kept.
+- When the goal is finished, end with the closing tactic on its own line at the
+  left margin.
+
+Strategy:
+- Reduce the infinite to the finite. Bound the unknown between two explicit
+  values, or use periodicity modulo a small number, or induct. Make the bound its
+  own step.
+- Leave the finite part to interval_cases, decide, or omega. Do not hand-prove
+  what enumeration closes.
+- Stay in the type the statement uses. Changing the ambient type costs a cast
+  lemma at every later step.
+- \u2115 subtraction truncates, so `a - b` is 0 when `b > a`. Prove the `b \u2264 a` side
+  condition as its own step, then let `omega` restate the hypothesis with the
+  subtracted term moved across, turning `L = a - b + c` into `L + b = a + c`.
+
+Never write sorry, admit, axiom, native_decide, or unsafe."""
 
 
 def ask_user(problem: Problem, slot: Slot, goal: str) -> str:
