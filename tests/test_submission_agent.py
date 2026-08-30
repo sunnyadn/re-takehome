@@ -780,3 +780,12 @@ def test_the_tail_form_is_what_discarded_the_proof():
     source = "import Mathlib\ntheorem t : True := by\n  have a := 1\n  bogus_name\n  trivial\n"
     tail = agent_mod.splice_at_failure(source, 4, "exact rfl")
     assert tail is not None and "trivial" not in tail
+
+
+def test_a_refine_that_opens_goals_is_not_counted_as_worse():
+    opened = [{"severity": "error", "data": "unsolved goals\n⊢ 8 ≤ (x + 2) ^ 3"},
+              {"severity": "error", "data": "unsolved goals\n⊢ x ≤ y"}]
+    named = [{"severity": "error", "data": "unknown constant `Nat.lt_of_pow_lt_pow`"}]
+    assert agent_mod.hard_errors(opened) == 0
+    assert agent_mod.hard_errors(named) == 1
+    assert agent_mod.hard_errors(opened + named) == 1

@@ -527,6 +527,14 @@ def suggestions(messages: Sequence[dict[str, Any]]) -> list[str]:
             if m.get("severity") == "info" and TRY_THIS in str(m.get("data", ""))]
 
 
+def hard_errors(messages: Sequence[dict[str, Any]]) -> int:
+    """Errors other than a goal left open, which `refine` opens by design.
+
+    97.7% of Lean's own suggestions are `refine`, so counting holes rejects all."""
+
+    return sum(1 for m in error_messages(messages) if not m.startswith(UNSOLVED))
+
+
 def drop_lines(source: str, drop: Sequence[int]) -> str:
     removed = set(drop)
     kept = [l for i, l in enumerate(source.splitlines(), start=1) if i not in removed]
@@ -736,7 +744,8 @@ class SubmissionAgent:
         hint, tactics, at = await self._lemma_hint(
             line.candidate, check, ledger, line.index, services)
         swapped = await self._substitute(line, at, tactics, services, ledger, names,
-                                         problem.challenge)
+                                         problem.challenge,
+                                         hard_errors(check.messages) + len(faults))
         if swapped is not None:
             line.candidate, check = swapped
             hint = []
@@ -787,11 +796,12 @@ class SubmissionAgent:
 
     async def _substitute(
         self, line: Line, at: int, tactics: Sequence[str], services: Services,
-        ledger: Ledger, names: Sequence[str], challenge: str,
+        ledger: Ledger, names: Sequence[str], challenge: str, before: int,
     ) -> tuple[str, Any] | None:
         """Splice a lemma Lean actually found, instead of asking for it.
 
-        The tail form fired 0 times on 65 recorded hits; swapping one line first."""
+        Gated on errors that are not open goals: 97.7% of suggestions are
+        `refine`, which opens goals and so never lowered a raw error count."""
 
         best = None
         forms = [f for t in tactics[:MAX_SUBSTITUTIONS]
@@ -809,8 +819,9 @@ class SubmissionAgent:
                 check = await services.lean.check_file(fixed)
             except LeanRuntimeError:
                 break
-            faults, errors = grade(fixed, check, names, challenge)
-            if faults or errors >= line.errors:
+            faults, _ = grade(fixed, check, names, challenge)
+            errors = hard_errors(check.messages)
+            if faults or errors >= before:
                 continue
             if best is None or errors < best[1]:
                 best = (fixed, errors, check)
