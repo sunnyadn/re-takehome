@@ -12,14 +12,17 @@ from submission.agent import (
 )
 
 
-def _walk(errors):
+def _walk(errors, proved=None):
+    """Each turn offers (proved have-steps, hard errors); default proved is flat."""
+
     line = Line(index=0, owner="m")
     ledger = agent_mod.Ledger()
     seen = []
     for i, e in enumerate(errors):
         line.candidate, line.errors = f"file-{i}", e
         line.signature, line.feedback = f"sig-{e}", f"fb-{e}"
-        line.candidate, line.errors = agent_mod.keep_best(line, ledger)
+        line.candidate, line.errors = agent_mod.keep_best(
+            line, ledger, (proved[i] if proved else 1), e)
         seen.append((line.errors, line.candidate))
     return line, seen, ledger
 
@@ -38,9 +41,9 @@ def test_a_line_keeps_working_from_its_latest_file_even_when_it_got_worse():
 def test_a_line_that_drifts_for_ten_turns_returns_to_its_best():
     """An 1800s line takes about 6 turns, so this only reaches long runs."""
 
-    line, seen, ledger = _walk([5, 2] + [9] * 10)
+    line, seen, ledger = _walk([5, 2] + [9] * 10, proved=[1, 3] + [0] * 10)
     restarts = [e for e in ledger.events if e.get("stage") == "restart"]
-    assert len(restarts) == 1 and restarts[0]["to_errors"] == 2
+    assert len(restarts) == 1 and restarts[0]["to"] == [3, 2]
     assert line.candidate == "file-1" and line.errors == 2
 
 
@@ -800,3 +803,11 @@ def test_a_refine_that_opens_goals_is_not_counted_as_worse():
     assert agent_mod.hard_errors(opened) == 0
     assert agent_mod.hard_errors(named) == 1
     assert agent_mod.hard_errors(opened + named) == 1
+
+
+def test_a_gutted_file_never_becomes_the_best():
+    """Two fewer errors does not outrank four proved steps that were deleted."""
+
+    line, _, ledger = _walk([9] + [1] * 12, proved=[4] + [0] * 12)
+    assert not [e for e in ledger.events if e.get("stage") == "restart"]
+    assert line.best_proved == 4

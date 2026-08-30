@@ -127,6 +127,8 @@ class Line:
     resume: tuple[str, str] | None = None
     best: str = ""
     best_errors: int | None = None
+    best_proved: int = -1
+    best_hard: int = 10 ** 9
     adrift: int = 0
 
 @dataclass
@@ -438,20 +440,32 @@ def source_lines(
     return sorted(set(out))
 
 
-def keep_best(line: Line, ledger: Ledger) -> tuple[str, int | None]:
-    """Return a line to its best file once it has drifted far from it.
+def proved_steps(source: str, messages: Sequence[dict[str, Any]]) -> int:
+    """How many `have` steps Lean did not complain about.
 
-    Every line of a 3.9-hour run ended worse than its own best, by 32."""
+    Error count alone once ranked a gutted file above a good skeleton."""
 
-    if line.errors is not None and (line.best_errors is None
-                                    or line.errors < line.best_errors):
+    bad = set(source_lines(messages, source))
+    return sum(1 for i, l in enumerate(source.splitlines(), start=1)
+               if l.lstrip().startswith("have ") and i not in bad)
+
+
+def keep_best(line: Line, ledger: Ledger, proved: int, hard: int) -> tuple[str, int | None]:
+    """Return a line to its best file, ranked by dominance, never by a score.
+
+    Every line of a 3.9-hour run ended worse than its own best."""
+
+    if line.best_errors is None or (proved >= line.best_proved and hard <= line.best_hard
+                                    and (proved > line.best_proved or hard < line.best_hard)):
         line.best, line.best_errors, line.adrift = line.candidate, line.errors, 0
+        line.best_proved, line.best_hard = proved, hard
         return line.candidate, line.errors
     line.adrift += 1
-    if line.adrift < RESTART_AFTER or not line.best:
+    dominated = proved < line.best_proved and hard > line.best_hard
+    if line.adrift < RESTART_AFTER or not dominated or not line.best:
         return line.candidate, line.errors
     ledger.events.append({"line": line.index, "stage": "restart",
-                          "from_errors": line.errors, "to_errors": line.best_errors})
+                          "from": [proved, hard], "to": [line.best_proved, line.best_hard]})
     line.adrift = 0
     return line.best, line.best_errors
 
@@ -777,7 +791,9 @@ class SubmissionAgent:
             ledger.events.append({"line": line.index, "stage": "substituted", "at": at,
                                   "model": model, "errors": line.errors,
                                   "accepted": check.accepted})
-        line.candidate, line.errors = keep_best(line, ledger)
+        line.candidate, line.errors = keep_best(
+            line, ledger, proved_steps(line.candidate, check.messages),
+            hard_errors(check.messages) + len(faults))
         signature = "\n".join([error_signature(check.messages)] + faults)
         line.stalls = line.stalls + 1 if signature == line.signature else 0
         line.signature = signature
