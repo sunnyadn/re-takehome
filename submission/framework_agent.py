@@ -791,8 +791,11 @@ class FrameworkAgent:
 
         ask = (f"Problem: {problem.description}\n\nThe goal, as Lean reports it:\n"
                f"{state.goal[:GOAL_CHARS]}\n\nHow do you prove this?")
+        # Measured on p10: with reasoning on, the plan came back as "The user is
+        # asking me to prove a theorem in Lean 4", which costs a call and enters
+        # every later prompt. Reasoning stays on only where it is the answer.
         reply, _ = await self._call(model or self.config.lines[0], ask, PLAN_TOKENS,
-                                    services, ledger, PLANNER_SYSTEM, think=True)
+                                    services, ledger, PLANNER_SYSTEM)
         return strip_fences(reply).strip()[:GOAL_CHARS]
 
     async def _ask_step(self, problem: Problem, state: State,
