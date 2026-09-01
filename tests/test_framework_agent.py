@@ -37,3 +37,9 @@ def test_probe_output_keeps_numerals_only():
         {"severity": "error", "data": "7"},
     ]
     assert fa.printed_numbers(msgs) == ["19"]
+
+
+def test_a_step_that_does_nothing_is_refused():
+    assert fa.screen_step("skip") == ""
+    assert fa.screen_step("skip\n\nskip") == ""
+    assert fa.screen_step("intro n\nskip") != ""

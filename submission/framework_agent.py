@@ -69,6 +69,9 @@ STALL_BEFORE_SWAP = 2
 # a goal that stands through this many of them is rolled back to where it began.
 DRIFT_LIMIT = 6
 MAX_REVERTS = 2
+# Once the rollbacks are spent there is no other exit: the cursor cannot move
+# off a goal nothing closes, so keeping the file growing only buys a bigger file.
+STUCK_LIMIT = 24
 # The finish pass is free of tokens but not of clock, so it is bounded.
 MAX_COLLAPSE = 4
 MAX_DELETIONS = 12
@@ -221,7 +224,7 @@ class FrameworkAgent:
         stalls = 0
         feedback: Feedback | None = None
         raised = False
-        anchor_goal, anchor_text, on_goal = "", text, 0
+        anchor_goal, anchor_text, on_goal, stuck = "", text, 0, 0
         reverted: dict[str, int] = {}
 
         def time_left() -> float:
@@ -328,9 +331,13 @@ class FrameworkAgent:
                 offer(state.text, state.accepted and is_done(state.text))
 
                 if state.goal != anchor_goal:
-                    anchor_goal, anchor_text, on_goal = state.goal, state.text, 0
+                    anchor_goal, anchor_text, on_goal, stuck = state.goal, state.text, 0, 0
                     continue
                 on_goal += 1 if kind == "step" else 0
+                stuck += 1 if kind == "step" else 0
+                if stuck >= STUCK_LIMIT:
+                    events.append({"stage": "stuck", "goal": anchor_goal[:80]})
+                    break
                 if on_goal >= DRIFT_LIMIT and reverted.get(anchor_goal, 0) < MAX_REVERTS:
                     dropped = [h[2] for h in have_spans(state.text)][-on_goal:]
                     reverted[anchor_goal] = reverted.get(anchor_goal, 0) + 1
@@ -560,6 +567,9 @@ def screen_step(reply: str) -> str:
     if not block or STEP_BAN.search(block):
         return ""
     if re.search(r"\bsorry\b", block) and "with" not in block and "|" not in block:
+        return ""
+    # A step that does nothing still enters the file and every later prompt.
+    if all(l.strip() in ("", "skip") for l in block.splitlines()):
         return ""
     return block
 
