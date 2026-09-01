@@ -55,7 +55,6 @@ from submission.framework import (
     is_done,
     message_line,
     unreachable,
-    reopen,
     normalise_steps,
     root_names,
     split_cursor,
@@ -168,6 +167,18 @@ The local check said 348ms, so nothing warns you. Cut the goal into `have`s smal
 enough for `linarith`, `positivity` or `norm_num`, and leave `nlinarith` for a
 step that is already almost closed.
 
+When more than one goal needs the same fact, state it once as a theorem of its
+own instead of as a `have` inside one of them. Reply with
+
+  theorem <a new name> <binders> : <statement> := by
+    sorry
+
+and it is placed above the graded theorems, where every goal can reach it. Its
+`sorry` becomes the next cursor, so you prove it one step at a time like
+anything else. Measured on p09: both directions of `7 ∣ 2 ^ n - 1 ↔ 3 ∣ n` and
+the separate `¬7 ∣ 2 ^ n + 1` all need `2 ^ n % 7 = 2 ^ (n % 3) % 7`, and a
+`have` proved inside one of them is invisible to the other two.
+
 Do not open a `·` bullet you cannot close in the same step: a bullet whose
 interior is unfinished is an error, not a placeholder. A step that splits the
 goal is complete on its own; each goal it opens gets its own turn.
@@ -178,7 +189,8 @@ so none of it could be used and Lean reported a syntax error that was not the
 mistake. Write the next step and stop.
 
 Answer with Lean tactic lines only. No prose, no code fences, no theorem
-header, no `sorry`, no `native_decide`. Indent as if at the top level of the
+header, no `native_decide`, and no `sorry` except as the body of a new theorem
+you are introducing. Indent as if at the top level of the
 proof; branches of an `induction ... with` end in `sorry` where you have not
 worked yet."""
 
@@ -526,10 +538,7 @@ class FrameworkAgent:
                     plan = ""
                     continue
                 on_goal += 1 if kind == "step" else 0
-                # Every turn counts here, not only the paid ones: a free turn
-                # that leaves the goal standing spins the clock, and the clock
-                # is eight hours.
-                stuck += 1
+                stuck += 1 if kind == "step" else 0
                 if stuck >= STUCK_LIMIT:
                     if state.goals > 1:
                         state = await park(state, "stuck")
@@ -575,12 +584,6 @@ class FrameworkAgent:
         surplus = [l for l in (message_line(m) for m in classify(state.messages)[1]) if l]
         if surplus:
             return await self._look(drop_lines(state.text, surplus), services, state.focus)
-        # A step that opened a branch and left it unfinished put a goal where no
-        # placeholder reaches. Lean names it; give it one where Lean points.
-        stranded = unreachable(state.messages, state.text, state.line)
-        if stranded:
-            return await self._look(
-                reopen(state.text, *stranded), services, state.focus)
         if state.accepted:
             return (await self._look(drop_lines(state.text, [state.line]), services,
                                      state.focus)
@@ -602,7 +605,17 @@ class FrameworkAgent:
         if failures or expensive:
             said = format_messages(nxt.messages)[:FEEDBACK_CHARS]
             return None, f"{said}\n{notes_for(said)}".strip()
-        return await self._settle(nxt, services), ""
+        if unreachable(nxt.messages, nxt.text, nxt.line):
+            # The step opened a branch and left it unfinished, so its goal sits
+            # where no placeholder reaches. Measured on p07: guessing where to
+            # put one lands outside the branch and every later closer is a
+            # no-op that still counts as a win.
+            return None, ("that step left a goal open inside a branch nothing "
+                          "can get back to. A step that splits the goal gives "
+                          "every branch its own `sorry`, or closes it outright")
+        if surplus:
+            nxt = await self._settle(nxt, services)
+        return nxt, ""
 
     async def _finish(self, state: State, services: Services, time_left) -> State:
         """Take the search out of a finished file: the comparator allows 180s."""
@@ -869,7 +882,11 @@ def screen_step(reply: str) -> str:
     block = normalise_steps(lean_lines(raw) if not blocks else raw).strip()
     if not block or STEP_BAN.search(block):
         return ""
-    if re.search(r"\bsorry\b", block) and "with" not in block and "|" not in block:
+    # A `sorry` is a placeholder for a goal that gets its own turn: a branch of
+    # an `induction ... with`, or the body of a lemma being introduced. Anywhere
+    # else it is the model closing the goal it was asked to prove.
+    if (re.search(r"\bsorry\b", block) and "with" not in block and "|" not in block
+            and not declaration_name(block)):
         return ""
     # A step that does nothing still enters the file and every later prompt.
     if all(l.strip() in ("", "skip") for l in block.splitlines()):

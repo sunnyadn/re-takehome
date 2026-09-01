@@ -526,3 +526,58 @@ def test_two_goals_behind_one_placeholder_are_split_once_and_only_once():
     splits = [e for e in result.metadata["events"] if e.get("stage") == "split"]
     assert len(splits) == 1 and splits[0]["goals"] == 2
     assert any("case mp =>" in s and "case mpr =>" in s for s in lean.sources)
+
+
+def test_a_lemma_every_goal_can_reach_is_hoisted_and_then_proved_at_the_cursor():
+    shared = "theorem key (n : ℕ) : n + 0 = n := by\n  sorry"
+    lean, llm = FakeLean(), FakeLLM([shared, "have key2 : True := by trivial", "exact key"])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    problem = Problem(id="demo", description="prove it", challenge=CHALLENGE)
+    result = asyncio.run(agent.solve(problem, services))
+    assert {"kind": "lemma", "by": "model-a", "name": "key", "accepted": True} in \
+        result.metadata["events"]
+    hoisted = next(s for s in lean.sources if "theorem key" in s)
+    assert hoisted.index("theorem key") < hoisted.index("theorem demo")
+    # Its own placeholder is the next cursor, so the lemma is proved like any goal.
+    assert any("theorem key (n : ℕ) : n + 0 = n := by\n  skip" in s
+               for s in lean.sources)
+
+
+class StrandLean:
+    """Answers the way Lean did on the bullet that broke p09."""
+
+    def __init__(self):
+        self.sources: list[str] = []
+
+    async def check_file(self, source, timeout_s=None):
+        self.sources.append(source)
+        if "vm_probe" in source:
+            return LeanCheck(True, [], False, False, 1)
+        line = skip_line(source)
+        if "first" in source or "exact?" in source:
+            return LeanCheck(False, [{"severity": "error", "pos": {"line": line or 1},
+                                      "data": "linarith failed"}], True, False, 1)
+        if "intro h" in source:
+            # One error on the bullet's own span, one on the declaration's.
+            return LeanCheck(False, [
+                {"severity": "error", "pos": {"line": 3, "column": 2},
+                 "endPos": {"line": 3, "column": 11},
+                 "data": "unsolved goals\ncase mp\n⊢ True"},
+                {"severity": "error", "pos": {"line": 2, "column": 40},
+                 "endPos": {"line": line, "column": 6},
+                 "data": "unsolved goals\ncase mpr\n⊢ True"}], True, False, 1)
+        if "exact key" in source and "have key" in source:
+            return LeanCheck(True, [], False, False, 1)
+        return unsolved(line)
+
+
+def test_a_step_that_strands_a_goal_in_a_branch_is_refused():
+    lean = StrandLean()
+    llm = FakeLLM(["constructor\n· intro h", "have key : True := by trivial", "exact key"])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    problem = Problem(id="demo", description="prove it", challenge=CHALLENGE)
+    result = asyncio.run(agent.solve(problem, services))
+    assert "intro h" not in result.solution
+    assert "nothing can get back to" in wrote(llm)[1][1]
