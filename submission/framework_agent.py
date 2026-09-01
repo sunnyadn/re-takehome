@@ -24,7 +24,6 @@ from submission.agent import (
     Config,
     Ledger,
     answer_names,
-    error_messages,
     format_messages,
     grade,
     normalise_imports,
@@ -320,10 +319,6 @@ class FrameworkAgent:
         except (BudgetExceeded, BudgetAccountingError, LeanRuntimeError) as exc:
             events.append({"stage": "abort", "error": type(exc).__name__})
             return result(best, "aborted", False)
-
-    async def _check(self, text: str, services: Services) -> Any:
-        source, _ = render(text)
-        return await services.lean.check_file(source)
 
     async def _look(self, text: str, services: Services) -> State:
         """One check does both jobs: it adjudicates, and it prints the next goal."""
