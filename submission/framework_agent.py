@@ -93,6 +93,10 @@ MAX_REVERTS = 2
 STUCK_LIMIT = 24
 # The finish pass is free of tokens but not of clock, so it is bounded.
 MAX_COLLAPSE = 24
+# Measured on p08: a file the REPL checks in 570ms timed out at the comparator's
+# 180s, because the kernel there re-checks the term and nlinarith's are huge.
+HEAVY = ("nlinarith", "polyrith", "decide", "interval_cases")
+LIGHTER = ("linarith", "norm_num", "positivity", "simp", "omega", "ring")
 # The cocktail is ordered by how often each tactic wins, so the one that fired
 # is usually near the front.
 COLLAPSE_TRIES = 12
@@ -515,6 +519,7 @@ class FrameworkAgent:
         """Take the search out of a finished file: the comparator allows 180s."""
 
         state = await self._substitute_search(state, services)
+        state = await self._lighten(state, services, time_left)
         state = await self._prune(state, services, time_left)
         for _ in range(MAX_COLLAPSE):
             blocks = first_blocks(state.text)
@@ -529,6 +534,19 @@ class FrameworkAgent:
             if collapsed is None:
                 break
             state = collapsed
+        return state
+
+    async def _lighten(self, state: State, services: Services, time_left) -> State:
+        """Trade a heavy tactic for a cheap one wherever the file still compiles."""
+
+        for heavy in HEAVY:
+            if time_left() < FINISH_RESERVE_S or heavy not in state.text:
+                continue
+            for light in LIGHTER:
+                probe = await self._look(state.text.replace(heavy, light, 1), services)
+                if probe.accepted and is_done(probe.text):
+                    state = probe
+                    break
         return state
 
     async def _prune(self, state: State, services: Services, time_left) -> State:

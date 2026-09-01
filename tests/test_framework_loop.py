@@ -326,3 +326,21 @@ def test_two_rejections_send_the_goal_back_to_the_mathematician():
     assert who[:4] == ["mathematician", "mathematician", "writer", "writer"]
     assert PLAN in wrote(llm)[2][1]
     assert result.metadata["accepted_by_repl"] is True
+
+
+class HeavyLean(FakeLean):
+    """`nlinarith` compiles; so does `linarith` in its place."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "nlinarith" in source or "linarith" in source:
+            return LeanCheck(True, [], False, False, 1)
+        return await super().check_file(source)
+
+
+def test_a_heavy_tactic_is_traded_for_a_cheap_one_when_the_file_still_compiles():
+    lean, llm = HeavyLean(), FakeLLM(["nlinarith [sq_nonneg (a - b)]"])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("m",), budget_usd=1.0, time_limit_s=3600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="d", challenge=CHALLENGE), services))
+    assert "nlinarith" not in result.solution and "linarith" in result.solution
