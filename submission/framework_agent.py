@@ -145,6 +145,13 @@ Rules:
 - Copy terms out of the printed goal rather than retyping them: omega and
   linarith atomise syntactically, so spellings must match.
 
+`nlinarith` is the most expensive thing you can write. Measured: a proof of one
+inequality that ended in `nlinarith` with three hints produced a 95,000-character
+term, which the grader compiles and re-checks under a 180-second limit it failed.
+The local check said 348ms, so nothing warns you. Cut the goal into `have`s small
+enough for `linarith`, `positivity` or `norm_num`, and leave `nlinarith` for a
+step that is already almost closed.
+
 Do not open a `·` bullet you cannot close in the same step: a bullet whose
 interior is unfinished is an error, not a placeholder. A step that splits the
 goal is complete on its own; each goal it opens gets its own turn.
