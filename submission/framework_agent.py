@@ -425,7 +425,7 @@ class FrameworkAgent:
                 if classify(state.messages)[3]:
                     if state.text != sound:
                         events.append({"stage": "repair",
-                                       "said": format_messages(state.messages)[:200],
+                                       "said": format_messages(classify(state.messages)[3])[:300],
                                        "was": state.text[-300:]})
                         state = await self._look(sound, services, state.focus)
                 else:
