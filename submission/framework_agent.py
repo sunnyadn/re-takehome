@@ -46,6 +46,7 @@ from submission.framework import (
     collapse,
     first_blocks,
     have_spans,
+    in_span,
     classify,
     cursor,
     cursor_goal,
@@ -423,7 +424,9 @@ class FrameworkAgent:
                 # rollback to the last file Lean had no error in.
                 if classify(state.messages)[3]:
                     if state.text != sound:
-                        events.append({"stage": "repair"})
+                        events.append({"stage": "repair",
+                                       "said": format_messages(state.messages)[:200],
+                                       "was": state.text[-300:]})
                         state = await self._look(sound, services, state.focus)
                 else:
                     sound = state.text
@@ -615,7 +618,7 @@ class FrameworkAgent:
         """Try one step. Anything but an open goal means the step is discarded."""
 
         try:
-            candidate, _ = replace_cursor(state.text, block, index=state.focus)
+            candidate, span = replace_cursor(state.text, block, index=state.focus)
         except ValueError:
             return None, "no active goal"
         nxt = await self._look(candidate, services, state.focus)
@@ -633,6 +636,13 @@ class FrameworkAgent:
             return None, ("that step left a goal open inside a branch nothing "
                           "can get back to. A step that splits the goal gives "
                           "every branch its own `sorry`, or closes it outright")
+        if any(in_span(m, span) for m in surplus):
+            # Measured on p09: a step written where the goal is already closed
+            # draws one `no goals` error, and dropping the one line Lean names
+            # leaves the rest of the step in the file as dead text. The step is
+            # wrong as a whole, so it goes as a whole.
+            return None, ("there are no goals left where that step was written: "
+                          "the goal it was meant for is already closed")
         if surplus:
             nxt = await self._settle(nxt, services)
         return nxt, ""

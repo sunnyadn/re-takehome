@@ -650,3 +650,30 @@ def test_a_file_carrying_an_error_of_its_own_is_rolled_back():
         Problem(id="demo", description="prove it", challenge=CHALLENGE), services))
     assert result.metadata["accepted_by_repl"] is True
     assert "have bad" not in result.solution
+
+
+class NoGoalsLean(FakeLean):
+    """Says `No goals to be solved` for a step written after the goal closed."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "simp_all" in source and "first" not in source and "exact?" not in source:
+            self.sources.append(source)
+            line = next(i for i, l in enumerate(source.split("\n"), start=1)
+                        if "simp_all" in l)
+            return LeanCheck(False, [{"severity": "error", "pos": {"line": line - 1},
+                                      "data": "No goals to be solved"}], True, False, 1)
+        return await super().check_file(source)
+
+
+def test_a_step_written_where_the_goal_is_closed_goes_as_a_whole():
+    lean = NoGoalsLean()
+    llm = FakeLLM(["simp_all\npositivity\nbound",
+                   "have key : True := by trivial", "exact key"])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=CHALLENGE), services))
+    # Not one line of it survives: dropping only the line Lean named is what
+    # left the rest of the step in p09's file as dead text.
+    assert "simp_all" not in result.solution and "positivity" not in result.solution
+    assert any("no goals left where that step" in t for _, t in wrote(llm))
