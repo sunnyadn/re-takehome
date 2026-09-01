@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import re
 import time
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Any, Sequence
 
 from re_harness import AgentResult, LLMCallError, Problem, Services
@@ -18,7 +18,6 @@ from re_harness.lean import LeanRuntimeError
 
 from submission.agent import (
     BUDGET_HEADROOM,
-    SubmissionAgent,
     declared_names,
     FEEDBACK_CHARS,
     RETRY_BACKOFF_S,
@@ -621,46 +620,5 @@ def screen_step(reply: str) -> str:
     return block
 
 
-# What is left for the fallback if the framework loop does not finish. The
-# split is a judgement, not a measurement: the older agent is the one with a
-# live-fire record, so it keeps a share it can actually work with.
-FRAMEWORK_SHARE = 0.6
-MIN_FALLBACK_USD = 0.15
-MIN_FALLBACK_S = 300.0
-
-
-class Submission:
-    """The framework loop, with the older search agent behind it.
-
-    Handing over costs nothing when the loop wins, and the loop cannot spend
-    the fallback's share, so this is never worse than either alone."""
-
-    def __init__(self, config: Config | None = None):
-        self.config = config or Config.from_env()
-
-    async def solve(self, problem: Problem, services: Services) -> AgentResult:
-        cfg = self.config
-        started = time.monotonic()
-        first = await FrameworkAgent(
-            replace(cfg, budget_usd=cfg.budget_usd * FRAMEWORK_SHARE)).solve(
-                problem, services)
-        if first.metadata.get("accepted_by_repl"):
-            return first
-        spent = float(first.metadata.get("spend_usd") or 0.0)
-        left_usd = cfg.budget_usd - spent
-        left_s = cfg.time_limit_s - (time.monotonic() - started)
-        if left_usd < MIN_FALLBACK_USD or left_s < MIN_FALLBACK_S:
-            return first
-        second = await SubmissionAgent(
-            replace(cfg, budget_usd=left_usd, time_limit_s=left_s)).solve(
-                problem, services)
-        if second.metadata.get("accepted_by_repl"):
-            return second
-        names = answer_names(problem.challenge)
-        if scoring_faults(second.solution, names, problem.challenge):
-            return first
-        return second
-
-
-def create_agent() -> Submission:
-    return Submission()
+def create_agent() -> FrameworkAgent:
+    return FrameworkAgent()
