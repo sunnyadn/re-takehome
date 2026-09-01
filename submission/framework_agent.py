@@ -73,9 +73,15 @@ MAX_REVERTS = 2
 MAX_COLLAPSE = 4
 MAX_DELETIONS = 12
 FINISH_RESERVE_S = 300.0
-# Lean's elaboration budget is deterministic, so raising it is sound; it buys
-# that determinism with wall clock, which the comparator caps at 180s.
-RAISED_HEARTBEATS = "set_option maxHeartbeats 400000"
+# Lean's budgets are deterministic, so raising them is sound; it buys that
+# determinism with wall clock, which the comparator caps at 180s. Measured on
+# p06_pow_mod: what a large power needs is recursion depth, not heartbeats.
+RAISED_BUDGETS = ("set_option maxHeartbeats 400000\n"
+                     "set_option maxRecDepth 8000\n"
+                     "set_option exponentiation.threshold 4000")
+# The comparator allows 180 seconds, so a file that only just compiles here is
+# not safe there. Recorded, never silently accepted.
+SLOW_COMPILE_MS = 150_000
 
 FRAMEWORK_SYSTEM = """You extend a Lean 4 proof one step at a time, against a full Mathlib.
 
@@ -298,20 +304,20 @@ class FrameworkAgent:
                     break
 
                 nxt, why = await self._advance(state, block, services)
-                if nxt is None and why == HEARTBEAT_RETRY and not raised:
+                if nxt is None and why == BUDGET_RETRY and not raised:
                     # A step that only ran out of elaboration budget is not a
                     # wrong step; give it the budget once and re-adjudicate.
                     raised = True
                     state = await self._look(
-                        insert_preamble(state.text, RAISED_HEARTBEATS), services)
+                        insert_preamble(state.text, RAISED_BUDGETS), services)
                     nxt, why = await self._advance(state, block, services)
                 events.append({"kind": kind, "by": author, "accepted": nxt is not None})
                 if nxt is None:
                     # Only a model's own rejections count towards its turn; the
                     # free attempts are the harness's.
-                    if why == HEARTBEAT_RETRY:
+                    if why == BUDGET_RETRY:
                         why = ("the step exceeded Lean's elaboration budget even at "
-                               f"{RAISED_HEARTBEATS.split()[-1]} heartbeats; make it cheaper")
+                               "a raised budget; make it cheaper")
                     feedback = Feedback(author if kind == "step" else kind, why)
                     stalls += 1 if kind == "step" else 0
                     if stalls >= STALL_BEFORE_SWAP:
@@ -339,7 +345,8 @@ class FrameworkAgent:
                 check = await services.lean.check_file(probed)
                 faults, _ = grade(state.text, check, names, problem.challenge)
                 events.append({"stage": "verify", "accepted": check.accepted,
-                               "faults": faults[:5]})
+                               "faults": faults[:5], "compile_ms": check.duration_ms,
+                               "slow": check.duration_ms > SLOW_COMPILE_MS})
                 if check.accepted and not faults:
                     offer(state.text, True)
                     return result(state.text, "framework_loop", True)
@@ -377,7 +384,7 @@ class FrameworkAgent:
         nxt = await self._look(candidate, services)
         _, surplus, expensive, failures = classify(nxt.messages)
         if expensive and not failures:
-            return None, HEARTBEAT_RETRY
+            return None, BUDGET_RETRY
         if failures or expensive:
             said = format_messages(nxt.messages)[:FEEDBACK_CHARS]
             return None, f"{said}\n{notes_for(said)}".strip()
@@ -516,7 +523,7 @@ class FrameworkAgent:
         return ""
 
 
-HEARTBEAT_RETRY = "__heartbeat__"
+BUDGET_RETRY = "__budget__"
 NUMBER = re.compile(r"^-?\d+$")
 
 

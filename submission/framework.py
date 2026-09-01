@@ -113,8 +113,12 @@ def root_names(text: str) -> tuple[str, ...]:
 # Measured: Lean writes "No goals to be solved" for a leftover tactic and
 # "no goals to be solved" elsewhere, so every match here is case-folded.
 UNSOLVED = "unsolved goals"
-HEARTBEAT = "maximum number of heartbeats"
 NO_GOALS = "no goals to be solved"
+# A step Lean refused for want of budget is not a wrong step, and Lean names the
+# option to raise. Measured on p06_pow_mod: 7 ^ 2026 fails in 88ms on recursion
+# depth, not on heartbeats.
+BUDGETS = ("maximum number of heartbeats", "maximum recursion depth",
+           "exceeds the threshold")
 
 
 def message_text(message: Any) -> str:
@@ -134,7 +138,7 @@ def classify(messages: Sequence[Any]) -> tuple[list[Any], list[Any], list[Any], 
             progress.append(m)
         elif NO_GOALS in text:
             surplus.append(m)
-        elif HEARTBEAT in text:
+        elif any(b in text for b in BUDGETS):
             expensive.append(m)
         else:
             failures.append(m)

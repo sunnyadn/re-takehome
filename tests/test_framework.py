@@ -153,3 +153,12 @@ def test_lean_s_own_wording_for_no_goals_is_matched_whatever_its_case():
             "data": "'skip' tactic does nothing"}
     progress, surplus, expensive, failures = fw.classify([left, warn])
     assert surplus == [left] and not failures and not progress
+
+
+def test_a_budget_error_is_not_a_wrong_step():
+    # Both lines came off the graded image, checking 7 ^ 2026 % 100 = 49.
+    depth = {"severity": "error", "data": "maximum recursion depth has been reached "
+             "use `set_option maxRecDepth <num>` to increase limit"}
+    threshold = {"severity": "warning", "data": "exponent 2026 exceeds the threshold 256"}
+    progress, surplus, expensive, failures = fw.classify([depth, threshold])
+    assert expensive == [depth] and not failures
