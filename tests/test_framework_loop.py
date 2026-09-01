@@ -123,3 +123,25 @@ def test_the_loop_stops_asking_once_the_budget_headroom_is_gone():
     assert len(llm.calls) <= 2
     assert result.metadata["accepted_by_repl"] is False
     assert result.metadata["spend_usd"] <= 0.02
+
+
+class AxiomLean(FakeLean):
+    """Lean accepts the file, but `#print axioms` names one off the allowlist."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "#print axioms" in source:
+            return LeanCheck(True, [{"severity": "info", "data":
+                "'demo' depends on axioms: [propext, demo._native.native_decide.ax_1]"}],
+                False, False, 1)
+        return await super().check_file(source)
+
+
+def test_an_axiom_off_the_allowlist_is_not_offered_as_a_win():
+    lean, llm = AxiomLean(), FakeLLM(["have key : True := by trivial", "exact key"])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="d", challenge=CHALLENGE), services))
+    assert result.metadata["accepted_by_repl"] is False
+    verify = [e for e in result.metadata["events"] if e.get("stage") == "verify"]
+    assert verify and verify[0]["faults"]

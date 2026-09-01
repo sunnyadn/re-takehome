@@ -122,3 +122,25 @@ def test_sweep_forces_every_alternative_to_close():
 
 def test_root_names_reads_the_graded_theorems():
     assert fw.root_names(TWO_THEOREMS) == ("a", "b")
+
+
+SWEPT = """import Mathlib
+
+theorem demo : True := by
+  first
+  | (rfl; done)
+  | (simp; done)
+"""
+
+
+def test_a_search_block_collapses_to_one_alternative():
+    blocks = fw.first_blocks(SWEPT)
+    assert len(blocks) == 1
+    assert fw.alternatives(blocks[0].group(2)) == ["rfl", "simp"]
+    collapsed = fw.collapse(SWEPT, blocks[0], "simp")
+    assert collapsed.endswith("  simp\n") and "first" not in collapsed
+
+
+def test_the_axiom_probe_names_every_graded_theorem():
+    probed = fw.axiom_probe(CHALLENGE, fw.root_names(CHALLENGE))
+    assert probed.rstrip().endswith("#print axioms demo")

@@ -184,3 +184,30 @@ def any_goals_sweep(cocktail: Sequence[str] = COCKTAIL) -> str:
     """`all_goals` rolls everything back if one goal survives; `any_goals` keeps."""
 
     return "any_goals (" + " | ".join(wrap_tactic(t) for t in cocktail) + ")"
+
+
+FIRST_BLOCK = re.compile(r"^([ \t]*)first[ \t]*\n((?:[ \t]*\|.*(?:\n|$))+)", re.M)
+ALTERNATIVE = re.compile(r"^[ \t]*\|[ \t]*\((.*);[ \t]*done\)[ \t]*$", re.M)
+
+
+def first_blocks(text: str) -> list[re.Match[str]]:
+    """Search blocks left in a finished proof, slowest first thing to compile."""
+
+    return list(FIRST_BLOCK.finditer(text))
+
+
+def alternatives(block: str) -> list[str]:
+    return ALTERNATIVE.findall(block)
+
+
+def collapse(text: str, match: re.Match[str], tactic: str) -> str:
+    """Put one alternative where the whole search block was."""
+
+    return text[: match.start()] + f"{match.group(1)}{tactic}\n" + text[match.end():]
+
+
+def axiom_probe(text: str, names: Sequence[str]) -> str:
+    """`#print axioms` for every graded name; an allowlist, never a blocklist."""
+
+    lines = "\n".join(f"#print axioms {n}" for n in names)
+    return f"{text.rstrip()}\n\n{lines}\n" if lines else text

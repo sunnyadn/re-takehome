@@ -18,6 +18,7 @@ from re_harness.lean import LeanRuntimeError
 
 from submission.agent import (
     BUDGET_HEADROOM,
+    declared_names,
     FEEDBACK_CHARS,
     RETRY_BACKOFF_S,
     Config,
@@ -37,8 +38,10 @@ from submission.agent import (
     usable_cocktail,
 )
 from submission.framework import (
-    NO_GOALS,
-    any_goals_sweep,
+    alternatives,
+    axiom_probe,
+    collapse,
+    first_blocks,
     classify,
     cursor,
     cursor_goal,
@@ -61,6 +64,9 @@ GOAL_CHARS = 4000
 FILE_CHARS = 8000
 # Two rejections on one goal and the other model gets it, with Lean's reason.
 STALL_BEFORE_SWAP = 2
+# The finish pass is free of tokens but not of clock, so it is bounded.
+MAX_COLLAPSE = 4
+FINISH_RESERVE_S = 300.0
 
 FRAMEWORK_SYSTEM = """You extend a Lean 4 proof one step at a time, against a full Mathlib.
 
@@ -265,12 +271,16 @@ class FrameworkAgent:
                 state, feedback, stalls = nxt, None, 0
                 offer(state.text, state.accepted and is_done(state.text))
 
-            state = await self._finish(state, problem, names, services)
-            faults, _ = grade(state.text, await self._check(state.text, services),
-                              names, problem.challenge)
-            if state.accepted and is_done(state.text) and not faults:
-                offer(state.text, True)
-                return result(state.text, "framework_loop", True)
+            if is_done(state.text):
+                state = await self._finish(state, services, time_left)
+                probed = axiom_probe(state.text, declared_names(problem.challenge))
+                check = await services.lean.check_file(probed)
+                faults, _ = grade(state.text, check, names, problem.challenge)
+                events.append({"stage": "verify", "accepted": check.accepted,
+                               "faults": faults[:5]})
+                if check.accepted and not faults:
+                    offer(state.text, True)
+                    return result(state.text, "framework_loop", True)
             offer(state.text, False)
             return result(best, "best_effort", False)
         except (BudgetExceeded, BudgetAccountingError, LeanRuntimeError) as exc:
@@ -315,19 +325,35 @@ class FrameworkAgent:
             nxt = await self._settle(nxt, services)
         return nxt, ""
 
-    async def _finish(self, state: State, problem: Problem, names: Sequence[str],
-                      services: Services) -> State:
-        """Replace each search call with the term it printed; the search is slow."""
+    async def _finish(self, state: State, services: Services, time_left) -> State:
+        """Take the search out of a finished file: the comparator allows 180s."""
+
+        state = await self._substitute_search(state, services)
+        for _ in range(MAX_COLLAPSE):
+            blocks = first_blocks(state.text)
+            if not blocks or time_left() < FINISH_RESERVE_S:
+                break
+            collapsed = None
+            for tactic in alternatives(blocks[0].group(2)):
+                probe = await self._look(collapse(state.text, blocks[0], tactic), services)
+                if probe.accepted:
+                    collapsed = probe
+                    break
+            if collapsed is None:
+                break
+            state = collapsed
+        return state
+
+    async def _substitute_search(self, state: State, services: Services) -> State:
+        """Replace each `exact?` with the term it printed, keeping the search
+        call when the term does not re-elaborate."""
 
         if "exact?" not in state.text and "apply?" not in state.text:
             return state
-        found = suggested_tactics(suggestions(state.messages))
-        for term in found[:4]:
-            candidate = state.text.replace("exact?", term, 1)
-            probe = await self._look(candidate, services)
-            if probe.accepted or not classify(probe.messages)[3]:
-                state = probe
-                break
+        for term in suggested_tactics(suggestions(state.messages))[:4]:
+            probe = await self._look(state.text.replace("exact?", term, 1), services)
+            if probe.accepted:
+                return probe
         return state
 
     async def _ask_step(self, problem: Problem, state: State,
