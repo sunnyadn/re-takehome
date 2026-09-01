@@ -337,3 +337,13 @@ def test_a_models_thinking_is_not_its_answer():
     # An unclosed think block runs to the end of the reply.
     assert fa.spoken("<think>\nstill going") == ""
     assert fa.spoken("intro h\nexact h") == "intro h\nexact h"
+
+
+def test_a_tool_call_is_read_when_the_model_makes_one():
+    import submission.framework_agent as fa
+    calls = [{"function": {"name": "answer",
+                           "arguments": '{"evals": ["#eval 6", "#eval 7"]}'}}]
+    assert fa.tool_lines(calls) == "#eval 6\n#eval 7"
+    # A model that ignores the schema leaves nothing here, and the reply is read.
+    assert fa.tool_lines([]) == "" and fa.tool_lines(None) == ""
+    assert fa.tool_lines([{"function": {"arguments": "not json"}}]) == ""

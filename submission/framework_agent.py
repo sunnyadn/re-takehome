@@ -7,6 +7,7 @@ otherwise ask a model for one step. A step that compiles is permanent.
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 import time
 from dataclasses import dataclass, field
@@ -856,7 +857,8 @@ class FrameworkAgent:
                    "line that prints `true` or `some n` is not an answer." + note)
             asking = self.config.lines[attempt % len(self.config.lines)]
             reply, _ = await self._call(
-                asking, ask, ANSWER_TOKENS, services, ledger, think=True)
+                asking, ask, ANSWER_TOKENS, services, ledger, think=True,
+                tools=[EVAL_TOOL])
             probes = [l for l in strip_fences(reply).splitlines()
                       if l.strip().startswith("#eval")]
             if not probes:
@@ -883,8 +885,8 @@ class FrameworkAgent:
         return text
 
     async def _call(self, model: str, prompt: str, max_tokens: int, services: Services,
-                    ledger: Ledger, system: str = "",
-                    think: bool = False) -> tuple[str, str]:
+                    ledger: Ledger, system: str = "", think: bool = False,
+                    tools: Sequence[Any] = ()) -> tuple[str, str]:
         """The reply and why the provider stopped, which is not always `stop`.
 
         Reasoning is off for steps because it crowds the block out of the reply.
@@ -902,19 +904,48 @@ class FrameworkAgent:
                     max_tokens=max_tokens,
                     temperature=0.4,
                     reasoning=REASONING if think else self._reasoning(model),
+                    **({"tools": list(tools),
+                        "tool_choice": {"type": "function",
+                                        "function": {"name": "answer"}}} if tools else {}),
                 )
             except LLMCallError as exc:
                 if refused_before_generation(exc):
                     continue
                 raise
             ledger.record(reply.usage)
-            return spoken(reply.content or ""), reply.finish_reason or ""
+            said = tool_lines(reply.tool_calls) or spoken(reply.content or "")
+            return said, reply.finish_reason or ""
         return "", ""
 
 
 # Measured on p10: a model that reasons returns its draft inside `<think>`
 # tags, and the ten `#eval` lines it tried there are not its answer.
 THINKING = re.compile(r"<think>.*?(?:</think>|\Z)", re.S | re.I)
+
+
+# Measured: qwen honours a forced tool call and gpt-oss ignores it, and
+# neither errors, so a schema is an extra channel and never a requirement.
+EVAL_TOOL = {"type": "function", "function": {
+    "name": "answer", "description": "One evaluation line per name, in order.",
+    "parameters": {"type": "object",
+                   "properties": {"evals": {"type": "array",
+                                            "items": {"type": "string"}}},
+                   "required": ["evals"]}}}
+
+
+def tool_lines(calls: Sequence[Any]) -> str:
+    """The strings a tool call carried, if the model made one."""
+
+    for call in calls or ():
+        body = (call or {}).get("function", {}).get("arguments")
+        try:
+            fields = json.loads(body) if isinstance(body, str) else body
+        except ValueError:
+            continue
+        for value in (fields or {}).values():
+            if isinstance(value, list) and all(isinstance(v, str) for v in value):
+                return "\n".join(value)
+    return ""
 
 
 def spoken(reply: str) -> str:

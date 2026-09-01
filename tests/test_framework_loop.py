@@ -67,7 +67,7 @@ PLAN = "Take the obvious route: state the fact and close it."
 
 def said(content: str, cost: float, finish: str = "stop"):
     return type("R", (), {"content": content, "usage": {"cost": cost},
-                          "finish_reason": finish})()
+                          "finish_reason": finish, "tool_calls": None})()
 
 
 class FakeLLM:
