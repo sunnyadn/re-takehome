@@ -240,3 +240,35 @@ def test_several_goals_behind_one_placeholder_each_get_their_own():
     # A bullet keeps its body on the next line, which is where the cursor scans.
     assert plain.split("\n")[3:7] == ["  ·", "    sorry", "  ·", "    sorry"]
     assert len(fw.placeholders(plain)) == 2
+
+
+# Both messages came off the graded image, checking the file below. Lean counts
+# lines from zero, so the bullet is its line 4 and the theorem its line 2.
+STRANDED = "import Mathlib\n\ntheorem t : True ∧ True := by\n  constructor\n  · trivial\n  skip\n"
+BULLET = {"severity": "error", "pos": {"line": 4, "column": 2},
+          "endPos": {"line": 4, "column": 11}, "data": "unsolved goals\ncase mp\n⊢ 3 ∣ n"}
+WHOLE = {"severity": "error", "pos": {"line": 2, "column": 62},
+         "endPos": {"line": 5, "column": 6}, "data": "unsolved goals\ncase mpr\n⊢ True"}
+
+
+def test_lean_counts_lines_from_zero_and_this_file_counts_from_one():
+    assert fw.message_line(BULLET) == 5 and fw.message_end_line(BULLET) == 5
+    assert fw.message_span(WHOLE) == (3, 6)
+    assert fw.message_column(BULLET) == 2
+
+
+def test_the_active_goal_is_the_tightest_span_that_holds_the_cursor():
+    # The first message is the branch's, not the cursor's; taking it is what
+    # showed the writer `case mp` for six hundred turns while it sat on mpr.
+    assert fw.cursor_goal([BULLET, WHOLE], 6) == "case mpr\n⊢ True"
+    assert fw.cursor_goal([BULLET, WHOLE], 5) == "case mp\n⊢ 3 ∣ n"
+
+
+def test_a_goal_no_placeholder_can_reach_is_given_one_inside_its_branch():
+    text = STRANDED.replace("  skip\n", "  sorry\n")
+    assert fw.unreachable([BULLET, WHOLE], text, 6) == (5, 4)
+    reopened = fw.reopen(text, 5, 4)
+    assert reopened.split("\n")[5] == "    sorry"
+    assert len(fw.placeholders(reopened)) == 2
+    # Once it has one, it is not stranded any more.
+    assert fw.unreachable([BULLET, WHOLE], reopened, 7) is None

@@ -156,10 +156,22 @@ def classify(messages: Sequence[Any]) -> tuple[list[Any], list[Any], list[Any], 
     return progress, surplus, expensive, failures
 
 
+def _at(message: Any, key: str, field: str) -> int | None:
+    """Measured on the graded image: Lean's positions are 0-based."""
+
+    pos = message.get(key) if isinstance(message, dict) else None
+    found = pos.get(field) if isinstance(pos, dict) else None
+    if not isinstance(found, int):
+        return None
+    return found + 1 if field == "line" else found
+
+
 def message_line(message: Any) -> int | None:
-    pos = message.get("pos") if isinstance(message, dict) else None
-    line = pos.get("line") if isinstance(pos, dict) else None
-    return line if isinstance(line, int) else None
+    return _at(message, "pos", "line")
+
+
+def message_column(message: Any) -> int | None:
+    return _at(message, "pos", "column")
 
 
 def in_span(message: Any, span: tuple[int, int]) -> bool:
@@ -179,25 +191,60 @@ def goal_text(message: Any) -> str:
 
 
 def cursor_goal(messages: Sequence[Any], cursor_line: int) -> str:
-    """The active goal.
+    """The active goal: the tightest reported span that holds the cursor.
 
-    Lean attributes the message to the `skip` sometimes and to the enclosing
-    declaration otherwise, so the cursor's own line is a preference, not a key."""
+    Lean attributes an unfinished branch to the branch and the goal at the
+    cursor to the whole declaration, so the first message is often the wrong
+    one and only containment tells them apart."""
 
     open_goals = classify(messages)[0]
-    for m in open_goals:
-        if message_line(m) == cursor_line:
-            return goal_text(m)
+    holding = [(m, message_span(m)) for m in open_goals]
+    fits = [(span[1] - span[0], goal_text(m)) for m, span in holding
+            if span and span[0] <= cursor_line <= span[1]]
+    if fits:
+        return min(fits, key=lambda f: f[0])[1]
     return goal_text(open_goals[0]) if open_goals else ""
 
 
 def message_end_line(message: Any) -> int | None:
-    pos = message.get("endPos") if isinstance(message, dict) else None
-    line = pos.get("line") if isinstance(pos, dict) else None
-    return line if isinstance(line, int) else None
+    return _at(message, "endPos", "line")
 
 
-def reopen(text: str, line: int) -> str:
+def message_span(message: Any) -> tuple[int, int] | None:
+    start = message_line(message)
+    if start is None:
+        return None
+    end = message_end_line(message)
+    return (start, end if end is not None and end >= start else start)
+
+
+def unreachable(messages: Sequence[Any], text: str,
+                cursor_line: int) -> tuple[int, int] | None:
+    """A goal no placeholder can reach, and where to put one.
+
+    Measured on p09: `· intro h` leaves the bullet's goal open with a span of
+    its own, while the declaration's span holds the goal at the cursor. A goal
+    whose span holds neither is one the cursor can never get back to."""
+
+    at = [(line_of(text, m.start()), len(m.group(1))) for m in placeholders(text)]
+    for message in classify(messages)[0]:
+        span = message_span(message)
+        column = message_column(message)
+        if span is None or column is None:
+            continue
+        if span[0] <= cursor_line <= span[1]:
+            continue
+        # A placeholder inside the span belongs to the branch, and so does the
+        # one this returns, which lands a line past the span indented under it.
+        # Without that second case the same goal is reopened on every check.
+        if any(span[0] <= line <= span[1] or (line == span[1] + 1 and indent > column)
+               for line, indent in at):
+            continue
+        return span[1], column + 2
+    return None
+
+
+def reopen(text: str, line: int, column: int | None = None) -> str:
     """Give a goal with nowhere to work a placeholder at the end of its block.
 
     A tactic closes the goal in front of it, so goals opened by a split are
@@ -208,7 +255,8 @@ def reopen(text: str, line: int) -> str:
     while at > 1 and not lines[at - 1].strip():
         at -= 1
     body = lines[at - 1]
-    indent = body[: len(body) - len(body.lstrip())] or "  "
+    indent = (" " * column if column is not None
+              else body[: len(body) - len(body.lstrip())] or "  ")
     lines.insert(at, f"{indent}sorry")
     return "\n".join(lines)
 

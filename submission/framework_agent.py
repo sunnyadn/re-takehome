@@ -53,8 +53,8 @@ from submission.framework import (
     fill_answer,
     insert_preamble,
     is_done,
-    message_end_line,
     message_line,
+    unreachable,
     reopen,
     normalise_steps,
     root_names,
@@ -575,15 +575,16 @@ class FrameworkAgent:
         surplus = [l for l in (message_line(m) for m in classify(state.messages)[1]) if l]
         if surplus:
             return await self._look(drop_lines(state.text, surplus), services, state.focus)
+        # A step that opened a branch and left it unfinished put a goal where no
+        # placeholder reaches. Lean names it; give it one where Lean points.
+        stranded = unreachable(state.messages, state.text, state.line)
+        if stranded:
+            return await self._look(
+                reopen(state.text, *stranded), services, state.focus)
         if state.accepted:
             return (await self._look(drop_lines(state.text, [state.line]), services,
                                      state.focus)
                     if state.line else state)
-        # A split left a goal behind and the file has nowhere to work on it.
-        open_goals = classify(state.messages)[0]
-        end = message_end_line(open_goals[0]) if open_goals else None
-        if end:
-            return await self._look(reopen(state.text, end), services, state.focus)
         return state
 
     async def _advance(self, state: State, block: str,
@@ -601,9 +602,7 @@ class FrameworkAgent:
         if failures or expensive:
             said = format_messages(nxt.messages)[:FEEDBACK_CHARS]
             return None, f"{said}\n{notes_for(said)}".strip()
-        if surplus:
-            nxt = await self._settle(nxt, services)
-        return nxt, ""
+        return await self._settle(nxt, services), ""
 
     async def _finish(self, state: State, services: Services, time_left) -> State:
         """Take the search out of a finished file: the comparator allows 180s."""
