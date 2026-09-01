@@ -319,3 +319,11 @@ def test_the_writer_may_restate_the_declaration_the_cursor_is_inside():
     assert body == "induction n with\n| zero => simp"
     # Restating a name that is taken and not the one being proved is not a step.
     assert fw.drop_own(reply, ("aux",)) == ""
+
+
+def test_a_block_is_cut_back_one_top_level_step_at_a_time():
+    block = "intro h\nhave a : True := by\n  trivial\nexact a"
+    assert fw.prefixes(block) == ["intro h\nhave a : True := by\n  trivial", "intro h"]
+    # A single step has no shorter form worth trying.
+    assert fw.prefixes("omega") == []
+    assert fw.prefixes("have a : True := by\n  trivial") == []

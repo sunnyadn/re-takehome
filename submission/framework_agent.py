@@ -64,6 +64,7 @@ from submission.framework import (
     split_cursor,
     unwrap_own,
     placeholders,
+    prefixes,
     render,
     replace_cursor,
     sweep_body,
@@ -123,6 +124,8 @@ LIGHTER = ("linarith", "norm_num", "positivity", "simp", "omega", "ring")
 # is usually near the front.
 COLLAPSE_TRIES = 12
 MAX_DELETIONS = 12
+# Each try is one check, and a check is 60ms against a reply's seconds.
+MAX_PREFIXES = 8
 FINISH_RESERVE_S = 300.0
 # Lean's budgets are deterministic, so raising them is sound; it buys that
 # determinism with wall clock, which the comparator caps at 180s. Measured on
@@ -516,6 +519,18 @@ class FrameworkAgent:
                     break
 
                 nxt, why = await self._advance(state, block, services)
+                if nxt is None and why != BUDGET_RETRY and kind == "step":
+                    # One wrong name at line ten is not a reason to lose lines
+                    # one to nine. Lean is the cheap resource, so it is asked
+                    # how much of the reply it will take.
+                    for shorter in prefixes(block)[:MAX_PREFIXES]:
+                        nxt, why2 = await self._advance(state, shorter, services)
+                        if nxt is not None:
+                            events.append({"kind": "prefix", "by": author,
+                                           "lines": shorter.count("\n") + 1})
+                            block, why = shorter, ""
+                            break
+                        why = why2
                 if nxt is None and why != BUDGET_RETRY:
                     # The fact may be right and only its proof wrong, which is
                     # exactly what `exact?` is for. One free check decides.

@@ -579,8 +579,9 @@ def test_a_step_that_strands_a_goal_in_a_branch_is_refused():
     agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
     problem = Problem(id="demo", description="prove it", challenge=CHALLENGE)
     result = asyncio.run(agent.solve(problem, services))
+    # The bullet is refused; what Lean will take of the block is kept instead.
     assert "intro h" not in result.solution
-    assert "nothing can get back to" in wrote(llm)[1][1]
+    assert any(e.get("kind") == "prefix" for e in result.metadata["events"])
 
 
 SLOT_CHALLENGE = ("import Mathlib\n\nabbrev p_answer : ℕ := sorry\n\n"
@@ -686,3 +687,28 @@ def test_a_goal_that_will_not_close_does_not_end_a_run_with_time_left():
                             lines=("model-a",))
     # Ending on the budget is the proof that nothing else ended it first.
     assert result.metadata["events"][-1] == {"stage": "stop", "note": "budget headroom"}
+
+
+class PickyLean(FakeLean):
+    """Takes `intro h` and `have good`, refuses anything naming `bad_lemma`."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "bad_lemma" in source:
+            self.sources.append(source)
+            return LeanCheck(False, [{"severity": "error", "pos": {"line": 1},
+                                      "data": "unknown identifier 'bad_lemma'"}],
+                             True, False, 1)
+        return await super().check_file(source)
+
+
+def test_the_part_of_a_block_lean_takes_is_kept():
+    lean = PickyLean()
+    llm = FakeLLM(["have key : True := by trivial\nexact bad_lemma", "exact key"])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=CHALLENGE), services))
+    assert {"kind": "prefix", "by": "model-a", "lines": 1} in result.metadata["events"]
+    assert "have key : True := by trivial" in result.solution
+    assert "bad_lemma" not in result.solution
+    assert result.metadata["accepted_by_repl"] is True

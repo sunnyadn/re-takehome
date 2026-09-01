@@ -403,6 +403,23 @@ def as_goal(block: str) -> str:
     return f"{found.group(1)}\n  sorry" if found else ""
 
 
+def prefixes(block: str) -> list[str]:
+    """The block cut back one top-level step at a time, longest first.
+
+    Measured on p09: every reply is a whole proof and one wrong lemma name
+    throws away the nine lines that were right. A check costs 60ms and a reply
+    costs seconds, so the cheap thing asks which prefix Lean will take."""
+
+    lines = block.split("\n")
+    body = [l for l in lines if l.strip()]
+    if len(body) < 2:
+        return []
+    base = min(len(l) - len(l.lstrip()) for l in body)
+    starts = [i for i, l in enumerate(lines)
+              if l.strip() and len(l) - len(l.lstrip()) == base]
+    return ["\n".join(lines[:at]).rstrip() for at in reversed(starts[1:])]
+
+
 def enclosing_name(text: str, index: int = 0) -> str:
     """The declaration the cursor is inside, which the writer keeps restating.
 
