@@ -465,29 +465,29 @@ def test_a_reply_cut_off_at_the_token_limit_is_not_sent_to_lean():
     assert "ran out of tokens" in wrote(llm)[1][1]
 
 
-class FussyLLM:
-    """Refuses to have its reasoning turned off, the way gpt-oss-120b does."""
+class WatchLLM:
+    """Records the reasoning setting each model is sent."""
 
     def __init__(self, replies):
-        self.replies, self.reasonings = list(replies), []
+        self.replies, self.sent = list(replies), []
 
     async def complete(self, *, model, messages, reasoning=None, **kwargs):
-        self.reasonings.append(reasoning)
-        if reasoning == {"enabled": False}:
-            raise LLMCallError("OpenRouter returned HTTP 400; spend is uncertain: "
-                               '{"error": {"message": "Reasoning is mandatory for this '
-                               'endpoint and cannot be disabled."}}')
+        self.sent.append((model, reasoning))
         reply = self.replies.pop(0) if self.replies else "have junk : True := by trivial"
         return said(reply, 0.01)
 
 
-def test_a_model_that_refuses_to_stop_reasoning_is_asked_again_with_it_on():
-    lean, llm = FakeLean(), FussyLLM(["have key : True := by trivial", "exact key"])
+def test_reasoning_is_decided_by_name_and_never_probed():
+    lean = FakeLean()
+    llm = WatchLLM(["have key : True := by trivial", "exact key"])
     services = FakeServices(lean, llm)
-    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    agent = FrameworkAgent(Config(lines=("vendor/qwen3.5-flash", "vendor/gpt-oss"),
+                                  budget_usd=1.0, time_limit_s=600.0))
     problem = Problem(id="demo", description="prove it", challenge=CHALLENGE)
     result = asyncio.run(agent.solve(problem, services))
-    assert llm.reasonings[0] == {"enabled": False}
-    # It is asked once, and every later call carries reasoning without asking.
-    assert llm.reasonings[1:] == [{"effort": "low"}] * (len(llm.reasonings) - 1)
+    sent = dict(llm.sent)
+    # A 400 for an unsupported setting ends the problem, so the model that
+    # refuses to stop reasoning is never asked to.
+    assert sent["vendor/qwen3.5-flash"] == {"enabled": False}
+    assert all(r == {"effort": "low"} for m, r in llm.sent if "qwen" not in m)
     assert result.metadata["accepted_by_repl"] is True

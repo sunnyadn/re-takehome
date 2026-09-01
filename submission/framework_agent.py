@@ -72,12 +72,14 @@ from submission.framework import (
 STEP_TOKENS = 6000
 ANSWER_TOKENS = 4000
 # Measured on p09: qwen3.5-flash narrates its reasoning as ordinary content and
-# the code block after it is what the token limit cuts. With reasoning off the
-# reply halves and every sample begins with the block; gpt-oss-120b answers HTTP
-# 400 rather than turn it off, so the setting is per model and learned.
+# the code block after it is what the token limit cuts. Over three samples each,
+# reasoning off halves the reply and every one of them begins with the block.
+# gpt-oss-120b answers HTTP 400 rather than turn it off, and that 400 is fatal:
+# the ledger marks accounting incomplete and never clears it, so the next call
+# aborts the problem. The setting is therefore decided by name, never probed.
 REASONING = {"effort": "low"}
 NO_REASONING = {"enabled": False}
-MANDATORY_REASONING = re.compile(r"[Rr]easoning is mandatory|cannot be disabled")
+NARRATES = ("qwen",)
 GOAL_CHARS = 4000
 FILE_CHARS = 8000
 # Two rejections on one goal and the other model gets it, with Lean's reason.
@@ -275,12 +277,11 @@ class Turn:
 class FrameworkAgent:
     def __init__(self, config: Config | None = None):
         self.config = config or Config.from_env()
-        self._thinks: set[str] = set()
 
     def _reasoning(self, model: str) -> dict[str, Any]:
         """Reasoning a model narrates in its content crowds out the step."""
 
-        return REASONING if model in self._thinks else NO_REASONING
+        return NO_REASONING if any(n in model for n in NARRATES) else REASONING
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
         cfg = self.config
@@ -769,9 +770,6 @@ class FrameworkAgent:
                     reasoning=self._reasoning(model),
                 )
             except LLMCallError as exc:
-                if MANDATORY_REASONING.search(str(exc)):
-                    self._thinks.add(model)
-                    continue
                 if refused_before_generation(exc):
                     continue
                 raise
