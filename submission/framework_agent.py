@@ -119,6 +119,10 @@ Rules:
 - Copy terms out of the printed goal rather than retyping them: omega and
   linarith atomise syntactically, so spellings must match.
 
+Do not open a `·` bullet you cannot close in the same step: a bullet whose
+interior is unfinished is an error, not a placeholder. A step that splits the
+goal is complete on its own; each goal it opens gets its own turn.
+
 Answer with Lean tactic lines only. No prose, no code fences, no theorem
 header, no `sorry`, no `native_decide`. Indent as if at the top level of the
 proof; branches of an `induction ... with` end in `sorry` where you have not
