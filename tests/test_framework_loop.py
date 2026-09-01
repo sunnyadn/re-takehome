@@ -75,13 +75,23 @@ class FakeLLM:
 
     def __init__(self, replies):
         self.replies, self.calls = list(replies), []
+        self.last: tuple[str, str, str] = ("", "", "")
 
     async def complete(self, *, model, messages, **kwargs):
         planning = "competition mathematician" in messages[0]["content"]
-        self.calls.append((model, messages[-1]["content"], planning))
+        prompt = messages[-1]["content"]
+        self.calls.append((model, prompt, planning))
         if planning:
             return said(PLAN, 0.001)
+        # Both models are asked one goal at once, and their prompts differ only
+        # in who is told what was rejected. The script is a sequence of turns,
+        # so the second of a pair repeats the first rather than taking a turn.
+        goal = prompt.split("What Lean reports")[0]
+        who, before, text = self.last
+        if goal == before and model != who:
+            return said(text, 0.001)
         reply = self.replies.pop(0) if self.replies else "have junk : True := by trivial"
+        self.last = (model, goal, reply)
         # A reply the provider cut is marked, so the loop can tell it from a step.
         if reply == "__cut__":
             return said("have half : True := by", 0.01, "length")
@@ -336,7 +346,9 @@ def test_two_rejections_send_the_goal_back_to_the_mathematician():
     # write, write, then the other model says what it was aiming at and takes
     # the goal over. The plan reaches whoever writes next.
     assert who[:4] == ["mathematician", "mathematician", "writer", "writer"]
-    assert PLAN in wrote(llm)[2][1]
+    # Both models are asked at once from the first stall, so the plan reaches
+    # a later prompt than it used to; what matters is that it reaches one.
+    assert any(PLAN in text for _, text in wrote(llm))
     assert result.metadata["accepted_by_repl"] is True
 
 

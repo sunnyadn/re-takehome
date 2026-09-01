@@ -323,6 +323,7 @@ class FrameworkAgent:
         stalls = 0
         feedback: Feedback | None = None
         raised = False
+        spare: list[tuple[str, str]] = []
         anchor_goal, anchor_text, on_goal, stuck = "", text, 0, 0
         sound = text
         reverted: dict[str, int] = {}
@@ -447,6 +448,7 @@ class FrameworkAgent:
 
                 # Never re-run a closer on a goal whose text and file are both
                 # unchanged; a longer file is a changed context.
+                spare = []
                 seen = (state.goal, len(state.text))
                 if state.goal and ("closers", seen) not in swept:
                     block, kind, author = sweep_body(cocktail), "closers", "harness"
@@ -467,8 +469,22 @@ class FrameworkAgent:
                         events.append({"kind": "plan", "by": planner, "chars": len(plan)})
                         turn_of, stalls = turn_of + 1, 0
                         author = models[turn_of % len(models)]
-                    block = await self._ask_step(
-                        problem, state, feedback, author, services, ledger, plan)
+                    # Measured on p09: 87% of the clock is model latency, and
+                    # one model answers in 33s where the other answers in 1.8s,
+                    # so waiting for it leaves the other idle. That run spent
+                    # 1.4% of its money and all of its time. Once a goal has
+                    # refused a step, both are asked at once and Lean picks; a
+                    # goal that yields at once still costs one call.
+                    asked = [author] + ([m for m in models if m != author]
+                                        if stalls else [])
+                    replies = await asyncio.gather(*[
+                        self._ask_step(problem, state, feedback, m, services,
+                                       ledger, plan) for m in asked])
+                    tries = [(m, b) for m, b in zip(asked, replies) if b and b != CUT]
+                    block = tries[0][1] if tries else replies[0]
+                    spare = tries[1:]
+                    if tries:
+                        author = tries[0][0]
                     kind = "step"
                     if not block or block == CUT:
                         # A refused reply is a failed turn. Skipping it silently
@@ -519,6 +535,14 @@ class FrameworkAgent:
                     break
 
                 nxt, why = await self._advance(state, block, services)
+                for other, alternative in (spare if nxt is None else []):
+                    nxt, why2 = await self._advance(state, alternative, services)
+                    events.append({"kind": "second", "by": other,
+                                   "accepted": nxt is not None})
+                    if nxt is not None:
+                        author, block, why = other, alternative, ""
+                        break
+                    why = why2
                 if nxt is None and why != BUDGET_RETRY and kind == "step":
                     # One wrong name at line ten is not a reason to lose lines
                     # one to nine. Lean is the cheap resource, so it is asked
