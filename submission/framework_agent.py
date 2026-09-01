@@ -895,8 +895,7 @@ class FrameworkAgent:
                    "line that prints `true` or `some n` is not an answer." + note)
             asking = self.config.lines[attempt % len(self.config.lines)]
             reply, _ = await self._call(
-                asking, ask, ANSWER_TOKENS, services, ledger, think=True,
-                tools=[EVAL_TOOL])
+                asking, ask, ANSWER_TOKENS, services, ledger, think=True)
             probes = [l for l in strip_fences(reply).splitlines()
                       if l.strip().startswith("#eval")]
             if not probes:
@@ -961,16 +960,12 @@ class FrameworkAgent:
 THINKING = re.compile(r"<think>.*?(?:</think>|\Z)", re.S | re.I)
 
 
-# Measured: qwen honours a forced tool call and gpt-oss ignores it, and
-# neither errors, so a schema is an extra channel and never a requirement.
-EVAL_TOOL = {"type": "function", "function": {
-    "name": "answer", "description": "One evaluation line per name, in order.",
-    "parameters": {"type": "object",
-                   "properties": {"evals": {"type": "array",
-                                            "items": {"type": "string"}}},
-                   "required": ["evals"]}}}
-
-
+# Measured twice, and the second measurement is the one that counts: asking
+# OpenRouter directly, qwen honours a forced tool call and gpt-oss ignores it
+# without error, but the same request through the harness answers HTTP 404,
+# `no endpoints found that support the provided tool_choice`, which marks the
+# budget incomplete and ends the problem. A tool call is read if one arrives
+# and never asked for.
 def tool_lines(calls: Sequence[Any]) -> str:
     """The strings a tool call carried, if the model made one."""
 
