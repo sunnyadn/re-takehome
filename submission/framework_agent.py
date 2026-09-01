@@ -550,7 +550,9 @@ class FrameworkAgent:
         source, line = render(state.text)
         parts = [f"Problem: {problem.description}".strip(),
                  "File:\n" + source[-FILE_CHARS:],
-                 f"The active goal is at `skip` on line {line}:\n{state.goal[:GOAL_CHARS]}"]
+                 "What Lean reports as open, with its hypotheses. The first goal "
+                 f"is the active one, at `skip` on line {line}:\n"
+                 f"{state.goal[:GOAL_CHARS]}"]
         if feedback:
             parts.append(f"{feedback.lead(model)}:\n{feedback.text}")
         # Measured on p09: qwen narrates instead of answering unless the

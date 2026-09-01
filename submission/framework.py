@@ -157,10 +157,14 @@ def in_span(message: Any, span: tuple[int, int]) -> bool:
 
 
 def goal_text(message: Any) -> str:
-    """The goal an `unsolved goals` error carries, after the last turnstile."""
+    """Everything an `unsolved goals` error carries: cases, hypotheses, goals.
+
+    Measured on p09: one message holds every open goal, so cutting at the first
+    turnstile hands the model two goals spliced together and no hypotheses."""
 
     text = message_text(message)
-    return text.split("⊢", 1)[1].strip() if "⊢" in text else ""
+    head, _, body = text.partition("\n")
+    return (body or text).strip() if UNSOLVED in head.lower() else text.strip()
 
 
 def cursor_goal(messages: Sequence[Any], cursor_line: int) -> str:

@@ -85,10 +85,10 @@ def test_surplus_placeholder_is_a_message_kind_of_its_own():
     ]
     progress, surplus, expensive, failures = fw.classify(msgs)
     assert len(progress) == len(surplus) == len(expensive) == len(failures) == 1
-    assert fw.cursor_goal(msgs, 4) == "True"
+    assert fw.cursor_goal(msgs, 4) == "⊢ True"
     # Lean attributes the message to the declaration as often as to the `skip`,
     # so a line that matches nothing still yields the goal that is open.
-    assert fw.cursor_goal(msgs, 9) == "True"
+    assert fw.cursor_goal(msgs, 9) == "⊢ True"
     assert fw.cursor_goal([], 4) == ""
 
 
