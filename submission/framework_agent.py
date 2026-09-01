@@ -38,6 +38,7 @@ from submission.agent import (
 )
 from submission.framework import (
     alternatives,
+    answer_slots,
     axiom_probe,
     collapse,
     first_blocks,
@@ -295,6 +296,9 @@ class FrameworkAgent:
                 if nxt is None:
                     # Only a model's own rejections count towards its turn; the
                     # free attempts are the harness's.
+                    if why == HEARTBEAT_RETRY:
+                        why = ("the step exceeded Lean's elaboration budget even at "
+                               f"{RAISED_HEARTBEATS.split()[-1]} heartbeats; make it cheaper")
                     feedback = Feedback(author if kind == "step" else kind, why)
                     stalls += 1 if kind == "step" else 0
                     if stalls >= STALL_BEFORE_SWAP:
@@ -431,22 +435,36 @@ class FrameworkAgent:
     async def _resolve_answers(self, problem: Problem, text: str, names: Sequence[str],
                                services: Services, ledger: Ledger,
                                events: list[dict[str, Any]]) -> str:
-        """An answer slot is a number to compute, never a number to guess."""
+        """An answer slot is a number to compute, never a number to guess.
 
-        ask = ("Write `#eval` lines, one per name, that compute these answers: "
-               f"{', '.join(names)}.\n\nProblem: {problem.description}\n\n"
-               f"File:\n{text[:FILE_CHARS]}\n\nLean 4 with Mathlib. Output the "
-               "`#eval` lines only. Each must print a single natural number.")
-        reply = await self._call(
-            self.config.lines[0], ask, ANSWER_TOKENS, services, ledger)
-        probes = [l for l in strip_fences(reply).splitlines() if l.strip().startswith("#eval")]
-        if not probes:
-            return text
-        check = await services.lean.check_file(insert_preamble(text, "\n".join(probes)))
-        values = [m for m in printed_numbers(check.messages)]
-        events.append({"stage": "probe", "values": values[:len(names)]})
-        for name, value in zip(names, values):
-            text = fill_answer(text, name, value)
+        A slot left as `sorry` is unreachable by the cursor and banned by the
+        grader, so an unfilled one is reported and asked for again."""
+
+        note = ""
+        for _ in range(2):
+            missing = answer_slots(text)
+            if not missing:
+                break
+            ask = (f"Write one `#eval` line per name, in this order: {', '.join(missing)}.\n\n"
+                   f"Problem: {problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
+                   "Lean 4 with Mathlib. Output the `#eval` lines only. Each must print "
+                   "a single natural number." + note)
+            reply = await self._call(
+                self.config.lines[0], ask, ANSWER_TOKENS, services, ledger)
+            probes = [l for l in strip_fences(reply).splitlines()
+                      if l.strip().startswith("#eval")]
+            if not probes:
+                note = "\n\nYour last reply contained no `#eval` line."
+                continue
+            check = await services.lean.check_file(insert_preamble(text, "\n".join(probes)))
+            values = printed_numbers(check.messages)
+            for name, value in zip(missing, values):
+                text = fill_answer(text, name, value)
+            left = answer_slots(text)
+            events.append({"stage": "probe", "asked": list(missing),
+                           "printed": values[:len(missing)], "unfilled": list(left)})
+            note = (f"\n\nThese slots are still unfilled: {', '.join(left)}. Each `#eval` "
+                    "must print one bare numeral." if left else "")
         return text
 
     async def _call(self, model: str, prompt: str, max_tokens: int,

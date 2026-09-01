@@ -204,3 +204,35 @@ def test_a_fact_the_finished_proof_does_not_use_is_deleted():
     assert result.metadata["accepted_by_repl"] is True
     # `spare` is never named again, and the file still checks without it.
     assert "spare" not in result.solution and "have key" in result.solution
+
+
+ANSWER_CHALLENGE = ("import Mathlib\n\nabbrev p_answer : ℕ := sorry\n\n"
+                    "theorem demo : p_answer = 77 := by\n  sorry\n")
+
+
+class AnswerLean(FakeLean):
+    """The first probe prints nothing usable; the second prints the number."""
+
+    def __init__(self):
+        super().__init__()
+        self.probes = 0
+
+    async def check_file(self, source, timeout_s=None):
+        if "#eval" in source:
+            self.probes += 1
+            data = "unable to evaluate" if self.probes == 1 else "77"
+            return LeanCheck(False, [{"severity": "info", "data": data}], True, False, 1)
+        return await super().check_file(source)
+
+
+def test_an_unfilled_answer_slot_is_noticed_and_asked_for_again():
+    lean, llm = AnswerLean(), FakeLLM(["#eval 1 + 1", "#eval 77",
+                                       "have key : True := by trivial", "exact key"])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="d", challenge=ANSWER_CHALLENGE), services))
+    probes = [e for e in result.metadata["events"] if e.get("stage") == "probe"]
+    assert probes[0]["unfilled"] == ["p_answer"] and probes[1]["unfilled"] == []
+    assert "abbrev p_answer : ℕ := 77" in result.solution
+    assert "sorry" not in result.solution
