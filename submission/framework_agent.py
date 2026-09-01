@@ -248,7 +248,10 @@ class FrameworkAgent:
         best = text
         events: list[dict[str, Any]] = []
         models = list(cfg.lines)
-        planner, writer = models[0], models[-1]
+        # Measured: qwen wrote p08 alone in one step and answered p09 in prose,
+        # while gpt-oss did the reverse. Neither is the writer; the one that is
+        # not writing is the one asked for the mathematics.
+        turn_of = 0
         plan = ""
         swept: set[tuple[str, tuple[str, int]]] = set()
         stalls = 0
@@ -346,11 +349,16 @@ class FrameworkAgent:
                 elif can_ask():
                     # The writer alone is the cheap path and often enough; the
                     # mathematician is what a stalled goal needs, not every goal.
-                    if stalls >= STALL_BEFORE_SWAP and not plan:
-                        plan = await self._ask_plan(problem, state, services, ledger)
+                    author = models[turn_of % len(models)]
+                    if stalls >= STALL_BEFORE_SWAP:
+                        # Two rejections: hand the goal to the other model, and
+                        # let the one that just failed say what it was aiming at.
+                        planner = models[(turn_of + 1) % len(models)]
+                        plan = await self._ask_plan(
+                            problem, state, services, ledger, planner)
                         events.append({"kind": "plan", "by": planner, "chars": len(plan)})
-                        stalls = 0
-                    author = writer
+                        turn_of, stalls = turn_of + 1, 0
+                        author = models[turn_of % len(models)]
                     block = await self._ask_step(
                         problem, state, feedback, author, services, ledger, plan)
                     kind = "step"
@@ -576,13 +584,13 @@ class FrameworkAgent:
                    if isinstance(m, dict) and m.get("severity") in ("info", "information")]
         return "\n".join(printed)[:FEEDBACK_CHARS] or "nothing"
 
-    async def _ask_plan(self, problem: Problem, state: State,
-                        services: Services, ledger: Ledger) -> str:
+    async def _ask_plan(self, problem: Problem, state: State, services: Services,
+                        ledger: Ledger, model: str = "") -> str:
         """The mathematics, from the model that answers in mathematics."""
 
         ask = (f"Problem: {problem.description}\n\nThe goal, as Lean reports it:\n"
                f"{state.goal[:GOAL_CHARS]}\n\nHow do you prove this?")
-        reply = await self._call(self.config.lines[0], ask, PLAN_TOKENS,
+        reply = await self._call(model or self.config.lines[0], ask, PLAN_TOKENS,
                                  services, ledger, PLANNER_SYSTEM)
         return strip_fences(reply).strip()[:GOAL_CHARS]
 

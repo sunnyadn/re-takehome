@@ -119,8 +119,8 @@ def test_a_rejected_step_is_removed_from_the_file():
                "have worse : True := by exact?",
                "have key : True := by trivial", "exact key"]
     result, _, llm, _ = run(replies)
-    # Only the writer is asked for Lean; who re-plans is covered elsewhere.
-    assert [m for m, _ in wrote(llm)][:2] == ["model-b", "model-b"]
+    # One model writes until Lean rejects it twice; the swap is covered elsewhere.
+    assert [m for m, _ in wrote(llm)][:2] == ["model-a", "model-a"]
     assert "bad" not in result.solution and "worse" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
 
@@ -309,7 +309,7 @@ def test_the_writer_works_alone_while_it_is_working():
 
     result, _, llm, _ = run(["have key : True := by trivial", "exact key"],
                             lines=("mathematician", "writer"))
-    assert [model for model, _, _ in llm.calls] == ["writer", "writer"]
+    assert [model for model, _, _ in llm.calls] == ["mathematician", "mathematician"]
     assert not [e for e in result.metadata["events"] if e.get("kind") == "plan"]
 
 
@@ -321,6 +321,8 @@ def test_two_rejections_send_the_goal_back_to_the_mathematician():
     who = [model for model, _, _ in llm.calls]
     # write, write, then the mathematician: two Lean rejections mean the plan is
     # wrong, not the wording. The plan reaches the writer's next turn.
-    assert who[:4] == ["writer", "writer", "mathematician", "writer"]
+    # write, write, then the other model says what it was aiming at and takes
+    # the goal over. The plan reaches whoever writes next.
+    assert who[:4] == ["mathematician", "mathematician", "writer", "writer"]
     assert PLAN in wrote(llm)[2][1]
     assert result.metadata["accepted_by_repl"] is True
