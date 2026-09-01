@@ -389,6 +389,20 @@ def unwrap_own(block: str, names: Sequence[str]) -> str:
     return block
 
 
+DECL_HEAD = re.compile(r"\A(.*?:=[ \t]*by)\b", re.S)
+
+
+def as_goal(block: str) -> str:
+    """The lemma's statement, with its proof handed back to the cursor.
+
+    Measured on p09: the writer states the right lemma and proves it wrong in
+    one shot. The statement is the part worth keeping; a `sorry` under it is a
+    goal like any other."""
+
+    found = DECL_HEAD.match(block)
+    return f"{found.group(1)}\n  sorry" if found else ""
+
+
 def drop_own(block: str, names: Sequence[str]) -> str:
     """Keep the lemma a reply adds and drop the graded theorem it restates.
 

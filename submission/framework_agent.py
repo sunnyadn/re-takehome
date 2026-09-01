@@ -56,6 +56,7 @@ from submission.framework import (
     message_line,
     unreachable,
     normalise_steps,
+    as_goal,
     drop_own,
     root_names,
     split_cursor,
@@ -469,6 +470,12 @@ class FrameworkAgent:
                         nxt = await self._look(
                             insert_preamble(state.text, block), services)
                         kept = not classify(nxt.messages)[3]
+                        if not kept and as_goal(block):
+                            # The statement may be right and only its proof
+                            # wrong, which is what the cursor is for.
+                            nxt = await self._look(
+                                insert_preamble(state.text, as_goal(block)), services)
+                            kept = not classify(nxt.messages)[3]
                         events.append({"kind": "lemma", "by": author, "name": named,
                                        "accepted": kept})
                         if kept:

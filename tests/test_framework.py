@@ -290,3 +290,12 @@ def test_a_reply_that_adds_a_lemma_and_restates_the_theorem_keeps_the_lemma():
         "theorem aux (k : ℕ) : 2 ^ k % 7 = 2 ^ (k % 3) % 7 := by\n  omega")
     # A block with no graded name in it is left whole.
     assert fw.drop_own("intro h\nexact h", ("demo",)) == "intro h\nexact h"
+
+
+def test_a_lemma_whose_proof_fails_keeps_its_statement():
+    block = ("theorem aux (k : ℕ) : 2 ^ k % 7 = 2 ^ (k % 3) % 7 := by\n"
+             "  simp [Nat.pow_mod]\n  omega")
+    assert fw.as_goal(block) == (
+        "theorem aux (k : ℕ) : 2 ^ k % 7 = 2 ^ (k % 3) % 7 := by\n  sorry")
+    # A term-mode declaration has no proof block to hand back.
+    assert fw.as_goal("theorem aux : True := trivial") == ""
