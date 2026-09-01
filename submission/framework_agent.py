@@ -161,6 +161,11 @@ Do not open a `·` bullet you cannot close in the same step: a bullet whose
 interior is unfinished is an error, not a placeholder. A step that splits the
 goal is complete on its own; each goal it opens gets its own turn.
 
+Your reply has a token limit. Measured on p09: a reply that reasoned in prose
+and then wrote a whole proof hit the limit and the code block was cut in half,
+so none of it could be used and Lean reported a syntax error that was not the
+mistake. Write the next step and stop.
+
 Answer with Lean tactic lines only. No prose, no code fences, no theorem
 header, no `sorry`, no `native_decide`. Indent as if at the top level of the
 proof; branches of an `induction ... with` end in `sorry` where you have not
@@ -224,6 +229,10 @@ class Feedback:
         if self.kind == "empty":
             return ("Your last reply contained no Lean. Reply with one ```lean block "
                     "of tactic lines and nothing else. What Lean last said was")
+        if self.kind == "cut":
+            return ("Your last reply ran out of tokens before its code block ended, so "
+                    "none of it could be used. You are writing a whole proof; write the "
+                    "next step and stop. What Lean last said was")
         if self.kind == "drift":
             return ("These facts compiled but left the goal standing, so they have been "
                     "removed. Reshape the goal or close it directly. They were")
@@ -401,12 +410,13 @@ class FrameworkAgent:
                     block = await self._ask_step(
                         problem, state, feedback, author, services, ledger, plan)
                     kind = "step"
-                    if not block:
+                    if not block or block == CUT:
                         # A refused reply is a failed turn. Skipping it silently
                         # spins the loop without a check, a cost or a stall.
-                        events.append({"kind": "refused", "by": author})
+                        gave = "cut" if block == CUT else "empty"
+                        events.append({"kind": gave, "by": author})
                         said = feedback.text if feedback else "nothing yet"
-                        feedback = Feedback(author, said, "empty")
+                        feedback = Feedback(author, said, gave)
                         stalls, stuck = stalls + 1, stuck + 1
                         if stalls >= STALL_BEFORE_SWAP:
                             plan, stalls = "", 0
@@ -665,8 +675,8 @@ class FrameworkAgent:
 
         ask = (f"Problem: {problem.description}\n\nThe goal, as Lean reports it:\n"
                f"{state.goal[:GOAL_CHARS]}\n\nHow do you prove this?")
-        reply = await self._call(model or self.config.lines[0], ask, PLAN_TOKENS,
-                                 services, ledger, PLANNER_SYSTEM)
+        reply, _ = await self._call(model or self.config.lines[0], ask, PLAN_TOKENS,
+                                    services, ledger, PLANNER_SYSTEM)
         return strip_fences(reply).strip()[:GOAL_CHARS]
 
     async def _ask_step(self, problem: Problem, state: State,
@@ -687,8 +697,9 @@ class FrameworkAgent:
         # contract is the last thing it reads.
         parts.append("Reply with one ```lean code block containing only tactic "
                      "lines, and nothing before or after it. No explanation.")
-        reply = await self._call(model, "\n\n".join(parts), STEP_TOKENS, services, ledger)
-        return screen_step(reply)
+        reply, why = await self._call(
+            model, "\n\n".join(parts), STEP_TOKENS, services, ledger)
+        return CUT if why == "length" else screen_step(reply)
 
     async def _resolve_answers(self, problem: Problem, text: str, names: Sequence[str],
                                services: Services, ledger: Ledger,
@@ -707,7 +718,7 @@ class FrameworkAgent:
                    f"Problem: {problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
                    "Lean 4 with Mathlib. Output the `#eval` lines only. Each must print "
                    "a single natural number." + note)
-            reply = await self._call(
+            reply, _ = await self._call(
                 self.config.lines[0], ask, ANSWER_TOKENS, services, ledger)
             probes = [l for l in strip_fences(reply).splitlines()
                       if l.strip().startswith("#eval")]
@@ -725,9 +736,9 @@ class FrameworkAgent:
                     "must print one bare numeral." if left else "")
         return text
 
-    async def _call(self, model: str, prompt: str, max_tokens: int,
-                    services: Services, ledger: Ledger, system: str = "") -> str:
-        """Retry only what the provider refused before generating anything."""
+    async def _call(self, model: str, prompt: str, max_tokens: int, services: Services,
+                    ledger: Ledger, system: str = "") -> tuple[str, str]:
+        """The reply and why the provider stopped, which is not always `stop`."""
 
         for wait in (0.0,) + RETRY_BACKOFF_S:
             if wait:
@@ -746,11 +757,14 @@ class FrameworkAgent:
                     continue
                 raise
             ledger.record(reply.usage)
-            return reply.content or ""
-        return ""
+            return reply.content or "", reply.finish_reason or ""
+        return "", ""
 
 
 BUDGET_RETRY = "__budget__"
+# A reply the provider cut at the token limit, which is not a step and not a
+# refusal: its syntax error is an artefact of the cut, never the mistake.
+CUT = "__cut__"
 NUMBER = re.compile(r"^-?\d+$")
 
 

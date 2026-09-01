@@ -65,6 +65,11 @@ def wrote(llm):
 PLAN = "Take the obvious route: state the fact and close it."
 
 
+def said(content: str, cost: float, finish: str = "stop"):
+    return type("R", (), {"content": content, "usage": {"cost": cost},
+                          "finish_reason": finish})()
+
+
 class FakeLLM:
     """The script drives the writer; the planner answers with a canned plan."""
 
@@ -75,9 +80,12 @@ class FakeLLM:
         planning = "competition mathematician" in messages[0]["content"]
         self.calls.append((model, messages[-1]["content"], planning))
         if planning:
-            return type("R", (), {"content": PLAN, "usage": {"cost": 0.001}})()
+            return said(PLAN, 0.001)
         reply = self.replies.pop(0) if self.replies else "have junk : True := by trivial"
-        return type("R", (), {"content": reply, "usage": {"cost": 0.01}})()
+        # A reply the provider cut is marked, so the loop can tell it from a step.
+        if reply == "__cut__":
+            return said("have half : True := by", 0.01, "length")
+        return said(reply, 0.01)
 
 
 class FakeServices:
@@ -404,8 +412,8 @@ class GoalLLM:
         prompt = messages[-1]["content"]
         planning = "competition mathematician" in messages[0]["content"]
         self.calls.append((model, prompt, planning))
-        said = PLAN if planning else ("trivial" if "⊢ True" in prompt else "linarith")
-        return type("R", (), {"content": said, "usage": {"cost": 0.001}})()
+        text = PLAN if planning else ("trivial" if "⊢ True" in prompt else "linarith")
+        return said(text, 0.001)
 
 
 def run_two_goals():
@@ -439,3 +447,19 @@ def test_what_was_said_about_the_parked_goal_does_not_follow_the_cursor():
     # The hard goal's rejections and its plan belong to the hard goal.
     assert "Your last step was rejected" not in easy[0]
     assert "A mathematician was asked" not in easy[0]
+
+
+def test_a_reply_cut_off_at_the_token_limit_is_not_sent_to_lean():
+    lean, llm = FakeLean(), FakeLLM(["__cut__", "have key : True := by trivial",
+                                     "exact key"])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    problem = Problem(id="demo", description="prove it", challenge=CHALLENGE)
+    result = asyncio.run(agent.solve(problem, services))
+    assert {"kind": "cut", "by": "model-a"} in result.metadata["events"]
+    # The half-written block never reached Lean, and never reached the file.
+    assert not any("have half" in s for s in lean.sources)
+    assert "have half" not in result.solution
+    assert result.metadata["accepted_by_repl"] is True
+    # The next turn is told what happened, not handed a syntax error to chase.
+    assert "ran out of tokens" in wrote(llm)[1][1]
