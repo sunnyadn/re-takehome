@@ -62,8 +62,11 @@ from submission.framework import (
 
 # A step is a few lines; the file it goes into is the context. Wide replies are
 # the failure mode here, not narrow ones.
-STEP_TOKENS = 2000
-ANSWER_TOKENS = 1200
+# Measured on p08: gpt-oss-120b spent all 2000 tokens reasoning and returned
+# `content: None` with `finish_reason: length`, so the call bought nothing.
+STEP_TOKENS = 6000
+ANSWER_TOKENS = 4000
+REASONING = {"effort": "low"}
 GOAL_CHARS = 4000
 FILE_CHARS = 8000
 # Two rejections on one goal and the other model gets it, with Lean's reason.
@@ -578,6 +581,7 @@ class FrameworkAgent:
                               {"role": "user", "content": prompt}],
                     max_tokens=max_tokens,
                     temperature=0.4,
+                    reasoning=REASONING,
                 )
             except LLMCallError as exc:
                 if refused_before_generation(exc):
@@ -618,11 +622,48 @@ def printed_numbers(messages: Sequence[Any]) -> list[str]:
 FENCED = re.compile(r"```(?:lean4?)?\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
 
 
+# What a Lean tactic line can start with. Measured on p08: qwen answers in
+# prose as often as in Lean, and prose spliced into the file is a wasted check.
+OPENERS = (
+    "have", "let", "set", "show", "intro", "intros", "induction", "cases",
+    "rcases", "obtain", "refine", "exact", "apply", "constructor", "use",
+    "rfl", "simp", "simp_all", "simp_only", "norm_num", "norm_cast", "push_cast",
+    "omega", "decide", "linarith", "nlinarith", "positivity", "polyrith", "ring",
+    "ring_nf", "field_simp", "gcongr", "bound", "aesop", "tauto", "trivial",
+    "interval_cases", "by_contra", "push_neg", "rw", "rwa", "subst", "subst_vars",
+    "unfold", "calc", "left", "right", "exfalso", "contradiction", "specialize",
+    "all_goals", "any_goals", "first", "repeat", "conv", "zify", "rify", "qify",
+    "nth_rewrite", "change", "convert", "ext", "funext", "split", "split_ifs",
+    "theorem", "lemma", "private", "set_option", "#eval", "#check", "#print",
+    "·", "|", "<;>", "sorry", "skip", "-",
+)
+
+
+def lean_lines(text: str) -> str:
+    """The longest run of lines that could be Lean, prose dropped."""
+
+    runs, current = [], []
+    for line in text.split("\n"):
+        body = line.strip()
+        opens = body.startswith(OPENERS) or (line.startswith((" ", "\t")) and bool(current))
+        if body and opens:
+            current.append(line)
+        elif not body and current:
+            current.append(line)
+        else:
+            runs.append(current)
+            current = []
+    runs.append(current)
+    best = max(runs, key=lambda r: len([l for l in r if l.strip()]), default=[])
+    return "\n".join(best).strip()
+
+
 def screen_step(reply: str) -> str:
-    """A step is tactic lines. Prose around a fence is dropped, not spliced."""
+    """A step is tactic lines. Prose around them is dropped, not spliced."""
 
     blocks = [b for b in FENCED.findall(reply) if b.strip()]
-    block = normalise_steps(strip_fences(blocks[-1] if blocks else reply)).strip()
+    raw = strip_fences(blocks[-1] if blocks else reply)
+    block = normalise_steps(lean_lines(raw) if not blocks else raw).strip()
     if not block or STEP_BAN.search(block):
         return ""
     if re.search(r"\bsorry\b", block) and "with" not in block and "|" not in block:
