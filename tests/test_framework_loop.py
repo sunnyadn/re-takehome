@@ -56,12 +56,26 @@ class FakeLean:
         return unsolved(line)
 
 
+def wrote(llm):
+    """The turns that asked for Lean, which is what most tests are about."""
+
+    return [(m, text) for m, text, planning in llm.calls if not planning]
+
+
+PLAN = "Take the obvious route: state the fact and close it."
+
+
 class FakeLLM:
+    """The script drives the writer; the planner answers with a canned plan."""
+
     def __init__(self, replies):
         self.replies, self.calls = list(replies), []
 
     async def complete(self, *, model, messages, **kwargs):
-        self.calls.append((model, messages[-1]["content"]))
+        planning = "competition mathematician" in messages[0]["content"]
+        self.calls.append((model, messages[-1]["content"], planning))
+        if planning:
+            return type("R", (), {"content": PLAN, "usage": {"cost": 0.001}})()
         reply = self.replies.pop(0) if self.replies else "have junk : True := by trivial"
         return type("R", (), {"content": reply, "usage": {"cost": 0.01}})()
 
@@ -97,17 +111,16 @@ def test_the_closers_are_tried_before_any_model_is_asked():
     _, lean, llm, _ = run(["have key : True := by trivial", "exact key"])
     swept = next(i for i, s in enumerate(lean.sources) if "first" in s and "vm_probe" not in s)
     assert swept < len(lean.sources)
-    assert len(llm.calls) == 2
+    assert len(wrote(llm)) == 2
 
 
-def test_a_rejected_step_is_removed_and_the_other_model_gets_the_next_turn():
+def test_a_rejected_step_is_removed_from_the_file():
     replies = ["have bad : True := by first | (rfl; done)",
                "have worse : True := by exact?",
                "have key : True := by trivial", "exact key"]
     result, _, llm, _ = run(replies)
-    authors = [model for model, _ in llm.calls]
-    # Two rejections on one goal, then the other model gets it.
-    assert authors[:3] == ["model-a", "model-a", "model-b"]
+    # Only the writer is asked for Lean; who re-plans is covered elsewhere.
+    assert [m for m, _ in wrote(llm)][:2] == ["model-b", "model-b"]
     assert "bad" not in result.solution and "worse" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
 
@@ -116,21 +129,22 @@ def test_lean_s_own_words_are_carried_into_the_next_attempt():
     replies = ["have bad : True := by first | (rfl; done)",
                "have key : True := by trivial", "exact key"]
     _, _, llm, _ = run(replies)
-    assert "linarith failed" in llm.calls[1][1]
-    assert "Every closer before nlinarith" in llm.calls[1][1]
+    assert "linarith failed" in wrote(llm)[1][1]
+    assert "Every closer before nlinarith" in wrote(llm)[1][1]
     # The closers are the harness's attempt, not the model's; saying otherwise
     # asks the model to correct a step it never wrote.
-    assert "Your last step" not in llm.calls[0][1]
-    assert "A search attempt on this goal was rejected" in llm.calls[0][1]
-    assert "Your last step was rejected" in llm.calls[1][1]
-    assert llm.calls[1][0] == llm.calls[0][0]
+    assert "Your last step" not in wrote(llm)[0][1]
+    assert "A search attempt on this goal was rejected" in wrote(llm)[0][1]
+    assert "Your last step was rejected" in wrote(llm)[1][1]
+    assert wrote(llm)[1][0] == wrote(llm)[0][0]
 
 
 def test_the_loop_stops_asking_once_the_budget_headroom_is_gone():
     result, _, llm, _ = run(["have junk : True := by trivial"] * 20, budget=0.02)
-    assert len(llm.calls) <= 2
+    assert len(wrote(llm)) <= 2
     assert result.metadata["accepted_by_repl"] is False
-    assert result.metadata["spend_usd"] <= 0.02
+    stopped = [e for e in result.metadata["events"] if e.get("note") == "budget headroom"]
+    assert stopped
 
 
 class AxiomLean(FakeLean):
@@ -177,7 +191,7 @@ def test_a_step_that_only_ran_out_of_budget_is_given_the_budget():
     assert "have key" in result.solution
     assert result.metadata["accepted_by_repl"] is True
     # The step was not blamed for it: the model was never asked to replace it.
-    assert len(llm.calls) == 2
+    assert len(wrote(llm)) == 2
 
 
 class ProbeLean(FakeLean):
@@ -196,7 +210,7 @@ def test_a_probe_goes_above_the_theorem_and_comes_back_as_a_number():
         Problem(id="demo", description="d", challenge=CHALLENGE), services))
     # The probe is read from its own check and left out of the proof.
     assert "#eval" not in result.solution
-    assert "The probe you asked for printed:\n77" in llm.calls[1][1]
+    assert "The probe you asked for printed:\n77" in wrote(llm)[1][1]
     assert result.metadata["accepted_by_repl"] is True
 
 
@@ -247,7 +261,7 @@ def test_facts_that_never_move_the_goal_are_rolled_back():
     reverts = [e for e in result.metadata["events"] if e.get("stage") == "revert"]
     assert reverts and reverts[0]["dropped"] == 6
     # The model is told what was removed, and the other one gets the next turn.
-    told = [c for _, c in llm.calls if "left the goal standing" in c]
+    told = [c for _, c, _ in llm.calls if "left the goal standing" in c]
     assert told and "j0 : True" in told[0]
 
 
@@ -257,7 +271,7 @@ def test_a_model_that_never_gives_a_usable_step_does_not_spin():
     assert stuck and stuck[0]["note"] == "replies refused"
     # It stopped on the refusals, not on the budget: every refused reply was a
     # real call, and the spend never reached the headroom.
-    assert len(llm.calls) < 40 and result.metadata["spend_usd"] < 0.9
+    assert len(wrote(llm)) < 40 and result.metadata["spend_usd"] < 0.9
 
 
 def test_a_shared_fact_can_be_stated_as_its_own_lemma():
@@ -286,5 +300,27 @@ def test_the_graded_entry_point_is_the_framework_loop():
 def test_a_reply_with_no_lean_is_told_so():
     result, _, llm, _ = run(["I think we should use induction here.",
                              "have key : True := by trivial", "exact key"])
-    assert "contained no Lean" in llm.calls[1][1]
+    assert "contained no Lean" in wrote(llm)[1][1]
+    assert result.metadata["accepted_by_repl"] is True
+
+
+def test_one_model_does_the_mathematics_and_the_other_writes_the_lean():
+    result, _, llm, _ = run(["have key : True := by trivial", "exact key"],
+                            lines=("mathematician", "writer"))
+    who = [model for model, _, _ in llm.calls]
+    assert who[0] == "mathematician" and who[1] == "writer"
+    # The plan reaches the writer, and the writer is never asked for prose.
+    assert PLAN in wrote(llm)[1][1]
+    plans = [e for e in result.metadata["events"] if e.get("kind") == "plan"]
+    assert plans and plans[0]["by"] == "mathematician"
+
+
+def test_two_rejections_send_the_goal_back_to_the_mathematician():
+    replies = ["have a : True := by first | (rfl; done)",
+               "have b : True := by exact?",
+               "have key : True := by trivial", "exact key"]
+    result, _, llm, _ = run(replies, lines=("mathematician", "writer"))
+    who = [model for model, _, _ in llm.calls]
+    # plan, write, write, plan again: the wording was not the problem.
+    assert who[:4] == ["mathematician", "writer", "writer", "mathematician"]
     assert result.metadata["accepted_by_repl"] is True

@@ -72,7 +72,18 @@ REASONING = {"effort": "low"}
 GOAL_CHARS = 4000
 FILE_CHARS = 8000
 # Two rejections on one goal and the other model gets it, with Lean's reason.
+# Measured: qwen answers in mathematics, gpt-oss answers in Lean. Asking both
+# for the same thing wastes whichever one is answering out of its strength.
 STALL_BEFORE_SWAP = 2
+PLAN_TOKENS = 1500
+
+PLANNER_SYSTEM = """You are a competition mathematician. You are given one goal from a
+Lean 4 proof, with its hypotheses.
+
+Say how to prove it, in at most six short lines. Name the key fact: the modulus,
+the witness, the identity, the bound, the induction, the case split. Give the
+value when it is a number. Write mathematics, not Lean, and do not restate the
+goal."""
 # Facts that compile but never move the goal still enter every later prompt, so
 # a goal that stands through this many of them is rolled back to where it began.
 DRIFT_LIMIT = 6
@@ -237,7 +248,8 @@ class FrameworkAgent:
         best = text
         events: list[dict[str, Any]] = []
         models = list(cfg.lines)
-        turn_of = 0
+        planner, writer = models[0], models[-1]
+        plan = ""
         swept: set[tuple[str, tuple[str, int]]] = set()
         stalls = 0
         feedback: Feedback | None = None
@@ -332,9 +344,12 @@ class FrameworkAgent:
                     block, kind, author = "exact?", "search", "harness"
                     swept.add(("search", seen))
                 elif can_ask():
-                    author = models[turn_of % len(models)]
+                    if not plan:
+                        plan = await self._ask_plan(problem, state, services, ledger)
+                        events.append({"kind": "plan", "by": planner, "chars": len(plan)})
+                    author = writer
                     block = await self._ask_step(
-                        problem, state, feedback, author, services, ledger)
+                        problem, state, feedback, author, services, ledger, plan)
                     kind = "step"
                     if not block:
                         # A refused reply is a failed turn. Skipping it silently
@@ -344,7 +359,7 @@ class FrameworkAgent:
                         feedback = Feedback(author, said, "empty")
                         stalls, stuck = stalls + 1, stuck + 1
                         if stalls >= STALL_BEFORE_SWAP:
-                            turn_of, stalls = turn_of + 1, 0
+                            plan, stalls = "", 0
                         if stuck >= STUCK_LIMIT:
                             events.append({"stage": "stuck", "note": "replies refused"})
                             break
@@ -378,9 +393,9 @@ class FrameworkAgent:
                     break
 
                 nxt, why = await self._advance(state, block, services)
-                if nxt is None and why != BUDGET_RETRY and UNKNOWN_NAME.search(why):
-                    # The fact may be right and only the lemma name wrong, which
-                    # is exactly what `exact?` is for. One free check decides.
+                if nxt is None and why != BUDGET_RETRY:
+                    # The fact may be right and only its proof wrong, which is
+                    # exactly what `exact?` is for. One free check decides.
                     retry = hand_to_search(block)
                     if retry != block:
                         nxt, why2 = await self._advance(state, retry, services)
@@ -404,8 +419,9 @@ class FrameworkAgent:
                     feedback = Feedback(author if kind == "step" else kind, why)
                     stalls += 1 if kind == "step" else 0
                     if stalls >= STALL_BEFORE_SWAP:
-                        turn_of += 1
-                        stalls = 0
+                        # Two Lean rejections mean the plan is wrong, not the
+                        # wording: ask the mathematician again, not the writer.
+                        plan, stalls = "", 0
                     continue
                 state, feedback, stalls = nxt, None, 0
                 if kind == "closers":
@@ -416,6 +432,7 @@ class FrameworkAgent:
 
                 if state.goal != anchor_goal:
                     anchor_goal, anchor_text, on_goal, stuck = state.goal, state.text, 0, 0
+                    plan = ""
                     continue
                 on_goal += 1 if kind == "step" else 0
                 stuck += 1 if kind == "step" else 0
@@ -428,7 +445,7 @@ class FrameworkAgent:
                     events.append({"stage": "revert", "dropped": len(dropped)})
                     state = await self._look(anchor_text, services)
                     feedback = Feedback(author, "; ".join(dropped)[:FEEDBACK_CHARS], "drift")
-                    turn_of, on_goal = turn_of + 1, 0
+                    plan, on_goal = "", 0
 
             if is_done(state.text):
                 won = await deliver(state.text, "framework_loop")
@@ -556,14 +573,28 @@ class FrameworkAgent:
                    if isinstance(m, dict) and m.get("severity") in ("info", "information")]
         return "\n".join(printed)[:FEEDBACK_CHARS] or "nothing"
 
+    async def _ask_plan(self, problem: Problem, state: State,
+                        services: Services, ledger: Ledger) -> str:
+        """The mathematics, from the model that answers in mathematics."""
+
+        ask = (f"Problem: {problem.description}\n\nThe goal, as Lean reports it:\n"
+               f"{state.goal[:GOAL_CHARS]}\n\nHow do you prove this?")
+        reply = await self._call(self.config.lines[0], ask, PLAN_TOKENS,
+                                 services, ledger, PLANNER_SYSTEM)
+        return strip_fences(reply).strip()[:GOAL_CHARS]
+
     async def _ask_step(self, problem: Problem, state: State,
-                        feedback: tuple[str, str] | None, model: str, services: Services, ledger: Ledger) -> str:
+                        feedback: Feedback | None, model: str, services: Services,
+                        ledger: Ledger, plan: str = "") -> str:
         source, line = render(state.text)
         parts = [f"Problem: {problem.description}".strip(),
                  "File:\n" + source[-FILE_CHARS:],
                  "What Lean reports as open, with its hypotheses. The first goal "
                  f"is the active one, at `skip` on line {line}:\n"
                  f"{state.goal[:GOAL_CHARS]}"]
+        if plan:
+            parts.append("A mathematician was asked how to prove this goal and "
+                         f"answered:\n{plan}")
         if feedback:
             parts.append(f"{feedback.lead(model)}:\n{feedback.text}")
         # Measured on p09: qwen narrates instead of answering unless the
@@ -609,7 +640,7 @@ class FrameworkAgent:
         return text
 
     async def _call(self, model: str, prompt: str, max_tokens: int,
-                    services: Services, ledger: Ledger) -> str:
+                    services: Services, ledger: Ledger, system: str = "") -> str:
         """Retry only what the provider refused before generating anything."""
 
         for wait in (0.0,) + RETRY_BACKOFF_S:
@@ -618,7 +649,7 @@ class FrameworkAgent:
             try:
                 reply = await services.llm.complete(
                     model=model,
-                    messages=[{"role": "system", "content": FRAMEWORK_SYSTEM},
+                    messages=[{"role": "system", "content": system or FRAMEWORK_SYSTEM},
                               {"role": "user", "content": prompt}],
                     max_tokens=max_tokens,
                     temperature=0.4,
