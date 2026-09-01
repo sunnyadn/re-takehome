@@ -42,6 +42,7 @@ from submission.framework import (
     axiom_probe,
     collapse,
     first_blocks,
+    have_spans,
     classify,
     cursor,
     cursor_goal,
@@ -66,7 +67,11 @@ FILE_CHARS = 8000
 STALL_BEFORE_SWAP = 2
 # The finish pass is free of tokens but not of clock, so it is bounded.
 MAX_COLLAPSE = 4
+MAX_DELETIONS = 12
 FINISH_RESERVE_S = 300.0
+# Lean's elaboration budget is deterministic, so raising it is sound; it buys
+# that determinism with wall clock, which the comparator caps at 180s.
+RAISED_HEARTBEATS = "set_option maxHeartbeats 400000"
 
 FRAMEWORK_SYSTEM = """You extend a Lean 4 proof one step at a time, against a full Mathlib.
 
@@ -148,6 +153,22 @@ def notes_for(text: str) -> str:
 
 
 @dataclass
+class Feedback:
+    """What to tell the next model, and who earned it."""
+
+    author: str
+    text: str
+    kind: str = "rejected"
+
+    def lead(self, model: str) -> str:
+        if self.kind == "probe":
+            return "The probe you asked for printed"
+        if self.author == model:
+            return "Your last step was rejected and has been removed. Lean said"
+        return f"A {self.author} attempt on this goal was rejected. Lean said"
+
+
+@dataclass
 class State:
     """The proof and what the last check said about it."""
 
@@ -185,7 +206,8 @@ class FrameworkAgent:
         turn_of = 0
         swept: set[tuple[str, tuple[str, int]]] = set()
         stalls = 0
-        feedback: tuple[str, str] | None = None
+        feedback: Feedback | None = None
+        raised = False
 
         def time_left() -> float:
             return deadline - time.monotonic()
@@ -253,16 +275,28 @@ class FrameworkAgent:
                     if not block:
                         turn_of += 1
                         continue
+                    if is_probe(block):
+                        printed = await self._probe(state, block, services)
+                        feedback = Feedback(author, printed, "probe")
+                        events.append({"kind": "probe", "by": author, "printed": printed[:80]})
+                        continue
                 else:
                     events.append({"stage": "stop", "note": "budget headroom"})
                     break
 
                 nxt, why = await self._advance(state, block, services)
+                if nxt is None and why == HEARTBEAT_RETRY and not raised:
+                    # A step that only ran out of elaboration budget is not a
+                    # wrong step; give it the budget once and re-adjudicate.
+                    raised = True
+                    state = await self._look(
+                        insert_preamble(state.text, RAISED_HEARTBEATS), services)
+                    nxt, why = await self._advance(state, block, services)
                 events.append({"kind": kind, "by": author, "accepted": nxt is not None})
                 if nxt is None:
                     # Only a model's own rejections count towards its turn; the
                     # free attempts are the harness's.
-                    feedback = (author if kind == "step" else kind, why)
+                    feedback = Feedback(author if kind == "step" else kind, why)
                     stalls += 1 if kind == "step" else 0
                     if stalls >= STALL_BEFORE_SWAP:
                         turn_of += 1
@@ -318,6 +352,8 @@ class FrameworkAgent:
             return None, "no active goal"
         nxt = await self._look(candidate, services)
         _, surplus, expensive, failures = classify(nxt.messages)
+        if expensive and not failures:
+            return None, HEARTBEAT_RETRY
         if failures or expensive:
             said = format_messages(nxt.messages)[:FEEDBACK_CHARS]
             return None, f"{said}\n{notes_for(said)}".strip()
@@ -329,6 +365,7 @@ class FrameworkAgent:
         """Take the search out of a finished file: the comparator allows 180s."""
 
         state = await self._substitute_search(state, services)
+        state = await self._prune(state, services, time_left)
         for _ in range(MAX_COLLAPSE):
             blocks = first_blocks(state.text)
             if not blocks or time_left() < FINISH_RESERVE_S:
@@ -344,6 +381,26 @@ class FrameworkAgent:
             state = collapsed
         return state
 
+    async def _prune(self, state: State, services: Services, time_left) -> State:
+        """Delete facts the finished proof does not use.
+
+        Only sound now: while a `sorry` remains, no deletion can break anything."""
+
+        tried: set[str] = set()
+        for _ in range(MAX_DELETIONS):
+            if time_left() < FINISH_RESERVE_S:
+                break
+            spans = [s for s in have_spans(state.text) if s[2] not in tried]
+            if not spans:
+                break
+            start, end, statement = spans[0]
+            tried.add(statement)
+            probe = await self._look(
+                drop_lines(state.text, range(start, end + 1)), services)
+            if probe.accepted and is_done(probe.text):
+                state = probe
+        return state
+
     async def _substitute_search(self, state: State, services: Services) -> State:
         """Replace each `exact?` with the term it printed, keeping the search
         call when the term does not re-elaborate."""
@@ -356,6 +413,14 @@ class FrameworkAgent:
                 return probe
         return state
 
+    async def _probe(self, state: State, block: str, services: Services) -> str:
+        """A probe sits above the theorem, is read from its own check, and goes."""
+
+        check = await services.lean.check_file(insert_preamble(state.text, block))
+        printed = [str(m.get("data", "")).strip() for m in check.messages
+                   if isinstance(m, dict) and m.get("severity") in ("info", "information")]
+        return "\n".join(printed)[:FEEDBACK_CHARS] or "nothing"
+
     async def _ask_step(self, problem: Problem, state: State,
                         feedback: tuple[str, str] | None, model: str, services: Services, ledger: Ledger) -> str:
         source, line = render(state.text)
@@ -363,10 +428,7 @@ class FrameworkAgent:
                  "File:\n" + source[-FILE_CHARS:],
                  f"The active goal is at `skip` on line {line}:\n{state.goal[:GOAL_CHARS]}"]
         if feedback:
-            whose, said = feedback
-            lead = ("Your last step was rejected and has been removed"
-                    if whose == model else f"A {whose} attempt on this goal was rejected")
-            parts.append(f"{lead}. Lean said:\n{said}")
+            parts.append(f"{feedback.lead(model)}:\n{feedback.text}")
         parts.append("Write the next step.")
         reply = await self._call(model, "\n\n".join(parts), STEP_TOKENS, services, ledger)
         return screen_step(reply)
@@ -416,7 +478,16 @@ class FrameworkAgent:
         return ""
 
 
+HEARTBEAT_RETRY = "__heartbeat__"
 NUMBER = re.compile(r"^-?\d+$")
+
+
+def is_probe(block: str) -> bool:
+    """A reply that only computes something is a probe, not a step."""
+
+    lines = [l for l in block.splitlines() if l.strip()]
+    return bool(lines) and all(l.strip().startswith(("#eval", "#check", "#print"))
+                               for l in lines)
 STEP_BAN = re.compile(r"^\s*(import|theorem|lemma|example|axiom)\b|```|native_decide|admit",
                       re.M)
 

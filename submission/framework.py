@@ -211,3 +211,33 @@ def axiom_probe(text: str, names: Sequence[str]) -> str:
 
     lines = "\n".join(f"#print axioms {n}" for n in names)
     return f"{text.rstrip()}\n\n{lines}\n" if lines else text
+
+
+def step_spans(text: str) -> list[tuple[int, int, str]]:
+    """Every top-level step of every proof body, as 1-based line spans."""
+
+    lines = text.split("\n")
+    out: list[tuple[int, int, str]] = []
+    i = 0
+    while i < len(lines):
+        if not lines[i].rstrip().endswith(":= by"):
+            i += 1
+            continue
+        j = i + 1
+        while j < len(lines) and (not lines[j].strip() or lines[j].startswith(" ")):
+            j += 1
+        body = [(n, l) for n, l in enumerate(lines[i + 1:j], start=i + 2) if l.strip()]
+        if body:
+            base = min(len(l) - len(l.lstrip()) for _, l in body)
+            starts = [n for n, l in body if len(l) - len(l.lstrip()) == base]
+            for k, start in enumerate(starts):
+                end = (starts[k + 1] - 1) if k + 1 < len(starts) else body[-1][0]
+                out.append((start, end, lines[start - 1].strip()))
+        i = j
+    return out
+
+
+def have_spans(text: str) -> list[tuple[int, int, str]]:
+    """The steps §4 may delete: facts, never the moves that shaped the goal."""
+
+    return [s for s in step_spans(text) if s[2].startswith("have ")]

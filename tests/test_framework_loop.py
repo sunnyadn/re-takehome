@@ -37,6 +37,11 @@ class FakeLean:
         if "vm_probe" in source:
             return LeanCheck(True, [], False, False, 1)
         if "exact key" in source:
+            # A name deleted from the file is a name out of scope, which is what
+            # makes the finish pass's deletion test sound.
+            if "have key" not in source:
+                return LeanCheck(False, [{"severity": "error", "pos": {"line": line or 1},
+                                          "data": "unknown identifier 'key'"}], True, False, 1)
             if line:
                 return LeanCheck(False, [{"severity": "error", "pos": {"line": line},
                                           "data": "no goals to be solved"}], False, False, 1)
@@ -145,3 +150,57 @@ def test_an_axiom_off_the_allowlist_is_not_offered_as_a_win():
     assert result.metadata["accepted_by_repl"] is False
     verify = [e for e in result.metadata["events"] if e.get("stage") == "verify"]
     assert verify and verify[0]["faults"]
+
+
+class SlowLean(FakeLean):
+    """`have key` only fits inside the elaboration budget once it is raised."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "have key" in source and "maxHeartbeats" not in source:
+            return LeanCheck(False, [{"severity": "error", "pos": {"line": skip_line(source)},
+                                      "data": "(deterministic) timeout at `whnf`, maximum "
+                                              "number of heartbeats (200000)"}],
+                             True, False, 1)
+        return await super().check_file(source)
+
+
+def test_a_step_that_only_ran_out_of_budget_is_given_the_budget():
+    lean, llm = SlowLean(), FakeLLM(["have key : True := by trivial", "exact key"])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="d", challenge=CHALLENGE), services))
+    assert "set_option maxHeartbeats 400000" in result.solution
+    assert "have key" in result.solution
+    assert result.metadata["accepted_by_repl"] is True
+    # The step was not blamed for it: the model was never asked to replace it.
+    assert len(llm.calls) == 2
+
+
+class ProbeLean(FakeLean):
+    async def check_file(self, source, timeout_s=None):
+        if "#eval" in source:
+            return LeanCheck(False, [{"severity": "info", "data": "77"}], True, False, 1)
+        return await super().check_file(source)
+
+
+def test_a_probe_goes_above_the_theorem_and_comes_back_as_a_number():
+    lean = ProbeLean()
+    llm = FakeLLM(["#eval (77 : ℕ)", "have key : True := by trivial", "exact key"])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="d", challenge=CHALLENGE), services))
+    # The probe is read from its own check and left out of the proof.
+    assert "#eval" not in result.solution
+    assert "The probe you asked for printed:\n77" in llm.calls[1][1]
+    assert result.metadata["accepted_by_repl"] is True
+
+
+def test_a_fact_the_finished_proof_does_not_use_is_deleted():
+    replies = ["have spare : True := by trivial", "have key : True := by trivial",
+               "exact key"]
+    result, lean, _, _ = run(replies)
+    assert result.metadata["accepted_by_repl"] is True
+    # `spare` is never named again, and the file still checks without it.
+    assert "spare" not in result.solution and "have key" in result.solution
