@@ -305,6 +305,21 @@ def declaration_name(block: str) -> str:
     return ""
 
 
+def unwrap_own(block: str, names: Sequence[str]) -> str:
+    """A block that restates the graded theorem is its body, wrongly framed.
+
+    Measured on p09: with reasoning off the writer opens with the theorem header
+    and, told the name is taken, opens with the same line minus `theorem`."""
+
+    for name in names:
+        head = re.compile(rf"\A\s*(?:private\s+)?(?:theorem|lemma)?\s*{re.escape(name)}\b"
+                          r"[^\n]*?:=\s*by[ \t]*\n")
+        found = head.match(block)
+        if found:
+            return reindent(block[found.end():], "")
+    return block
+
+
 HAVE_BODY = re.compile(r"^(\s*have\b.*?:=\s*)(\S.*)$", re.M)
 UNKNOWN_NAME = re.compile(r"[Uu]nknown (identifier|constant)|environment does not contain")
 

@@ -205,3 +205,13 @@ def test_the_cursor_can_be_any_open_goal_not_only_the_first():
     assert new.split("\n")[6].strip() == "trivial"
     # An index past the last goal is the last goal, never a crash.
     assert fw.render(TWO_THEOREMS, 9)[1] == 7
+
+
+def test_a_block_that_restates_the_graded_theorem_is_unwrapped_to_its_body():
+    body = "  constructor\n  · intro h\n    trivial\n"
+    for head in ("theorem demo (n : ℕ) : n + 0 = n := by\n",
+                 "demo (n : ℕ) : n + 0 = n := by\n"):
+        assert fw.unwrap_own(head + body, ("demo",)) == "constructor\n· intro h\n  trivial\n"
+    # A block that declares something else is left alone.
+    other = "theorem helper : True := by trivial"
+    assert fw.unwrap_own(other, ("demo",)) == other

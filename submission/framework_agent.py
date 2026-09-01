@@ -57,6 +57,8 @@ from submission.framework import (
     message_line,
     reopen,
     normalise_steps,
+    root_names,
+    unwrap_own,
     placeholders,
     render,
     replace_cursor,
@@ -711,7 +713,9 @@ class FrameworkAgent:
                      "lines, and nothing before or after it. No explanation.")
         reply, why = await self._call(
             model, "\n\n".join(parts), STEP_TOKENS, services, ledger)
-        return CUT if why == "length" else screen_step(reply)
+        if why == "length":
+            return CUT
+        return unwrap_own(screen_step(reply), root_names(problem.challenge))
 
     async def _resolve_answers(self, problem: Problem, text: str, names: Sequence[str],
                                services: Services, ledger: Ledger,
