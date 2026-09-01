@@ -51,7 +51,9 @@ from submission.framework import (
     fill_answer,
     insert_preamble,
     is_done,
+    message_end_line,
     message_line,
+    reopen,
     normalise_steps,
     render,
     replace_cursor,
@@ -278,7 +280,11 @@ class FrameworkAgent:
                 if state.accepted and is_done(state.text):
                     break
                 if is_done(state.text) or state.accepted:
-                    state = await self._settle(state, services)
+                    settled = await self._settle(state, services)
+                    if settled.text == state.text:
+                        events.append({"stage": "stop", "note": "no goal left to work on"})
+                        break
+                    state = settled
                     continue
 
                 # Never re-run a closer on a goal whose text and file are both
@@ -400,13 +406,20 @@ class FrameworkAgent:
                      messages=list(check.messages), accepted=check.accepted)
 
     async def _settle(self, state: State, services: Services) -> State:
-        """A placeholder Lean has no goal for is surplus, and comes out."""
+        """Match placeholders to goals: drop a spare one, add a missing one."""
 
-        surplus = [message_line(m) for m in classify(state.messages)[1]]
-        lines = [l for l in surplus if l] or ([state.line] if state.line else [])
-        if not lines:
-            return State(text=state.text, accepted=state.accepted, messages=state.messages)
-        return await self._look(drop_lines(state.text, lines), services)
+        surplus = [l for l in (message_line(m) for m in classify(state.messages)[1]) if l]
+        if surplus:
+            return await self._look(drop_lines(state.text, surplus), services)
+        if state.accepted:
+            return (await self._look(drop_lines(state.text, [state.line]), services)
+                    if state.line else state)
+        # A split left a goal behind and the file has nowhere to work on it.
+        open_goals = classify(state.messages)[0]
+        end = message_end_line(open_goals[0]) if open_goals else None
+        if end:
+            return await self._look(reopen(state.text, end), services)
+        return state
 
     async def _advance(self, state: State, block: str,
                        services: Services) -> tuple[State | None, str]:

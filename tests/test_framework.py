@@ -86,7 +86,10 @@ def test_surplus_placeholder_is_a_message_kind_of_its_own():
     progress, surplus, expensive, failures = fw.classify(msgs)
     assert len(progress) == len(surplus) == len(expensive) == len(failures) == 1
     assert fw.cursor_goal(msgs, 4) == "True"
-    assert fw.cursor_goal(msgs, 9) == ""
+    # Lean attributes the message to the declaration as often as to the `skip`,
+    # so a line that matches nothing still yields the goal that is open.
+    assert fw.cursor_goal(msgs, 9) == "True"
+    assert fw.cursor_goal([], 4) == ""
 
 
 def test_dropping_the_surplus_line_finishes_the_proof():
@@ -162,3 +165,11 @@ def test_a_budget_error_is_not_a_wrong_step():
     threshold = {"severity": "warning", "data": "exponent 2026 exceeds the threshold 256"}
     progress, surplus, expensive, failures = fw.classify([depth, threshold])
     assert expensive == [depth] and not failures
+
+
+def test_a_goal_with_nowhere_to_work_gets_a_placeholder_back():
+    text = "import Mathlib\n\ntheorem t : True ∧ True := by\n  constructor\n  trivial\n"
+    # `endPos` is where Lean says the proof block ends.
+    reopened = fw.reopen(text, 5)
+    assert reopened.split("\n")[5] == "  sorry"
+    assert not fw.is_done(reopened) and fw.render(reopened)[1] == 6

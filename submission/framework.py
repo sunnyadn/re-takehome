@@ -164,12 +164,38 @@ def goal_text(message: Any) -> str:
 
 
 def cursor_goal(messages: Sequence[Any], cursor_line: int) -> str:
-    """The active goal: the `unsolved goals` message sitting on the `skip`."""
+    """The active goal.
 
-    for m in classify(messages)[0]:
+    Lean attributes the message to the `skip` sometimes and to the enclosing
+    declaration otherwise, so the cursor's own line is a preference, not a key."""
+
+    open_goals = classify(messages)[0]
+    for m in open_goals:
         if message_line(m) == cursor_line:
             return goal_text(m)
-    return ""
+    return goal_text(open_goals[0]) if open_goals else ""
+
+
+def message_end_line(message: Any) -> int | None:
+    pos = message.get("endPos") if isinstance(message, dict) else None
+    line = pos.get("line") if isinstance(pos, dict) else None
+    return line if isinstance(line, int) else None
+
+
+def reopen(text: str, line: int) -> str:
+    """Give a goal with nowhere to work a placeholder at the end of its block.
+
+    A tactic closes the goal in front of it, so goals opened by a split are
+    reached one placeholder at a time, in order."""
+
+    lines = text.split("\n")
+    at = min(max(line, 1), len(lines))
+    while at > 1 and not lines[at - 1].strip():
+        at -= 1
+    body = lines[at - 1]
+    indent = body[: len(body) - len(body.lstrip())] or "  "
+    lines.insert(at, f"{indent}sorry")
+    return "\n".join(lines)
 
 
 def drop_lines(text: str, lines: Sequence[int]) -> str:
