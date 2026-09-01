@@ -677,3 +677,12 @@ def test_a_step_written_where_the_goal_is_closed_goes_as_a_whole():
     # left the rest of the step in p09's file as dead text.
     assert "simp_all" not in result.solution and "positivity" not in result.solution
     assert any("no goals left where that step" in t for _, t in wrote(llm))
+
+
+def test_a_goal_that_will_not_close_does_not_end_a_run_with_time_left():
+    # Nothing in the script ever closes the goal, and the budget is what stops
+    # it: an unfinished proof scores what a stopped one scores.
+    result, _, llm, _ = run(["have j : True := by trivial"] * 40, budget=0.05,
+                            lines=("model-a",))
+    # Ending on the budget is the proof that nothing else ended it first.
+    assert result.metadata["events"][-1] == {"stage": "stop", "note": "budget headroom"}

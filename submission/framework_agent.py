@@ -567,8 +567,12 @@ class FrameworkAgent:
                     if state.goals > 1:
                         state = await park(state, "stuck")
                         continue
+                    # An unfinished proof scores what a stopped one scores, so
+                    # there is nothing to save by stopping. Measured on p09: this
+                    # ended a healthy run at 763s of the 1800s it was given, and
+                    # having spent 2% of the budget. Time and money are the exits.
                     events.append({"stage": "stuck", "goal": anchor_goal[:80]})
-                    break
+                    plan, stuck = "", 0
                 if on_goal >= DRIFT_LIMIT and reverted.get(anchor_goal, 0) < MAX_REVERTS:
                     dropped = [h[2] for h in have_spans(state.text)][-on_goal:]
                     reverted[anchor_goal] = reverted.get(anchor_goal, 0) + 1
