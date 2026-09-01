@@ -215,3 +215,28 @@ def test_a_block_that_restates_the_graded_theorem_is_unwrapped_to_its_body():
     # A block that declares something else is left alone.
     other = "theorem helper : True := by trivial"
     assert fw.unwrap_own(other, ("demo",)) == other
+
+
+TWO_CASES = """case mp
+n : ℕ
+⊢ 7 ∣ 2 ^ n - 1 → 3 ∣ n
+
+case mpr
+n : ℕ
+⊢ 3 ∣ n → 7 ∣ 2 ^ n - 1"""
+
+
+def test_several_goals_behind_one_placeholder_each_get_their_own():
+    apart = fw.split_cursor(CHALLENGE, TWO_CASES)
+    assert apart.split("\n")[3:7] == ["  case mp =>", "    sorry",
+                                      "  case mpr =>", "    sorry"]
+    assert len(fw.placeholders(apart)) == 2
+    # Lean keeps attributing the message to the declaration, so a second pass
+    # over the same text must not split the split.
+    assert fw.split_cursor(apart, TWO_CASES) == ""
+    # One goal is not a split, and unnamed goals fall back to bullets.
+    assert fw.split_cursor(CHALLENGE, "n : ℕ\n⊢ True") == ""
+    plain = fw.split_cursor(CHALLENGE, "⊢ True\n\n⊢ False")
+    # A bullet keeps its body on the next line, which is where the cursor scans.
+    assert plain.split("\n")[3:7] == ["  ·", "    sorry", "  ·", "    sorry"]
+    assert len(fw.placeholders(plain)) == 2

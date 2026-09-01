@@ -491,3 +491,38 @@ def test_reasoning_is_decided_by_name_and_never_probed():
     assert sent["vendor/qwen3.5-flash"] == {"enabled": False}
     assert all(r == {"effort": "low"} for m, r in llm.sent if "qwen" not in m)
     assert result.metadata["accepted_by_repl"] is True
+
+
+BOTH = ("unsolved goals\ncase mp\nn : ℕ\n⊢ 7 ∣ 2 ^ n - 1 → 3 ∣ n\n\n"
+        "case mpr\nn : ℕ\n⊢ 3 ∣ n → 7 ∣ 2 ^ n - 1")
+
+
+class SplitLean:
+    """Reports both goals at the declaration, the way Lean did on p09."""
+
+    def __init__(self):
+        self.sources: list[str] = []
+
+    async def check_file(self, source, timeout_s=None):
+        self.sources.append(source)
+        if "vm_probe" in source:
+            return LeanCheck(True, [], False, False, 1)
+        if "first" in source or "exact?" in source:
+            # Every alternative ends in `done`, so a block that does not close
+            # the goal is an error, never a quiet success.
+            return LeanCheck(False, [{"severity": "error", "pos": {"line": 4},
+                                      "data": "linarith failed"}], True, False, 1)
+        data = "unsolved goals\nn : ℕ\n⊢ 3 ∣ n" if "case mp =>" in source else BOTH
+        return LeanCheck(False, [{"severity": "error", "pos": {"line": 3}, "data": data}],
+                         True, False, 1)
+
+
+def test_two_goals_behind_one_placeholder_are_split_once_and_only_once():
+    lean, llm = SplitLean(), FakeLLM([])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=0.05, time_limit_s=600.0))
+    problem = Problem(id="demo", description="prove it", challenge=CHALLENGE)
+    result = asyncio.run(agent.solve(problem, services))
+    splits = [e for e in result.metadata["events"] if e.get("stage") == "split"]
+    assert len(splits) == 1 and splits[0]["goals"] == 2
+    assert any("case mp =>" in s and "case mpr =>" in s for s in lean.sources)

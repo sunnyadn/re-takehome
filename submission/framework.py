@@ -305,6 +305,27 @@ def declaration_name(block: str) -> str:
     return ""
 
 
+CASE_TAG = re.compile(r"^case (\S+)\s*$", re.M)
+
+
+def split_cursor(text: str, goal: str, index: int = 0) -> str:
+    """One placeholder per goal, so each of them gets a turn of its own.
+
+    A tactic that splits leaves several goals behind one `sorry`, and Lean then
+    reports them all at the declaration. Tags are used only if there is one per
+    goal; mixing the two forms in one split is what breaks."""
+
+    goals = goal.count("⊢")
+    tags = CASE_TAG.findall(goal)
+    if goals < 2 or any(f"case {t} =>" in text for t in tags):
+        return ""
+    if len(tags) == goals:
+        block = "\n".join(f"case {t} =>\n  sorry" for t in tags)
+    else:
+        block = "\n".join("· sorry" for _ in range(goals))
+    return replace_cursor(text, block, index=index, trailing=False)[0]
+
+
 def unwrap_own(block: str, names: Sequence[str]) -> str:
     """A block that restates the graded theorem is its body, wrongly framed.
 

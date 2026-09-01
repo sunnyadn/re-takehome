@@ -58,6 +58,7 @@ from submission.framework import (
     reopen,
     normalise_steps,
     root_names,
+    split_cursor,
     unwrap_own,
     placeholders,
     render,
@@ -299,6 +300,7 @@ class FrameworkAgent:
         turn_of = 0
         plan = ""
         swept: set[tuple[str, tuple[str, int]]] = set()
+        divided: set[str] = set()
         stalls = 0
         feedback: Feedback | None = None
         raised = False
@@ -399,6 +401,16 @@ class FrameworkAgent:
                         break
                     state = settled
                     continue
+
+                # Several goals behind one placeholder: give each its own, so
+                # the closers, the cursor and the park all reach every one.
+                if state.goal not in divided:
+                    divided.add(state.goal)
+                    apart = split_cursor(state.text, state.goal, state.focus)
+                    if apart:
+                        state = await self._look(apart, services, state.focus)
+                        events.append({"stage": "split", "goals": state.goals})
+                        continue
 
                 # Never re-run a closer on a goal whose text and file are both
                 # unchanged; a longer file is a changed context.
@@ -514,7 +526,10 @@ class FrameworkAgent:
                     plan = ""
                     continue
                 on_goal += 1 if kind == "step" else 0
-                stuck += 1 if kind == "step" else 0
+                # Every turn counts here, not only the paid ones: a free turn
+                # that leaves the goal standing spins the clock, and the clock
+                # is eight hours.
+                stuck += 1
                 if stuck >= STUCK_LIMIT:
                     if state.goals > 1:
                         state = await park(state, "stuck")
