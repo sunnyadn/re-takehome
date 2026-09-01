@@ -319,6 +319,7 @@ class FrameworkAgent:
         feedback: Feedback | None = None
         raised = False
         anchor_goal, anchor_text, on_goal, stuck = "", text, 0, 0
+        sound = text
         reverted: dict[str, int] = {}
         tried: dict[str, int] = {}
 
@@ -415,6 +416,17 @@ class FrameworkAgent:
                         break
                     state = settled
                     continue
+
+                # Measured on p09: a file carrying an error of its own rejects
+                # every later step, including a correct lemma, because the check
+                # judges the whole file. Nothing recovers from that but a
+                # rollback to the last file Lean had no error in.
+                if classify(state.messages)[3]:
+                    if state.text != sound:
+                        events.append({"stage": "repair"})
+                        state = await self._look(sound, services, state.focus)
+                else:
+                    sound = state.text
 
                 # Several goals behind one placeholder: give each its own, so
                 # the closers, the cursor and the park all reach every one.

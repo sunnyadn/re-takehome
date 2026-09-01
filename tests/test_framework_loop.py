@@ -617,3 +617,36 @@ def test_more_probes_than_names_are_asked_for_again():
     asyncio.run(agent.solve(problem, services))
     assert "exactly one per name" in wrote(llm)[1][1]
     assert any("abbrev p_answer : ℕ := 19" in s for s in lean.sources)
+
+
+class BreaksOnceLean(FakeLean):
+    """The third check leaves an error the file keeps until it is rolled back."""
+
+    def __init__(self):
+        super().__init__()
+        self.broken = False
+
+    async def check_file(self, source, timeout_s=None):
+        if "have bad" in source:
+            self.broken = True
+        if self.broken and "have bad" not in source:
+            self.broken = False
+        if self.broken:
+            self.sources.append(source)
+            return LeanCheck(False, [{"severity": "error", "pos": {"line": 9},
+                                      "data": "unexpected identifier; expected command"}],
+                             True, False, 1)
+        return await super().check_file(source)
+
+
+def test_a_file_carrying_an_error_of_its_own_is_rolled_back():
+    lean = BreaksOnceLean()
+    # The bad step is accepted by the harness only because the fake lets it in;
+    # what matters is that the loop does not stay in a file it cannot use.
+    llm = FakeLLM(["have key : True := by trivial", "exact key"])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=CHALLENGE), services))
+    assert result.metadata["accepted_by_repl"] is True
+    assert "have bad" not in result.solution
