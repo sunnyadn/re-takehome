@@ -263,6 +263,21 @@ class FrameworkAgent:
                 "events": kept,
             })
 
+        async def deliver(text: str, how: str) -> AgentResult | None:
+            """Every winning file leaves by the same door: finish, then verify."""
+
+            state = await self._finish(State(text=text, accepted=True), services, time_left)
+            check = await services.lean.check_file(
+                axiom_probe(state.text, declared_names(problem.challenge)))
+            faults, _ = grade(state.text, check, names, problem.challenge)
+            events.append({"stage": "verify", "accepted": check.accepted,
+                           "faults": faults[:5], "compile_ms": check.duration_ms,
+                           "slow": check.duration_ms > SLOW_COMPILE_MS})
+            if not check.accepted or faults:
+                return None
+            offer(state.text, True)
+            return result(state.text, how, True)
+
         try:
             cocktail = await usable_cocktail(services)
             for candidate in sweep_files(problem.challenge, cocktail) + split_files(
@@ -271,8 +286,13 @@ class FrameworkAgent:
                     break
                 check = await services.lean.check_file(candidate)
                 if check.accepted and not scoring_faults(candidate, names, problem.challenge):
-                    offer(candidate, True)
                     events.append({"stage": "sweep", "accepted": True})
+                    # A 39-way `first` compiles here and still has to fit the
+                    # comparator's 180 seconds, so it goes through §4 too.
+                    won = await deliver(candidate, "deterministic_sweep")
+                    if won:
+                        return won
+                    offer(candidate, True)
                     return result(candidate, "deterministic_sweep", True)
 
             if names and can_ask():
@@ -385,16 +405,9 @@ class FrameworkAgent:
                     turn_of, on_goal = turn_of + 1, 0
 
             if is_done(state.text):
-                state = await self._finish(state, services, time_left)
-                probed = axiom_probe(state.text, declared_names(problem.challenge))
-                check = await services.lean.check_file(probed)
-                faults, _ = grade(state.text, check, names, problem.challenge)
-                events.append({"stage": "verify", "accepted": check.accepted,
-                               "faults": faults[:5], "compile_ms": check.duration_ms,
-                               "slow": check.duration_ms > SLOW_COMPILE_MS})
-                if check.accepted and not faults:
-                    offer(state.text, True)
-                    return result(state.text, "framework_loop", True)
+                won = await deliver(state.text, "framework_loop")
+                if won:
+                    return won
             offer(state.text, False)
             return result(best, "best_effort", False)
         except (BudgetExceeded, BudgetAccountingError, LeanRuntimeError) as exc:
