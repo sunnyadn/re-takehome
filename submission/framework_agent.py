@@ -79,7 +79,10 @@ MAX_REVERTS = 2
 # off a goal nothing closes, so keeping the file growing only buys a bigger file.
 STUCK_LIMIT = 24
 # The finish pass is free of tokens but not of clock, so it is bounded.
-MAX_COLLAPSE = 4
+MAX_COLLAPSE = 24
+# The cocktail is ordered by how often each tactic wins, so the one that fired
+# is usually near the front.
+COLLAPSE_TRIES = 12
 MAX_DELETIONS = 12
 FINISH_RESERVE_S = 300.0
 # Lean's budgets are deterministic, so raising them is sound; it buys that
@@ -389,6 +392,10 @@ class FrameworkAgent:
                         stalls = 0
                     continue
                 state, feedback, stalls = nxt, None, 0
+                if kind == "closers":
+                    # A 39-way block left in the file is re-elaborated by every
+                    # later check, and there is one per goal the sweep closes.
+                    state = await self._collapse_last(state, services)
                 offer(state.text, state.accepted and is_done(state.text))
 
                 if state.goal != anchor_goal:
@@ -498,6 +505,19 @@ class FrameworkAgent:
                 drop_lines(state.text, range(start, end + 1)), services)
             if probe.accepted and is_done(probe.text):
                 state = probe
+        return state
+
+    async def _collapse_last(self, state: State, services: Services) -> State:
+        """Put the alternative that fired where the search block stands."""
+
+        blocks = first_blocks(state.text)
+        if not blocks:
+            return state
+        block = blocks[-1]
+        for tactic in alternatives(block.group(2))[:COLLAPSE_TRIES]:
+            probe = await self._look(collapse(state.text, block, tactic), services)
+            if not classify(probe.messages)[3] and not classify(probe.messages)[2]:
+                return probe
         return state
 
     async def _substitute_search(self, state: State, services: Services) -> State:
