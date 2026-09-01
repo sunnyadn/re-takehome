@@ -361,3 +361,81 @@ def test_a_short_proof_is_not_tidied_at_all(monkeypatch):
     monkeypatch.setattr(fa_mod, "TIDY_ABOVE_BYTES", 0)
     _, busy, _, _ = run(replies)
     assert len(quiet.sources) < len(busy.sources)
+
+
+TWO_GOALS = ("import Mathlib\n\ntheorem hard : False := by\n  sorry\n\n"
+             "theorem easy : True := by\n  sorry\n")
+
+
+class ParkLean:
+    """Nothing closes `hard`; `trivial` closes `easy`."""
+
+    def __init__(self):
+        self.sources: list[str] = []
+
+    async def check_file(self, source, timeout_s=None):
+        self.sources.append(source)
+        if "vm_probe" in source:
+            return LeanCheck(True, [], False, False, 1)
+        line = skip_line(source)
+        if any(t in source for t in ("first", "exact?", "linarith")):
+            return LeanCheck(False, [{"severity": "error", "pos": {"line": line or 1},
+                                      "data": "linarith failed to find a contradiction"}],
+                             True, False, 1)
+        if not line:
+            return LeanCheck("sorry" not in source, [], "sorry" in source, False, 1)
+        head = source[: source.index("skip")]
+        if head.rfind("theorem hard") > head.rfind("theorem easy"):
+            return unsolved(line, "False")
+        if "trivial" in head[head.rfind("theorem easy"):]:
+            return LeanCheck(True, [{"severity": "warning", "pos": {"line": line},
+                                     "data": "'skip' tactic does nothing"}],
+                             False, False, 1)
+        return unsolved(line, "True")
+
+
+class GoalLLM:
+    """Answers the goal it is shown, not the order it is asked in."""
+
+    def __init__(self):
+        self.calls: list[tuple[str, str, bool]] = []
+
+    async def complete(self, *, model, messages, **kwargs):
+        prompt = messages[-1]["content"]
+        planning = "competition mathematician" in messages[0]["content"]
+        self.calls.append((model, prompt, planning))
+        said = PLAN if planning else ("trivial" if "⊢ True" in prompt else "linarith")
+        return type("R", (), {"content": said, "usage": {"cost": 0.001}})()
+
+
+def run_two_goals():
+    lean, llm = ParkLean(), GoalLLM()
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a", "model-b"), budget_usd=0.05,
+                                  time_limit_s=600.0))
+    problem = Problem(id="two", description="prove both", challenge=TWO_GOALS)
+    return asyncio.run(agent.solve(problem, services)), lean, llm
+
+
+def test_a_goal_nothing_closes_does_not_hold_the_other_one_hostage():
+    result, lean, llm = run_two_goals()
+    events = result.metadata["events"]
+    parked = [e for e in events if e.get("stage") == "park"]
+    assert parked and parked[0]["left"].startswith("⊢ False")
+    assert parked[0]["now"].startswith("⊢ True")
+    # The easy goal is closed, and the hard one keeps the run for the rest of
+    # the budget rather than ending it.
+    assert any("theorem easy : True := by\n  trivial\n" in s for s in lean.sources)
+    assert events[-1] == {"stage": "stop", "note": "budget headroom"}
+    # Both models saw the hard goal before the cursor left it.
+    hard = [m for m, prompt, planning in llm.calls if not planning and "⊢ False" in prompt]
+    assert set(hard[:4]) == {"model-a", "model-b"}
+
+
+def test_what_was_said_about_the_parked_goal_does_not_follow_the_cursor():
+    _, _, llm = run_two_goals()
+    easy = [p for _, p, planning in llm.calls if not planning and "⊢ True" in p]
+    assert easy
+    # The hard goal's rejections and its plan belong to the hard goal.
+    assert "Your last step was rejected" not in easy[0]
+    assert "A mathematician was asked" not in easy[0]

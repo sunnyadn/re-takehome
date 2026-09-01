@@ -57,6 +57,7 @@ from submission.framework import (
     message_line,
     reopen,
     normalise_steps,
+    placeholders,
     render,
     replace_cursor,
     sweep_body,
@@ -88,9 +89,13 @@ goal."""
 # a goal that stands through this many of them is rolled back to where it began.
 DRIFT_LIMIT = 6
 MAX_REVERTS = 2
-# Once the rollbacks are spent there is no other exit: the cursor cannot move
-# off a goal nothing closes, so keeping the file growing only buys a bigger file.
+# Per goal, not per run: a goal that has stood through this many accepted steps
+# has the cursor moved off it, and only a lone goal ends the run here.
 STUCK_LIMIT = 24
+# Both models get a turn at a goal, the second one holding a plan, before the
+# cursor leaves it. Measured on p09: `case mp` is hard and `case mpr` is not,
+# and a cursor pinned to the topmost placeholder never reaches the easy one.
+PARK_AFTER = 4
 # The finish pass is free of tokens but not of clock, so it is bounded.
 MAX_COLLAPSE = 24
 # Measured on p08: a file the REPL checks in 570ms timed out at the comparator's
@@ -236,6 +241,8 @@ class State:
     line: int = 0
     messages: list[dict[str, Any]] = field(default_factory=list)
     accepted: bool = False
+    focus: int = 0
+    goals: int = 0
 
 
 @dataclass
@@ -273,6 +280,7 @@ class FrameworkAgent:
         raised = False
         anchor_goal, anchor_text, on_goal, stuck = "", text, 0, 0
         reverted: dict[str, int] = {}
+        tried: dict[str, int] = {}
 
         def time_left() -> float:
             return deadline - time.monotonic()
@@ -287,6 +295,23 @@ class FrameworkAgent:
             if accepted or not scoring_faults(candidate, names, problem.challenge):
                 best = candidate
                 services.checkpoint(best, {"accepted": accepted})
+
+        async def park(state: State, why: str) -> State:
+            """Move the cursor to the next open goal.
+
+            What was said about the goal being left says nothing about the next
+            one, so the plan and the feedback go with it."""
+
+            nonlocal stalls, plan, feedback, on_goal, stuck, anchor_goal, anchor_text
+            if state.goals <= 1:
+                return state
+            moved = await self._look(
+                state.text, services, (state.focus + 1) % state.goals)
+            events.append({"stage": "park", "why": why, "left": state.goal[:60],
+                           "now": moved.goal[:60]})
+            stalls, plan, feedback, on_goal, stuck = 0, "", None, 0, 0
+            anchor_goal, anchor_text = moved.goal, moved.text
+            return moved
 
         def result(source: str, how: str, accepted: bool) -> AgentResult:
             # Turns are many and alike; a stage is rare and is why the run went
@@ -432,7 +457,7 @@ class FrameworkAgent:
                     # wrong step; give it the budget once and re-adjudicate.
                     raised = True
                     state = await self._look(
-                        insert_preamble(state.text, RAISED_BUDGETS), services)
+                        insert_preamble(state.text, RAISED_BUDGETS), services, state.focus)
                     nxt, why = await self._advance(state, block, services)
                 events.append({"kind": kind, "by": author, "accepted": nxt is not None})
                 if nxt is None:
@@ -447,6 +472,10 @@ class FrameworkAgent:
                         # The plan it was given did not survive Lean either, so
                         # the next stall buys a new one.
                         plan = ""
+                    if kind == "step":
+                        tried[state.goal] = tried.get(state.goal, 0) + 1
+                        if tried[state.goal] >= PARK_AFTER:
+                            state = await park(state, "rejected")
                     continue
                 state, feedback, stalls = nxt, None, 0
                 if kind == "closers":
@@ -462,15 +491,22 @@ class FrameworkAgent:
                 on_goal += 1 if kind == "step" else 0
                 stuck += 1 if kind == "step" else 0
                 if stuck >= STUCK_LIMIT:
+                    if state.goals > 1:
+                        state = await park(state, "stuck")
+                        continue
                     events.append({"stage": "stuck", "goal": anchor_goal[:80]})
                     break
                 if on_goal >= DRIFT_LIMIT and reverted.get(anchor_goal, 0) < MAX_REVERTS:
                     dropped = [h[2] for h in have_spans(state.text)][-on_goal:]
                     reverted[anchor_goal] = reverted.get(anchor_goal, 0) + 1
                     events.append({"stage": "revert", "dropped": len(dropped)})
-                    state = await self._look(anchor_text, services)
+                    state = await self._look(anchor_text, services, state.focus)
                     feedback = Feedback(author, "; ".join(dropped)[:FEEDBACK_CHARS], "drift")
                     plan, on_goal = "", 0
+                elif on_goal >= DRIFT_LIMIT:
+                    # The rollbacks are spent and the goal still stands; another
+                    # open goal is a better use of the clock than a third try.
+                    state = await park(state, "drift")
 
             if is_done(state.text):
                 won = await deliver(state.text, "framework_loop")
@@ -482,28 +518,32 @@ class FrameworkAgent:
             events.append({"stage": "abort", "error": type(exc).__name__})
             return result(best, "aborted", False)
 
-    async def _look(self, text: str, services: Services) -> State:
+    async def _look(self, text: str, services: Services, focus: int = 0) -> State:
         """One check does both jobs: it adjudicates, and it prints the next goal."""
 
-        source, line = render(text)
+        open_goals = len(placeholders(text))
+        focus = min(max(focus, 0), open_goals - 1) if open_goals else 0
+        source, line = render(text, focus)
         check = await services.lean.check_file(source)
         return State(text=text, goal=cursor_goal(check.messages, line), line=line,
-                     messages=list(check.messages), accepted=check.accepted)
+                     messages=list(check.messages), accepted=check.accepted,
+                     focus=focus, goals=open_goals)
 
     async def _settle(self, state: State, services: Services) -> State:
         """Match placeholders to goals: drop a spare one, add a missing one."""
 
         surplus = [l for l in (message_line(m) for m in classify(state.messages)[1]) if l]
         if surplus:
-            return await self._look(drop_lines(state.text, surplus), services)
+            return await self._look(drop_lines(state.text, surplus), services, state.focus)
         if state.accepted:
-            return (await self._look(drop_lines(state.text, [state.line]), services)
+            return (await self._look(drop_lines(state.text, [state.line]), services,
+                                     state.focus)
                     if state.line else state)
         # A split left a goal behind and the file has nowhere to work on it.
         open_goals = classify(state.messages)[0]
         end = message_end_line(open_goals[0]) if open_goals else None
         if end:
-            return await self._look(reopen(state.text, end), services)
+            return await self._look(reopen(state.text, end), services, state.focus)
         return state
 
     async def _advance(self, state: State, block: str,
@@ -511,10 +551,10 @@ class FrameworkAgent:
         """Try one step. Anything but an open goal means the step is discarded."""
 
         try:
-            candidate, _ = replace_cursor(state.text, block)
+            candidate, _ = replace_cursor(state.text, block, index=state.focus)
         except ValueError:
             return None, "no active goal"
-        nxt = await self._look(candidate, services)
+        nxt = await self._look(candidate, services, state.focus)
         _, surplus, expensive, failures = classify(nxt.messages)
         if expensive and not failures:
             return None, BUDGET_RETRY
@@ -593,7 +633,8 @@ class FrameworkAgent:
             return state
         block = blocks[-1]
         for tactic in alternatives(block.group(2))[:COLLAPSE_TRIES]:
-            probe = await self._look(collapse(state.text, block, tactic), services)
+            probe = await self._look(
+                collapse(state.text, block, tactic), services, state.focus)
             if not classify(probe.messages)[3] and not classify(probe.messages)[2]:
                 return probe
         return state
@@ -631,7 +672,7 @@ class FrameworkAgent:
     async def _ask_step(self, problem: Problem, state: State,
                         feedback: Feedback | None, model: str, services: Services,
                         ledger: Ledger, plan: str = "") -> str:
-        source, line = render(state.text)
+        source, line = render(state.text, state.focus)
         parts = [f"Problem: {problem.description}".strip(),
                  "File:\n" + source[-FILE_CHARS:],
                  "What Lean reports as open, with its hypotheses. The first goal "

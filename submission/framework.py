@@ -23,10 +23,17 @@ PROOF_HEAD = re.compile(r"^\s*(theorem|lemma)\s+([A-Za-z_][\w']*)", re.M)
 IMPORT_LINE = re.compile(r"^\s*import\s", re.M)
 
 
-def cursor(text: str) -> re.Match[str] | None:
-    """The topmost placeholder line, which is the active goal."""
+def placeholders(text: str) -> list[re.Match[str]]:
+    """Every open goal, in file order. The cursor sits on one of them."""
 
-    return PLACEHOLDER.search(text)
+    return list(PLACEHOLDER.finditer(text))
+
+
+def cursor(text: str, index: int = 0) -> re.Match[str] | None:
+    """The placeholder the cursor is on, the topmost unless told otherwise."""
+
+    found = placeholders(text)
+    return found[min(max(index, 0), len(found) - 1)] if found else None
 
 
 def is_done(text: str) -> bool:
@@ -37,10 +44,13 @@ def line_of(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
-def render(text: str) -> tuple[str, int]:
-    """The file to send, and the 1-based line the `skip` sits on (0 if none)."""
+def render(text: str, index: int = 0) -> tuple[str, int]:
+    """The file to send, and the 1-based line the `skip` sits on (0 if none).
 
-    match = cursor(text)
+    Only the cursor becomes `skip`; the other placeholders stay `sorry`, so Lean
+    reports one open goal and it is the one being worked on."""
+
+    match = cursor(text, index)
     if match is None:
         return text, 0
     swapped = text[: match.start()] + f"{match.group(1)}skip" + text[match.end():]
@@ -72,10 +82,11 @@ def normalise_steps(block: str) -> str:
     return TAIL_SORRY.sub(split, block.replace("\t", "  ")).rstrip()
 
 
-def replace_cursor(text: str, block: str, *, trailing: bool = True) -> tuple[str, tuple[int, int]]:
+def replace_cursor(text: str, block: str, *, index: int = 0,
+                   trailing: bool = True) -> tuple[str, tuple[int, int]]:
     """Put a step where the cursor is, leaving a placeholder for what follows."""
 
-    match = cursor(text)
+    match = cursor(text, index)
     if match is None:
         raise ValueError("no cursor to replace")
     indent = match.group(1)

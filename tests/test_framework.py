@@ -192,3 +192,16 @@ def test_the_cheapest_spellings_trim_the_hints_before_the_tactic():
     assert "  nlinarith\n  decide\n" in forms
     # A hint list is tried before the tactic is traded down.
     assert forms.index("  nlinarith [h1]\n  decide\n") < forms.index("  linarith [h1, h2]\n  decide\n")
+
+
+def test_the_cursor_can_be_any_open_goal_not_only_the_first():
+    assert len(fw.placeholders(TWO_THEOREMS)) == 2
+    source, line = fw.render(TWO_THEOREMS, 1)
+    assert line == 7 and source.split("\n")[line - 1].strip() == "skip"
+    # The goal being left alone stays `sorry`, so Lean reports one open goal.
+    assert source.count("skip") == 1 and source.count("sorry") == 1
+    new, span = fw.replace_cursor(TWO_THEOREMS, "trivial", index=1)
+    assert span == (7, 8) and new.split("\n")[3].strip() == "sorry"
+    assert new.split("\n")[6].strip() == "trivial"
+    # An index past the last goal is the last goal, never a crash.
+    assert fw.render(TWO_THEOREMS, 9)[1] == 7
