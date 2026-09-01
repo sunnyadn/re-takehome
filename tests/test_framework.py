@@ -327,3 +327,13 @@ def test_a_block_is_cut_back_one_top_level_step_at_a_time():
     # A single step has no shorter form worth trying.
     assert fw.prefixes("omega") == []
     assert fw.prefixes("have a : True := by\n  trivial") == []
+
+
+def test_a_models_thinking_is_not_its_answer():
+    import submission.framework_agent as fa
+    # Measured on p10: the draft holds ten `#eval` lines that are not the answer.
+    reply = "<think>\n#eval 1\n#eval 2\n</think>\n\n#eval 6"
+    assert fa.spoken(reply) == "#eval 6"
+    # An unclosed think block runs to the end of the reply.
+    assert fa.spoken("<think>\nstill going") == ""
+    assert fa.spoken("intro h\nexact h") == "intro h\nexact h"

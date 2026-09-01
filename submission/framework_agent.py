@@ -833,8 +833,12 @@ class FrameworkAgent:
         A slot left as `sorry` is unreachable by the cursor and banned by the
         grader, so an unfilled one is reported and asked for again."""
 
+        # A slot left as `sorry` makes the theorem unprovable and the goal
+        # display empty, so the loop that follows is worth nothing. Measured on
+        # p10: 72 turns asked about a goal Lean could not print. Both models
+        # get a turn at it before that happens.
         note = ""
-        for attempt in range(2):
+        for attempt in range(4):
             missing = answer_slots(text)
             if not missing:
                 break
@@ -843,10 +847,13 @@ class FrameworkAgent:
                    "evaluate the definition.\n\n"
                    f"Problem: {problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
                    "Lean 4 with Mathlib. Output the `#eval` lines only. Each must print "
-                   "one natural number and nothing else: put `.getD 0` after a "
-                   "`find?` rather than printing `some n`." + note)
+                   "one natural number and nothing else, so the whole search goes in "
+                   "the expression: `#eval ((List.range 200).filter (fun n => P n))."
+                   "getLast?.getD 0` for a largest, `.head?.getD 0` for a least. A "
+                   "line that prints `true` or `some n` is not an answer." + note)
+            asking = self.config.lines[attempt % len(self.config.lines)]
             reply, _ = await self._call(
-                self.config.lines[0], ask, ANSWER_TOKENS, services, ledger, think=True)
+                asking, ask, ANSWER_TOKENS, services, ledger, think=True)
             probes = [l for l in strip_fences(reply).splitlines()
                       if l.strip().startswith("#eval")]
             if not probes:
@@ -855,7 +862,7 @@ class FrameworkAgent:
             # Measured on p07: three `#eval` lines for one name, the answer and
             # two checks of it. The first printed value fills the slot, and a
             # slot filled wrong is a false theorem no later step can recover.
-            if len(probes) != len(missing) and attempt == 0:
+            if len(probes) != len(missing) and attempt < 2:
                 note = (f"\n\nYour last reply had {len(probes)} `#eval` lines for "
                         f"{len(missing)}. Give exactly one per name, in that order, "
                         "and nothing else.")
@@ -866,7 +873,7 @@ class FrameworkAgent:
             for name, value in zip(missing, values):
                 text = fill_answer(text, name, value)
             left = answer_slots(text)
-            events.append({"stage": "probe", "asked": list(missing),
+            events.append({"stage": "probe", "by": asking, "asked": list(missing),
                            "printed": values[:len(missing)], "unfilled": list(left)})
             note = (f"\n\nThese slots are still unfilled: {', '.join(left)}. Each `#eval` "
                     "must print one bare numeral." if left else "")
@@ -898,8 +905,19 @@ class FrameworkAgent:
                     continue
                 raise
             ledger.record(reply.usage)
-            return reply.content or "", reply.finish_reason or ""
+            return spoken(reply.content or ""), reply.finish_reason or ""
         return "", ""
+
+
+# Measured on p10: a model that reasons returns its draft inside `<think>`
+# tags, and the ten `#eval` lines it tried there are not its answer.
+THINKING = re.compile(r"<think>.*?(?:</think>|\Z)", re.S | re.I)
+
+
+def spoken(reply: str) -> str:
+    """What the model said, without the thinking it said it in."""
+
+    return THINKING.sub("", reply).strip()
 
 
 BUDGET_RETRY = "__budget__"
