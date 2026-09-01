@@ -189,6 +189,9 @@ class Feedback:
     def lead(self, model: str) -> str:
         if self.kind == "probe":
             return "The probe you asked for printed"
+        if self.kind == "empty":
+            return ("Your last reply contained no Lean. Reply with one ```lean block "
+                    "of tactic lines and nothing else. What Lean last said was")
         if self.kind == "drift":
             return ("These facts compiled but left the goal standing, so they have been "
                     "removed. Reshape the goal or close it directly. They were")
@@ -335,6 +338,8 @@ class FrameworkAgent:
                         # A refused reply is a failed turn. Skipping it silently
                         # spins the loop without a check, a cost or a stall.
                         events.append({"kind": "refused", "by": author})
+                        said = feedback.text if feedback else "nothing yet"
+                        feedback = Feedback(author, said, "empty")
                         stalls, stuck = stalls + 1, stuck + 1
                         if stalls >= STALL_BEFORE_SWAP:
                             turn_of, stalls = turn_of + 1, 0
@@ -548,7 +553,10 @@ class FrameworkAgent:
                  f"The active goal is at `skip` on line {line}:\n{state.goal[:GOAL_CHARS]}"]
         if feedback:
             parts.append(f"{feedback.lead(model)}:\n{feedback.text}")
-        parts.append("Write the next step.")
+        # Measured on p09: qwen narrates instead of answering unless the
+        # contract is the last thing it reads.
+        parts.append("Reply with one ```lean code block containing only tactic "
+                     "lines, and nothing before or after it. No explanation.")
         reply = await self._call(model, "\n\n".join(parts), STEP_TOKENS, services, ledger)
         return screen_step(reply)
 

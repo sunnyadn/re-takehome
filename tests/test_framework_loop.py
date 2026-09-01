@@ -281,3 +281,10 @@ def test_the_graded_entry_point_is_the_framework_loop():
     from submission.framework_agent import FrameworkAgent
 
     assert isinstance(agent_mod.create_agent(), FrameworkAgent)
+
+
+def test_a_reply_with_no_lean_is_told_so():
+    result, _, llm, _ = run(["I think we should use induction here.",
+                             "have key : True := by trivial", "exact key"])
+    assert "contained no Lean" in llm.calls[1][1]
+    assert result.metadata["accepted_by_repl"] is True
