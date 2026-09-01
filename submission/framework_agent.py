@@ -65,6 +65,10 @@ GOAL_CHARS = 4000
 FILE_CHARS = 8000
 # Two rejections on one goal and the other model gets it, with Lean's reason.
 STALL_BEFORE_SWAP = 2
+# Facts that compile but never move the goal still enter every later prompt, so
+# a goal that stands through this many of them is rolled back to where it began.
+DRIFT_LIMIT = 6
+MAX_REVERTS = 2
 # The finish pass is free of tokens but not of clock, so it is bounded.
 MAX_COLLAPSE = 4
 MAX_DELETIONS = 12
@@ -163,6 +167,9 @@ class Feedback:
     def lead(self, model: str) -> str:
         if self.kind == "probe":
             return "The probe you asked for printed"
+        if self.kind == "drift":
+            return ("These facts compiled but left the goal standing, so they have been "
+                    "removed. Reshape the goal or close it directly. They were")
         if self.author == model:
             return "Your last step was rejected and has been removed. Lean said"
         return f"A {self.author} attempt on this goal was rejected. Lean said"
@@ -208,6 +215,8 @@ class FrameworkAgent:
         stalls = 0
         feedback: Feedback | None = None
         raised = False
+        anchor_goal, anchor_text, on_goal = "", text, 0
+        reverted: dict[str, int] = {}
 
         def time_left() -> float:
             return deadline - time.monotonic()
@@ -224,6 +233,10 @@ class FrameworkAgent:
                 services.checkpoint(best, {"accepted": accepted})
 
         def result(source: str, how: str, accepted: bool) -> AgentResult:
+            # Turns are many and alike; a stage is rare and is why the run went
+            # the way it did, so the tail window never drops one.
+            tail = events[-60:]
+            kept = [e for e in events[:-60] if "stage" in e] + tail
             return AgentResult(source, {
                 "strategy": "framework",
                 "solved_by": how,
@@ -231,7 +244,7 @@ class FrameworkAgent:
                 "spend_usd": round(ledger.spent_usd, 6),
                 "wall_s": round(time.monotonic() - started, 1),
                 "turns": len(events),
-                "events": events[-60:],
+                "events": kept,
             })
 
         try:
@@ -307,6 +320,18 @@ class FrameworkAgent:
                     continue
                 state, feedback, stalls = nxt, None, 0
                 offer(state.text, state.accepted and is_done(state.text))
+
+                if state.goal != anchor_goal:
+                    anchor_goal, anchor_text, on_goal = state.goal, state.text, 0
+                    continue
+                on_goal += 1 if kind == "step" else 0
+                if on_goal >= DRIFT_LIMIT and reverted.get(anchor_goal, 0) < MAX_REVERTS:
+                    dropped = [h[2] for h in have_spans(state.text)][-on_goal:]
+                    reverted[anchor_goal] = reverted.get(anchor_goal, 0) + 1
+                    events.append({"stage": "revert", "dropped": len(dropped)})
+                    state = await self._look(anchor_text, services)
+                    feedback = Feedback(author, "; ".join(dropped)[:FEEDBACK_CHARS], "drift")
+                    turn_of, on_goal = turn_of + 1, 0
 
             if is_done(state.text):
                 state = await self._finish(state, services, time_left)

@@ -236,3 +236,13 @@ def test_an_unfilled_answer_slot_is_noticed_and_asked_for_again():
     assert probes[0]["unfilled"] == ["p_answer"] and probes[1]["unfilled"] == []
     assert "abbrev p_answer : ℕ := 77" in result.solution
     assert "sorry" not in result.solution
+
+
+def test_facts_that_never_move_the_goal_are_rolled_back():
+    junk = [f"have j{i} : True := by trivial" for i in range(8)]
+    result, _, llm, _ = run(junk + ["exact key"], lines=("model-a", "model-b"))
+    reverts = [e for e in result.metadata["events"] if e.get("stage") == "revert"]
+    assert reverts and reverts[0]["dropped"] == 6
+    # The model is told what was removed, and the other one gets the next turn.
+    told = [c for _, c in llm.calls if "left the goal standing" in c]
+    assert told and "j0 : True" in told[0]
