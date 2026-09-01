@@ -292,3 +292,16 @@ def declaration_name(block: str) -> str:
             found = DECLARATION.match(line)
             return found.group(1) if found else ""
     return ""
+
+
+HAVE_BODY = re.compile(r"^(\s*have\b.*?:=\s*)(\S.*)$", re.M)
+UNKNOWN_NAME = re.compile(r"[Uu]nknown (identifier|constant)|environment does not contain")
+
+
+def hand_to_search(block: str) -> str:
+    """Rule 1 of the framework, applied mechanically.
+
+    A `have` whose body names something Lean does not know is a fact stated
+    correctly with the wrong lemma; `exact?` names it or nothing does."""
+
+    return HAVE_BODY.sub(r"\1by exact?", block)

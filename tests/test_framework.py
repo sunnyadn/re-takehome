@@ -173,3 +173,12 @@ def test_a_goal_with_nowhere_to_work_gets_a_placeholder_back():
     reopened = fw.reopen(text, 5)
     assert reopened.split("\n")[5] == "  sorry"
     assert not fw.is_done(reopened) and fw.render(reopened)[1] == 6
+
+
+def test_a_have_whose_body_names_nothing_known_is_handed_to_search():
+    block = ("have h : 2 ^ n % 7 = 1 := Nat.mod_eq_zero_of_dvd h\n"
+             "have k : True := by trivial")
+    handed = fw.hand_to_search(block)
+    assert handed.splitlines()[0].endswith(":= by exact?")
+    assert handed.splitlines()[1].endswith(":= by exact?")
+    assert fw.UNKNOWN_NAME.search("Unknown identifier `sub_eq`")

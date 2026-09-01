@@ -37,7 +37,9 @@ from submission.agent import (
     usable_cocktail,
 )
 from submission.framework import (
+    UNKNOWN_NAME,
     alternatives,
+    hand_to_search,
     declaration_name,
     answer_slots,
     axiom_probe,
@@ -376,6 +378,15 @@ class FrameworkAgent:
                     break
 
                 nxt, why = await self._advance(state, block, services)
+                if nxt is None and why != BUDGET_RETRY and UNKNOWN_NAME.search(why):
+                    # The fact may be right and only the lemma name wrong, which
+                    # is exactly what `exact?` is for. One free check decides.
+                    retry = hand_to_search(block)
+                    if retry != block:
+                        nxt, why2 = await self._advance(state, retry, services)
+                        events.append({"kind": "search-retry", "by": author,
+                                       "accepted": nxt is not None})
+                        why = why if nxt is not None else why2
                 if nxt is None and why == BUDGET_RETRY and not raised:
                     # A step that only ran out of elaboration budget is not a
                     # wrong step; give it the budget once and re-adjudicate.
