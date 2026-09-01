@@ -214,7 +214,11 @@ def test_a_probe_goes_above_the_theorem_and_comes_back_as_a_number():
     assert result.metadata["accepted_by_repl"] is True
 
 
-def test_a_fact_the_finished_proof_does_not_use_is_deleted():
+def test_a_fact_the_finished_proof_does_not_use_is_deleted(monkeypatch):
+    import submission.framework_agent as fa_mod
+
+    # The gate is a size, not a rule: below it §4 says leave the file alone.
+    monkeypatch.setattr(fa_mod, "TIDY_ABOVE_BYTES", 0)
     replies = ["have spare : True := by trivial", "have key : True := by trivial",
                "exact key"]
     result, lean, _, _ = run(replies)
@@ -344,3 +348,16 @@ def test_a_heavy_tactic_is_traded_for_a_cheap_one_when_the_file_still_compiles()
     result = asyncio.run(agent.solve(
         Problem(id="demo", description="d", challenge=CHALLENGE), services))
     assert "nlinarith" not in result.solution and "linarith" in result.solution
+
+
+def test_a_short_proof_is_not_tidied_at_all(monkeypatch):
+    """The finish pass may not trade a file the grader accepts for a smaller one."""
+
+    import submission.framework_agent as fa_mod
+
+    replies = ["have spare : True := by trivial", "have key : True := by trivial",
+               "exact key"]
+    _, quiet, _, _ = run(replies)
+    monkeypatch.setattr(fa_mod, "TIDY_ABOVE_BYTES", 0)
+    _, busy, _, _ = run(replies)
+    assert len(quiet.sources) < len(busy.sources)

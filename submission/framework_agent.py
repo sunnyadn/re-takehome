@@ -96,6 +96,8 @@ MAX_COLLAPSE = 24
 # Measured on p08: a file the REPL checks in 570ms timed out at the comparator's
 # 180s, because the kernel there re-checks the term and nlinarith's are huge.
 MAX_LIGHTEN = 16
+# Below this a proof is already small; tidying it only risks it.
+TIDY_ABOVE_BYTES = 2000
 HEAVY = ("nlinarith", "polyrith", "decide", "interval_cases")
 LIGHTER = ("linarith", "norm_num", "positivity", "simp", "omega", "ring")
 # The cocktail is ordered by how often each tactic wins, so the one that fired
@@ -520,8 +522,13 @@ class FrameworkAgent:
         """Take the search out of a finished file: the comparator allows 180s."""
 
         state = await self._substitute_search(state, services)
-        state = await self._lighten(state, services, time_left)
-        state = await self._prune(state, services, time_left)
+        # Measured on p08: both passes turned a file the comparator accepted
+        # into one it timed out on, because deleting a fact a closer was using
+        # makes that closer redo the work in a term the kernel then re-checks.
+        # A short file has nothing to win here, and §4 says not to touch it.
+        if len(state.text) > TIDY_ABOVE_BYTES:
+            state = await self._lighten(state, services, time_left)
+            state = await self._prune(state, services, time_left)
         for _ in range(MAX_COLLAPSE):
             blocks = first_blocks(state.text)
             if not blocks or time_left() < FINISH_RESERVE_S:
