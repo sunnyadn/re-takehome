@@ -344,9 +344,12 @@ class FrameworkAgent:
                     block, kind, author = "exact?", "search", "harness"
                     swept.add(("search", seen))
                 elif can_ask():
-                    if not plan:
+                    # The writer alone is the cheap path and often enough; the
+                    # mathematician is what a stalled goal needs, not every goal.
+                    if stalls >= STALL_BEFORE_SWAP and not plan:
                         plan = await self._ask_plan(problem, state, services, ledger)
                         events.append({"kind": "plan", "by": planner, "chars": len(plan)})
+                        stalls = 0
                     author = writer
                     block = await self._ask_step(
                         problem, state, feedback, author, services, ledger, plan)
@@ -418,10 +421,10 @@ class FrameworkAgent:
                                "a raised budget; make it cheaper")
                     feedback = Feedback(author if kind == "step" else kind, why)
                     stalls += 1 if kind == "step" else 0
-                    if stalls >= STALL_BEFORE_SWAP:
-                        # Two Lean rejections mean the plan is wrong, not the
-                        # wording: ask the mathematician again, not the writer.
-                        plan, stalls = "", 0
+                    if stalls >= STALL_BEFORE_SWAP and plan:
+                        # The plan it was given did not survive Lean either, so
+                        # the next stall buys a new one.
+                        plan = ""
                     continue
                 state, feedback, stalls = nxt, None, 0
                 if kind == "closers":

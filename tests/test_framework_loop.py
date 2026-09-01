@@ -304,15 +304,13 @@ def test_a_reply_with_no_lean_is_told_so():
     assert result.metadata["accepted_by_repl"] is True
 
 
-def test_one_model_does_the_mathematics_and_the_other_writes_the_lean():
+def test_the_writer_works_alone_while_it_is_working():
+    """The mathematician costs a call, so it is what a stall buys, not a habit."""
+
     result, _, llm, _ = run(["have key : True := by trivial", "exact key"],
                             lines=("mathematician", "writer"))
-    who = [model for model, _, _ in llm.calls]
-    assert who[0] == "mathematician" and who[1] == "writer"
-    # The plan reaches the writer, and the writer is never asked for prose.
-    assert PLAN in wrote(llm)[1][1]
-    plans = [e for e in result.metadata["events"] if e.get("kind") == "plan"]
-    assert plans and plans[0]["by"] == "mathematician"
+    assert [model for model, _, _ in llm.calls] == ["writer", "writer"]
+    assert not [e for e in result.metadata["events"] if e.get("kind") == "plan"]
 
 
 def test_two_rejections_send_the_goal_back_to_the_mathematician():
@@ -321,6 +319,8 @@ def test_two_rejections_send_the_goal_back_to_the_mathematician():
                "have key : True := by trivial", "exact key"]
     result, _, llm, _ = run(replies, lines=("mathematician", "writer"))
     who = [model for model, _, _ in llm.calls]
-    # plan, write, write, plan again: the wording was not the problem.
-    assert who[:4] == ["mathematician", "writer", "writer", "mathematician"]
+    # write, write, then the mathematician: two Lean rejections mean the plan is
+    # wrong, not the wording. The plan reaches the writer's next turn.
+    assert who[:4] == ["writer", "writer", "mathematician", "writer"]
+    assert PLAN in wrote(llm)[2][1]
     assert result.metadata["accepted_by_repl"] is True
