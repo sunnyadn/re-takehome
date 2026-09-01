@@ -249,3 +249,12 @@ def test_facts_that_never_move_the_goal_are_rolled_back():
     # The model is told what was removed, and the other one gets the next turn.
     told = [c for _, c in llm.calls if "left the goal standing" in c]
     assert told and "j0 : True" in told[0]
+
+
+def test_a_model_that_never_gives_a_usable_step_does_not_spin():
+    result, lean, llm, _ = run(["skip"] * 200)
+    stuck = [e for e in result.metadata["events"] if e.get("stage") == "stuck"]
+    assert stuck and stuck[0]["note"] == "replies refused"
+    # It stopped on the refusals, not on the budget: every refused reply was a
+    # real call, and the spend never reached the headroom.
+    assert len(llm.calls) < 40 and result.metadata["spend_usd"] < 0.9

@@ -295,7 +295,15 @@ class FrameworkAgent:
                         problem, state, feedback, author, services, ledger)
                     kind = "step"
                     if not block:
-                        turn_of += 1
+                        # A refused reply is a failed turn. Skipping it silently
+                        # spins the loop without a check, a cost or a stall.
+                        events.append({"kind": "refused", "by": author})
+                        stalls, stuck = stalls + 1, stuck + 1
+                        if stalls >= STALL_BEFORE_SWAP:
+                            turn_of, stalls = turn_of + 1, 0
+                        if stuck >= STUCK_LIMIT:
+                            events.append({"stage": "stuck", "note": "replies refused"})
+                            break
                         continue
                     if is_probe(block):
                         printed = await self._probe(state, block, services)
