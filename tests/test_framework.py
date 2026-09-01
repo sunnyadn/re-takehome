@@ -347,3 +347,22 @@ def test_a_tool_call_is_read_when_the_model_makes_one():
     # A model that ignores the schema leaves nothing here, and the reply is read.
     assert fa.tool_lines([]) == "" and fa.tool_lines(None) == ""
     assert fa.tool_lines([{"function": {"arguments": "not json"}}]) == ""
+
+
+SET_SLOT = """import Mathlib
+
+abbrev putnam_solution : Set (ℤ × ℤ) := by
+  sorry
+
+theorem putnam (a : ℤ) : (a, a) ∈ putnam_solution := by
+  sorry
+"""
+
+
+def test_a_definition_slot_takes_a_term_and_is_not_a_goal():
+    assert fw.definition_slots(SET_SLOT) == (("putnam_solution", "Set (ℤ × ℤ)"),)
+    filled = fw.fill_definition(SET_SLOT, "putnam_solution", "{p | p.1 = p.2}")
+    assert "abbrev putnam_solution : Set (ℤ × ℤ) := {p | p.1 = p.2}" in filled
+    assert fw.definition_slots(filled) == ()
+    # Once it holds a term the cursor moves on to the theorem below it.
+    assert len(fw.placeholders(filled)) == 1

@@ -42,6 +42,8 @@ from submission.framework import (
     alternatives,
     hand_to_search,
     declaration_name,
+    definition_slots,
+    fill_definition,
     answer_slots,
     axiom_probe,
     collapse,
@@ -408,6 +410,8 @@ class FrameworkAgent:
                     offer(candidate, True)
                     return result(candidate, "deterministic_sweep", True)
 
+            if definition_slots(text) and can_ask():
+                text = await self._define(problem, text, services, ledger, events)
             if names and can_ask():
                 text = await self._resolve_answers(
                     problem, text, names, services, ledger, events)
@@ -828,6 +832,40 @@ class FrameworkAgent:
         here = enclosing_name(state.text, state.focus)
         taken = [n for n in root_names(state.text) if n != here]
         return drop_own(unwrap_own(screen_step(reply), (here,) if here else ()), taken)
+
+    async def _define(self, problem: Problem, text: str, services: Services,
+                      ledger: Ledger, events: list[dict[str, Any]]) -> str:
+        """A definition slot holds the answer as a term, not as a proof.
+
+        Measured on putnam_2018_a1: left as `:= by sorry` the cursor takes it
+        for a goal and writes `exact?` into a place with no goal to search."""
+
+        for name, kind in definition_slots(text):
+            note = ""
+            for attempt in range(4):
+                ask = (f"Give the value of `{name} : {kind}`.\n\nProblem: "
+                       f"{problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
+                       f"Reply with one Lean 4 term of type `{kind}` on a single line, "
+                       "and nothing else. It is the answer itself, not a proof of it, "
+                       "so no tactics and no `by`." + note)
+                said, _ = await self._call(
+                    self.config.lines[attempt % len(self.config.lines)], ask,
+                    ANSWER_TOKENS, services, ledger, think=True)
+                term = " ".join(strip_fences(said).split("\n"))[:FEEDBACK_CHARS].strip()
+                if not term or term.startswith("by "):
+                    note = "\n\nYour last reply was not a term."
+                    continue
+                candidate = fill_definition(text, name, term)
+                check = await services.lean.check_file(candidate)
+                kept = not classify(check.messages)[3]
+                events.append({"stage": "define", "name": name, "kept": kept,
+                               "term": term[:120]})
+                if kept:
+                    text = candidate
+                    break
+                note = ("\n\nThat term did not elaborate. Lean said:\n"
+                        + format_messages(check.messages)[:FEEDBACK_CHARS])
+        return text
 
     async def _resolve_answers(self, problem: Problem, text: str, names: Sequence[str],
                                services: Services, ledger: Ledger,

@@ -117,6 +117,30 @@ def fill_answer(text: str, name: str, value: str) -> str:
     return pattern.sub(rf"\g<1>{value}", text)
 
 
+# A definition slot states the answer as a term. Measured on putnam_2018_a1:
+# `abbrev ... : Set (ℤ × ℤ) := by / sorry`, which the cursor took for a goal and
+# wrote `exact?` into, where there is no goal to search.
+DEFINITION = re.compile(
+    r"^([ \t]*abbrev\s+([A-Za-z_][\w']*)\s*:\s*)(.+?)(\s*:=\s*by[ \t]*\n[ \t]*sorry[ \t]*)$",
+    re.M)
+
+
+def definition_slots(text: str) -> tuple[tuple[str, str], ...]:
+    """Each name still waiting for a value, with the type it must have."""
+
+    return tuple((m.group(2), m.group(3).strip()) for m in DEFINITION.finditer(text))
+
+
+def fill_definition(text: str, name: str, term: str) -> str:
+    """Put a term where a definition slot is; it is a value, never a proof."""
+
+    def swap(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{match.group(3)} := {term.strip()}" \
+            if match.group(2) == name else match.group(0)
+
+    return DEFINITION.sub(swap, text)
+
+
 def root_names(text: str) -> tuple[str, ...]:
     return tuple(m.group(2) for m in PROOF_HEAD.finditer(text))
 
