@@ -606,13 +606,14 @@ class SlotLean:
         return unsolved(skip_line(source))
 
 
-def test_an_answer_stated_as_a_numeral_is_not_an_answer():
+def test_more_probes_than_names_are_asked_for_again():
     lean = SlotLean()
-    llm = FakeLLM(["#eval 73", "#eval (List.range 100).find? (fun n => n = 19) |>.get!"])
+    # The answer and two checks of it: the first printed value is what fills
+    # the slot, so which line comes first decides the whole run.
+    llm = FakeLLM(["#eval 19\n#eval 77 * 6\n#eval 21 * 22", "#eval 19"])
     services = FakeServices(lean, llm)
     agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=0.03, time_limit_s=600.0))
     problem = Problem(id="demo", description="find it", challenge=SLOT_CHALLENGE)
     asyncio.run(agent.solve(problem, services))
-    assert "computes anything" in wrote(llm)[1][1]
-    # The numeral was never sent to Lean, so it was never written into the slot.
-    assert not any("#eval 73" in s for s in lean.sources)
+    assert "exactly one per name" in wrote(llm)[1][1]
+    assert any("abbrev p_answer : ℕ := 19" in s for s in lean.sources)

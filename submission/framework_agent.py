@@ -754,7 +754,7 @@ class FrameworkAgent:
         grader, so an unfilled one is reported and asked for again."""
 
         note = ""
-        for _ in range(2):
+        for attempt in range(2):
             missing = answer_slots(text)
             if not missing:
                 break
@@ -768,15 +768,18 @@ class FrameworkAgent:
                 self.config.lines[0], ask, ANSWER_TOKENS, services, ledger, think=True)
             probes = [l for l in strip_fences(reply).splitlines()
                       if l.strip().startswith("#eval")]
-            # Measured on p07: `#eval 73` for an answer that is 19. A numeral is
-            # the model stating the answer, and a wrong one makes the theorem
-            # false, which no later step can recover from.
-            probes = [l for l in probes if not NUMBER.match(l.split("#eval", 1)[1].strip())]
             if not probes:
-                note = ("\n\nYour last reply had no `#eval` that computes anything. "
-                        "The expression must search for or calculate the value, not "
-                        "state it: a bare numeral is not an answer.")
+                note = "\n\nYour last reply contained no `#eval` line."
                 continue
+            # Measured on p07: three `#eval` lines for one name, the answer and
+            # two checks of it. The first printed value fills the slot, and a
+            # slot filled wrong is a false theorem no later step can recover.
+            if len(probes) != len(missing) and attempt == 0:
+                note = (f"\n\nYour last reply had {len(probes)} `#eval` lines for "
+                        f"{len(missing)}. Give exactly one per name, in that order, "
+                        "and nothing else.")
+                continue
+            probes = probes[:len(missing)]
             check = await services.lean.check_file(insert_preamble(text, "\n".join(probes)))
             values = printed_numbers(check.messages)
             for name, value in zip(missing, values):
