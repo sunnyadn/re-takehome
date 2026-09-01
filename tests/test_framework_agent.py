@@ -45,3 +45,21 @@ def test_a_step_that_does_nothing_is_refused():
     assert fa.screen_step("skip") == ""
     assert fa.screen_step("skip\n\nskip") == ""
     assert fa.screen_step("intro n\nskip") != ""
+
+
+def test_the_calls_the_loop_makes_satisfy_the_harness_policy():
+    """The model path spends money to exercise, so its contract is checked here.
+
+    A rejected model name or an oversized max_tokens fails every call at once."""
+
+    from re_harness.llm import LLMClient, MAX_OUTPUT_TOKENS
+    from re_harness.models import ALLOWED_MODELS, PRICE_CEILINGS
+    from submission.agent import Config
+
+    for model in Config().lines:
+        assert model in ALLOWED_MODELS and model in PRICE_CEILINGS
+    messages = [{"role": "system", "content": fa.FRAMEWORK_SYSTEM},
+                {"role": "user", "content": "Write the next step."}]
+    LLMClient._validate_messages(messages)
+    for tokens in (fa.STEP_TOKENS, fa.ANSWER_TOKENS):
+        assert isinstance(tokens, int) and 1 <= tokens <= MAX_OUTPUT_TOKENS
