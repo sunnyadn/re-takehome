@@ -38,6 +38,7 @@ from submission.agent import (
 )
 from submission.framework import (
     alternatives,
+    declaration_name,
     answer_slots,
     axiom_probe,
     collapse,
@@ -305,6 +306,25 @@ class FrameworkAgent:
                             events.append({"stage": "stuck", "note": "replies refused"})
                             break
                         continue
+                    named = declaration_name(block)
+                    if named and named not in declared_names(problem.challenge):
+                        nxt = await self._look(
+                            insert_preamble(state.text, block), services)
+                        kept = not classify(nxt.messages)[3]
+                        events.append({"kind": "lemma", "by": author, "name": named,
+                                       "accepted": kept})
+                        if kept:
+                            state, feedback, stalls = nxt, None, 0
+                        else:
+                            feedback = Feedback(
+                                author, format_messages(nxt.messages)[:FEEDBACK_CHARS])
+                            stuck += 1
+                        continue
+                    if named:
+                        feedback = Feedback(author, "that name is the problem's own; "
+                                            "prove it where it stands", "rejected")
+                        stuck += 1
+                        continue
                     if is_probe(block):
                         printed = await self._probe(state, block, services)
                         feedback = Feedback(author, printed, "probe")
@@ -548,8 +568,9 @@ def is_probe(block: str) -> bool:
     lines = [l for l in block.splitlines() if l.strip()]
     return bool(lines) and all(l.strip().startswith(("#eval", "#check", "#print"))
                                for l in lines)
-STEP_BAN = re.compile(r"^\s*(import|theorem|lemma|example|axiom)\b|```|native_decide|admit",
-                      re.M)
+# A step is tactic text, except a whole auxiliary declaration, which §4 allows
+# and which is the only way to state a fact two theorems share.
+STEP_BAN = re.compile(r"^\s*(import|example|axiom)\b|```|native_decide|admit", re.M)
 
 
 def printed_numbers(messages: Sequence[Any]) -> list[str]:

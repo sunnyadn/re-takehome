@@ -247,3 +247,18 @@ def have_spans(text: str) -> list[tuple[int, int, str]]:
     """The steps §4 may delete: facts, never the moves that shaped the goal."""
 
     return [s for s in step_spans(text) if s[2].startswith("have ")]
+
+
+DECLARATION = re.compile(r"^\s*(?:private\s+)?(?:theorem|lemma)\s+([A-Za-z_][\w']*)")
+
+
+def declaration_name(block: str) -> str:
+    """The name a block declares at the top level, if it declares one.
+
+    A fact two theorems share cannot live inside either one's proof."""
+
+    for line in block.split("\n"):
+        if line.strip():
+            found = DECLARATION.match(line)
+            return found.group(1) if found else ""
+    return ""

@@ -258,3 +258,19 @@ def test_a_model_that_never_gives_a_usable_step_does_not_spin():
     # It stopped on the refusals, not on the budget: every refused reply was a
     # real call, and the spend never reached the headroom.
     assert len(llm.calls) < 40 and result.metadata["spend_usd"] < 0.9
+
+
+def test_a_shared_fact_can_be_stated_as_its_own_lemma():
+    lemma = "lemma helper : True := by trivial"
+    result, _, llm, _ = run([lemma, "exact key", "have key : True := by trivial",
+                             "exact key"])
+    lemmas = [e for e in result.metadata["events"] if e.get("kind") == "lemma"]
+    assert lemmas and lemmas[0]["name"] == "helper" and lemmas[0]["accepted"]
+    # It goes above the theorem, not inside its proof.
+    assert result.solution.index(lemma) < result.solution.index("theorem demo")
+
+
+def test_the_graded_theorem_cannot_be_restated_as_a_lemma():
+    result, _, llm, _ = run(["theorem demo : True := by trivial"] * 30)
+    assert result.metadata["accepted_by_repl"] is False
+    assert "theorem demo : True := by trivial" not in result.solution

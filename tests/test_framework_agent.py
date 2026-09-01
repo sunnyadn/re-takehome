@@ -12,7 +12,9 @@ def test_a_fenced_step_survives_screening():
 
 
 def test_a_step_that_rewrites_the_file_is_refused():
-    assert fa.screen_step("theorem x : True := by trivial") == ""
+    # A declaration is not refused here: the loop routes it above the theorem,
+    # and refuses it there if it names something the problem already declares.
+    assert fa.screen_step("theorem x : True := by trivial") != ""
     assert fa.screen_step("import Mathlib\nintro x") == ""
     assert fa.screen_step("decide using native_decide") == ""
     assert fa.screen_step("") == ""
