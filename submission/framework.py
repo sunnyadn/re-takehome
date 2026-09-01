@@ -389,6 +389,20 @@ def unwrap_own(block: str, names: Sequence[str]) -> str:
     return block
 
 
+def drop_own(block: str, names: Sequence[str]) -> str:
+    """Keep the lemma a reply adds and drop the graded theorem it restates.
+
+    Measured on p09: the writer states `p09_aux_mod` and then rewrites `p09_a`
+    under it. Only the first is new; the second is `already been declared`."""
+
+    lines = block.split("\n")
+    for i, line in enumerate(lines):
+        found = DECLARATION.match(line)
+        if found and found.group(1) in names:
+            return "\n".join(lines[:i]).rstrip()
+    return block
+
+
 HAVE_BODY = re.compile(r"^(\s*have\b.*?:=\s*)(\S.*)$", re.M)
 UNKNOWN_NAME = re.compile(r"[Uu]nknown (identifier|constant)|environment does not contain")
 

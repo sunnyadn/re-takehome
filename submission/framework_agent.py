@@ -56,6 +56,7 @@ from submission.framework import (
     message_line,
     unreachable,
     normalise_steps,
+    drop_own,
     root_names,
     split_cursor,
     unwrap_own,
@@ -743,7 +744,8 @@ class FrameworkAgent:
             model, "\n\n".join(parts), STEP_TOKENS, services, ledger)
         if why == "length":
             return CUT
-        return unwrap_own(screen_step(reply), root_names(problem.challenge))
+        own = root_names(problem.challenge)
+        return drop_own(unwrap_own(screen_step(reply), own), own)
 
     async def _resolve_answers(self, problem: Problem, text: str, names: Sequence[str],
                                services: Services, ledger: Ledger,

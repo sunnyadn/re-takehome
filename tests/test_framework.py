@@ -281,3 +281,12 @@ def test_a_search_that_prints_an_option_is_still_an_answer():
     said = [{"severity": "info", "data": "some 19"}, {"severity": "info", "data": "19"},
             {"severity": "info", "data": "[1, 2]"}]
     assert fa.printed_numbers(said) == ["19", "19"]
+
+
+def test_a_reply_that_adds_a_lemma_and_restates_the_theorem_keeps_the_lemma():
+    block = ("theorem aux (k : ℕ) : 2 ^ k % 7 = 2 ^ (k % 3) % 7 := by\n"
+             "  omega\n\ntheorem demo (n : ℕ) : n + 0 = n := by\n  simp")
+    assert fw.drop_own(block, ("demo",)) == (
+        "theorem aux (k : ℕ) : 2 ^ k % 7 = 2 ^ (k % 3) % 7 := by\n  omega")
+    # A block with no graded name in it is left whole.
+    assert fw.drop_own("intro h\nexact h", ("demo",)) == "intro h\nexact h"
