@@ -255,7 +255,7 @@ class AnswerLean(FakeLean):
 
 
 def test_an_unfilled_answer_slot_is_noticed_and_asked_for_again():
-    lean, llm = AnswerLean(), FakeLLM(["#eval 1 + 1", "#eval 77",
+    lean, llm = AnswerLean(), FakeLLM(["#eval 1 + 1", "#eval 70 + 7",
                                        "have key : True := by trivial", "exact key"])
     services = FakeServices(lean, llm)
     agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
@@ -581,3 +581,38 @@ def test_a_step_that_strands_a_goal_in_a_branch_is_refused():
     result = asyncio.run(agent.solve(problem, services))
     assert "intro h" not in result.solution
     assert "nothing can get back to" in wrote(llm)[1][1]
+
+
+SLOT_CHALLENGE = ("import Mathlib\n\nabbrev p_answer : ℕ := sorry\n\n"
+                    "theorem demo : p_answer = 19 := by\n  sorry\n")
+
+
+class SlotLean:
+    """Prints whatever the `#eval` line says, the way the real probe reads it."""
+
+    def __init__(self):
+        self.sources: list[str] = []
+
+    async def check_file(self, source, timeout_s=None):
+        self.sources.append(source)
+        if "first" in source or "exact?" in source:
+            return LeanCheck(False, [{"severity": "error", "pos": {"line": 1},
+                                      "data": "linarith failed"}], True, False, 1)
+        printed = [l.split("#eval", 1)[1].strip() for l in source.splitlines()
+                   if l.strip().startswith("#eval")]
+        if printed:
+            return LeanCheck(False, [{"severity": "info", "data": p} for p in printed],
+                             True, False, 1)
+        return unsolved(skip_line(source))
+
+
+def test_an_answer_stated_as_a_numeral_is_not_an_answer():
+    lean = SlotLean()
+    llm = FakeLLM(["#eval 73", "#eval (List.range 100).find? (fun n => n = 19) |>.get!"])
+    services = FakeServices(lean, llm)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=0.03, time_limit_s=600.0))
+    problem = Problem(id="demo", description="find it", challenge=SLOT_CHALLENGE)
+    asyncio.run(agent.solve(problem, services))
+    assert "computes anything" in wrote(llm)[1][1]
+    # The numeral was never sent to Lean, so it was never written into the slot.
+    assert not any("#eval 73" in s for s in lean.sources)

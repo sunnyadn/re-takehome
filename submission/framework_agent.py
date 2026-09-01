@@ -718,7 +718,7 @@ class FrameworkAgent:
         ask = (f"Problem: {problem.description}\n\nThe goal, as Lean reports it:\n"
                f"{state.goal[:GOAL_CHARS]}\n\nHow do you prove this?")
         reply, _ = await self._call(model or self.config.lines[0], ask, PLAN_TOKENS,
-                                    services, ledger, PLANNER_SYSTEM)
+                                    services, ledger, PLANNER_SYSTEM, think=True)
         return strip_fences(reply).strip()[:GOAL_CHARS]
 
     async def _ask_step(self, problem: Problem, state: State,
@@ -758,16 +758,24 @@ class FrameworkAgent:
             missing = answer_slots(text)
             if not missing:
                 break
-            ask = (f"Write one `#eval` line per name, in this order: {', '.join(missing)}.\n\n"
+            ask = (f"Write one `#eval` line per name, in this order: {', '.join(missing)}.\n"
+                   "Each must compute the value, not state it: search a range, or "
+                   "evaluate the definition.\n\n"
                    f"Problem: {problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
                    "Lean 4 with Mathlib. Output the `#eval` lines only. Each must print "
                    "a single natural number." + note)
             reply, _ = await self._call(
-                self.config.lines[0], ask, ANSWER_TOKENS, services, ledger)
+                self.config.lines[0], ask, ANSWER_TOKENS, services, ledger, think=True)
             probes = [l for l in strip_fences(reply).splitlines()
                       if l.strip().startswith("#eval")]
+            # Measured on p07: `#eval 73` for an answer that is 19. A numeral is
+            # the model stating the answer, and a wrong one makes the theorem
+            # false, which no later step can recover from.
+            probes = [l for l in probes if not NUMBER.match(l.split("#eval", 1)[1].strip())]
             if not probes:
-                note = "\n\nYour last reply contained no `#eval` line."
+                note = ("\n\nYour last reply had no `#eval` that computes anything. "
+                        "The expression must search for or calculate the value, not "
+                        "state it: a bare numeral is not an answer.")
                 continue
             check = await services.lean.check_file(insert_preamble(text, "\n".join(probes)))
             values = printed_numbers(check.messages)
@@ -781,8 +789,13 @@ class FrameworkAgent:
         return text
 
     async def _call(self, model: str, prompt: str, max_tokens: int, services: Services,
-                    ledger: Ledger, system: str = "") -> tuple[str, str]:
-        """The reply and why the provider stopped, which is not always `stop`."""
+                    ledger: Ledger, system: str = "",
+                    think: bool = False) -> tuple[str, str]:
+        """The reply and why the provider stopped, which is not always `stop`.
+
+        Reasoning is off for steps because it crowds the block out of the reply.
+        It stays on where thinking is the answer: the plan, and the arithmetic
+        behind a numeric slot."""
 
         for wait in (0.0,) + RETRY_BACKOFF_S:
             if wait:
@@ -794,7 +807,7 @@ class FrameworkAgent:
                               {"role": "user", "content": prompt}],
                     max_tokens=max_tokens,
                     temperature=0.4,
-                    reasoning=self._reasoning(model),
+                    reasoning=REASONING if think else self._reasoning(model),
                 )
             except LLMCallError as exc:
                 if refused_before_generation(exc):
