@@ -182,3 +182,13 @@ def test_a_have_whose_body_names_nothing_known_is_handed_to_search():
     assert handed.splitlines()[0].endswith(":= by exact?")
     assert handed.splitlines()[1].endswith(":= by exact?")
     assert fw.UNKNOWN_NAME.search("Unknown identifier `sub_eq`")
+
+
+def test_the_cheapest_spellings_trim_the_hints_before_the_tactic():
+    import submission.framework_agent as fa
+    text = "  nlinarith [h1, h2]\n  decide\n"
+    forms = fa.lighter_forms(text)
+    assert "  nlinarith [h1]\n  decide\n" in forms
+    assert "  nlinarith\n  decide\n" in forms
+    # A hint list is tried before the tactic is traded down.
+    assert forms.index("  nlinarith [h1]\n  decide\n") < forms.index("  linarith [h1, h2]\n  decide\n")

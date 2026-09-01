@@ -95,6 +95,7 @@ STUCK_LIMIT = 24
 MAX_COLLAPSE = 24
 # Measured on p08: a file the REPL checks in 570ms timed out at the comparator's
 # 180s, because the kernel there re-checks the term and nlinarith's are huge.
+MAX_LIGHTEN = 16
 HEAVY = ("nlinarith", "polyrith", "decide", "interval_cases")
 LIGHTER = ("linarith", "norm_num", "positivity", "simp", "omega", "ring")
 # The cocktail is ordered by how often each tactic wins, so the one that fired
@@ -537,16 +538,17 @@ class FrameworkAgent:
         return state
 
     async def _lighten(self, state: State, services: Services, time_left) -> State:
-        """Trade a heavy tactic for a cheap one wherever the file still compiles."""
+        """Make the finished term small.
 
-        for heavy in HEAVY:
-            if time_left() < FINISH_RESERVE_S or heavy not in state.text:
-                continue
-            for light in LIGHTER:
-                probe = await self._look(state.text.replace(heavy, light, 1), services)
-                if probe.accepted and is_done(probe.text):
-                    state = probe
-                    break
+        Measured on p08: `nlinarith` with three hints checks in 348ms here and
+        times out at the comparator's 180s, with one hint it passes."""
+
+        for rewrite in lighter_forms(state.text)[:MAX_LIGHTEN]:
+            if time_left() < FINISH_RESERVE_S:
+                break
+            probe = await self._look(rewrite, services)
+            if probe.accepted and is_done(probe.text):
+                state = probe
         return state
 
     async def _prune(self, state: State, services: Services, time_left) -> State:
@@ -777,3 +779,29 @@ def screen_step(reply: str) -> str:
 
 def create_agent() -> FrameworkAgent:
     return FrameworkAgent()
+
+
+HINTED = re.compile(r"\b(nlinarith|linarith|positivity|norm_num)\s*\[([^\]]*)\]")
+
+
+def lighter_forms(text: str) -> list[str]:
+    """Cheaper spellings of the same file, cheapest first.
+
+    A hint list is what makes a certificate large, so it is trimmed before the
+    tactic itself is traded down."""
+
+    out: list[str] = []
+    for m in HINTED.finditer(text):
+        hints = [h.strip() for h in m.group(2).split(",") if h.strip()]
+        if len(hints) > 1:
+            for hint in hints:
+                out.append(text[:m.start()] + f"{m.group(1)} [{hint}]" + text[m.end():])
+        if hints:
+            out.append(text[:m.start()] + m.group(1) + text[m.end():])
+    for heavy in HEAVY:
+        start = 0
+        while (at := text.find(heavy, start)) != -1:
+            for light in LIGHTER:
+                out.append(text[:at] + light + text[at + len(heavy):])
+            start = at + len(heavy)
+    return out
