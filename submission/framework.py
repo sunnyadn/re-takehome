@@ -403,6 +403,19 @@ def as_goal(block: str) -> str:
     return f"{found.group(1)}\n  sorry" if found else ""
 
 
+def enclosing_name(text: str, index: int = 0) -> str:
+    """The declaration the cursor is inside, which the writer keeps restating.
+
+    Measured on p09: once a shared lemma is in the file, every reply about it
+    comes back as the whole `theorem ... := by ...`, and the name is taken."""
+
+    at = cursor(text, index)
+    if at is None:
+        return ""
+    heads = [m for m in PROOF_HEAD.finditer(text) if m.start() < at.start()]
+    return heads[-1].group(2) if heads else ""
+
+
 def drop_own(block: str, names: Sequence[str]) -> str:
     """Keep the lemma a reply adds and drop the graded theorem it restates.
 

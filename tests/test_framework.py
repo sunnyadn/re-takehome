@@ -299,3 +299,23 @@ def test_a_lemma_whose_proof_fails_keeps_its_statement():
         "theorem aux (k : ℕ) : 2 ^ k % 7 = 2 ^ (k % 3) % 7 := by\n  sorry")
     # A term-mode declaration has no proof block to hand back.
     assert fw.as_goal("theorem aux : True := trivial") == ""
+
+
+HOISTED = """import Mathlib
+
+theorem aux (n : ℕ) : n + 0 = n := by
+  sorry
+
+theorem demo (n : ℕ) : n + 0 = n := by
+  sorry
+"""
+
+
+def test_the_writer_may_restate_the_declaration_the_cursor_is_inside():
+    assert fw.enclosing_name(HOISTED, 0) == "aux"
+    assert fw.enclosing_name(HOISTED, 1) == "demo"
+    reply = "theorem aux (n : ℕ) : n + 0 = n := by\n  induction n with\n  | zero => simp"
+    body = fw.unwrap_own(reply, ("aux",))
+    assert body == "induction n with\n| zero => simp"
+    # Restating a name that is taken and not the one being proved is not a step.
+    assert fw.drop_own(reply, ("aux",)) == ""

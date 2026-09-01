@@ -59,6 +59,7 @@ from submission.framework import (
     normalise_steps,
     as_goal,
     drop_own,
+    enclosing_name,
     root_names,
     split_cursor,
     unwrap_own,
@@ -773,8 +774,13 @@ class FrameworkAgent:
             model, "\n\n".join(parts), STEP_TOKENS, services, ledger)
         if why == "length":
             return CUT
-        own = root_names(problem.challenge)
-        return drop_own(unwrap_own(screen_step(reply), own), own)
+        # A reply about a goal inside a declaration comes back as that whole
+        # declaration; its header is a name already taken, and its body is the
+        # step. Names elsewhere in the file are taken too, and truncating there
+        # keeps whatever is new.
+        here = enclosing_name(state.text, state.focus)
+        taken = [n for n in root_names(state.text) if n != here]
+        return drop_own(unwrap_own(screen_step(reply), (here,) if here else ()), taken)
 
     async def _resolve_answers(self, problem: Problem, text: str, names: Sequence[str],
                                services: Services, ledger: Ledger,
