@@ -110,6 +110,8 @@ def root_names(text: str) -> tuple[str, ...]:
     return tuple(m.group(2) for m in PROOF_HEAD.finditer(text))
 
 
+# Measured: Lean writes "No goals to be solved" for a leftover tactic and
+# "no goals to be solved" elsewhere, so every match here is case-folded.
 UNSOLVED = "unsolved goals"
 HEARTBEAT = "maximum number of heartbeats"
 NO_GOALS = "no goals to be solved"
@@ -127,7 +129,7 @@ def classify(messages: Sequence[Any]) -> tuple[list[Any], list[Any], list[Any], 
     for m in messages:
         if not isinstance(m, dict) or m.get("severity") != "error":
             continue
-        text = message_text(m)
+        text = message_text(m).lower()
         if UNSOLVED in text:
             progress.append(m)
         elif NO_GOALS in text:

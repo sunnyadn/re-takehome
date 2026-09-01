@@ -144,3 +144,12 @@ def test_a_search_block_collapses_to_one_alternative():
 def test_the_axiom_probe_names_every_graded_theorem():
     probed = fw.axiom_probe(CHALLENGE, fw.root_names(CHALLENGE))
     assert probed.rstrip().endswith("#print axioms demo")
+
+
+def test_lean_s_own_wording_for_no_goals_is_matched_whatever_its_case():
+    # Both strings came off the graded image, from the same session.
+    left = {"severity": "error", "pos": {"line": 4}, "data": "No goals to be solved"}
+    warn = {"severity": "warning", "pos": {"line": 4},
+            "data": "'skip' tactic does nothing"}
+    progress, surplus, expensive, failures = fw.classify([left, warn])
+    assert surplus == [left] and not failures and not progress

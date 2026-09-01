@@ -43,8 +43,11 @@ class FakeLean:
                 return LeanCheck(False, [{"severity": "error", "pos": {"line": line or 1},
                                           "data": "unknown identifier 'key'"}], True, False, 1)
             if line:
-                return LeanCheck(False, [{"severity": "error", "pos": {"line": line},
-                                          "data": "no goals to be solved"}], False, False, 1)
+                # Measured on the graded image: a `skip` with no goals left is a
+                # linter warning and the file is accepted, not an error.
+                return LeanCheck(True, [{"severity": "warning", "pos": {"line": line},
+                                         "data": "'skip' tactic does nothing"}],
+                                 False, False, 1)
             return LeanCheck(True, [], False, False, 1)
         if "first" in source or "exact?" in source:
             return LeanCheck(False, [{"severity": "error", "pos": {"line": line or 1},
