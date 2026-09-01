@@ -1072,5 +1072,14 @@ def repairer_user(problem: Problem, line: Line, handoff: bool) -> str:
     return "\n".join(parts)
 
 
-def create_agent() -> SubmissionAgent:
+def create_agent():
+    """The graded entry point: the framework loop with this agent behind it.
+
+    Imported here, not at module scope, because that module imports this one."""
+
+    from submission.framework_agent import create_agent as framework_agent
+    return framework_agent()
+
+
+def create_search_agent() -> SubmissionAgent:
     return SubmissionAgent()

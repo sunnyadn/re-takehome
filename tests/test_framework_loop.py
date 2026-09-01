@@ -274,3 +274,54 @@ def test_the_graded_theorem_cannot_be_restated_as_a_lemma():
     result, _, llm, _ = run(["theorem demo : True := by trivial"] * 30)
     assert result.metadata["accepted_by_repl"] is False
     assert "theorem demo : True := by trivial" not in result.solution
+
+
+def composite(replies, fallback, budget=1.0):
+    """Run the graded entry point with the fallback agent stubbed out."""
+
+    import submission.agent as agent_mod
+    from submission.framework_agent import Submission
+
+    lean, llm = FakeLean(), FakeLLM(replies)
+    services = FakeServices(lean, llm)
+    seen = {}
+
+    async def stub(self, problem, services):
+        seen["budget"] = self.config.budget_usd
+        return fallback
+
+    original, agent_mod.SubmissionAgent.solve = agent_mod.SubmissionAgent.solve, stub
+    try:
+        agent = Submission(Config(lines=("model-a",), budget_usd=budget,
+                                  time_limit_s=3600.0))
+        result = asyncio.run(agent.solve(
+            Problem(id="demo", description="d", challenge=CHALLENGE), services))
+    finally:
+        agent_mod.SubmissionAgent.solve = original
+    return result, seen
+
+
+def test_the_framework_keeps_the_win_and_never_calls_the_fallback():
+    from re_harness import AgentResult
+
+    result, seen = composite(["have key : True := by trivial", "exact key"],
+                             AgentResult("fallback", {"accepted_by_repl": True}))
+    assert result.metadata["strategy"] == "framework" and not seen
+
+
+def test_the_fallback_gets_what_the_framework_did_not_spend():
+    from re_harness import AgentResult
+
+    won = AgentResult("import Mathlib\n\ntheorem demo : True := by\n  trivial\n",
+                      {"accepted_by_repl": True})
+    result, seen = composite(["nonsense that never compiles"] * 40, won)
+    assert result is won
+    # The loop is capped at its share, so the fallback always has money left.
+    assert 0.15 <= seen["budget"] <= 1.0
+
+
+def test_the_graded_entry_point_is_the_composite():
+    import submission.agent as agent_mod
+    from submission.framework_agent import Submission
+
+    assert isinstance(agent_mod.create_agent(), Submission)
