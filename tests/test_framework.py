@@ -272,3 +272,12 @@ def test_a_goal_no_placeholder_can_reach_is_given_one_inside_its_branch():
     assert len(fw.placeholders(reopened)) == 2
     # Once it has one, it is not stranded any more.
     assert fw.unreachable([BULLET, WHOLE], reopened, 7) is None
+
+
+def test_a_search_that_prints_an_option_is_still_an_answer():
+    import submission.framework_agent as fa
+    # Measured: `#eval (List.range 100).find? p` prints `some 19`, and the same
+    # search with `.getD 0` prints `19`.
+    said = [{"severity": "info", "data": "some 19"}, {"severity": "info", "data": "19"},
+            {"severity": "info", "data": "[1, 2]"}]
+    assert fa.printed_numbers(said) == ["19", "19"]

@@ -763,7 +763,8 @@ class FrameworkAgent:
                    "evaluate the definition.\n\n"
                    f"Problem: {problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
                    "Lean 4 with Mathlib. Output the `#eval` lines only. Each must print "
-                   "a single natural number." + note)
+                   "one natural number and nothing else: put `.getD 0` after a "
+                   "`find?` rather than printing `some n`." + note)
             reply, _ = await self._call(
                 self.config.lines[0], ask, ANSWER_TOKENS, services, ledger, think=True)
             probes = [l for l in strip_fences(reply).splitlines()
@@ -839,15 +840,20 @@ def is_probe(block: str) -> bool:
 STEP_BAN = re.compile(r"^\s*(import|example|axiom)\b|```|native_decide|admit", re.M)
 
 
+# Measured: `#eval (List.range 100).find? p` prints `some 19`, which is the
+# right answer computed the right way and was being discarded as not a numeral.
+PRINTED = re.compile(r"\A(?:Option\.)?some\s+(-?\d+)\Z|\A(-?\d+)\Z")
+
+
 def printed_numbers(messages: Sequence[Any]) -> list[str]:
-    """What `#eval` printed, in order, keeping only bare numerals."""
+    """What `#eval` printed, in order, as numbers."""
 
     out = []
     for m in messages:
         if isinstance(m, dict) and m.get("severity") in ("info", "information"):
-            body = str(m.get("data", "")).strip()
-            if NUMBER.match(body):
-                out.append(body)
+            found = PRINTED.match(str(m.get("data", "")).strip())
+            if found:
+                out.append(found.group(1) or found.group(2))
     return out
 
 
