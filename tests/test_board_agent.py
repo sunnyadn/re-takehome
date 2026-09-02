@@ -198,9 +198,12 @@ def test_with_one_goal_left_the_fast_model_is_not_idled_by_the_slow_one():
     }, delay={"model-b": 0.8}, lines=("model-b", "model-a"))
     assert result.metadata["accepted_by_repl"] is True
     # The slow model claimed the only goal first; the fast one finished it
-    # anyway, and the slow reply found its goal gone.
-    assert {e["by"] for e in steps(result) if e["accepted"]} == {"model-a"}
-    assert {"kind": "stale", "by": "model-b"} in result.metadata["events"]
+    # anyway. The slow reply, judged against the file it was asked about,
+    # becomes a sibling branch; the delivered proof is the finished one.
+    events = result.metadata["events"]
+    assert any(e.get("stage") == "fork" for e in events) or \
+        {"kind": "stale", "by": "model-b"} in events
+    assert "have slow" not in result.solution
 
 
 def test_feedback_names_this_step_s_error_and_not_the_other_open_goals():

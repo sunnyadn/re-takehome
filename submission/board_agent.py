@@ -90,6 +90,11 @@ LAST_IN_LINE = 6
 MAX_RESTATES = 2
 # A worker with no goal to take waits this long for the board to change.
 IDLE_WAIT_S = 2.0
+# Live branches: alternative proof files racing on the same problem. A second
+# accepted answer to a goal one model already moved becomes a sibling branch
+# rather than a stale reply. Measured on p09: the run was decided by one such
+# choice at t=50s, and there was no way to hedge it.
+BEAM = 2
 
 
 @dataclass(frozen=True)
@@ -114,6 +119,12 @@ class Board:
     goals: list[Goal] = field(default_factory=list)
     messages: list[dict[str, Any]] = field(default_factory=list)
     accepted: bool = False
+    bid: int = 0
+
+    @property
+    def score(self) -> tuple[int, int]:
+        """Fewer open goals first; the tie goes to the less-tried branch."""
+        return len(self.goals), self.bid
 
     def find(self, key: tuple[str, str]) -> Goal | None:
         return next((g for g in self.goals if g.key == key), None)
@@ -299,7 +310,22 @@ class BoardAgent(FrameworkAgent):
             return result(state.text, how, True)
 
         board = Board(text)
-        sound = text
+        branches: list[Board] = []
+        sound: dict[int, str] = {}
+        next_bid = 1
+
+        def focus(b: Board) -> None:
+            nonlocal board
+            board = b
+
+        def live(bid: int) -> Board | None:
+            return next((b for b in branches if b.bid == bid), None)
+
+        def prune() -> None:
+            while len(branches) > BEAM:
+                worst = max(branches, key=lambda b: (len(b.goals), -b.bid))
+                branches.remove(worst)
+                events.append({"stage": "prune", "bid": worst.bid, "goals": len(worst.goals)})
 
         async def look(candidate: str) -> Board:
             check = await services.lean.check_file(render_all(candidate))
@@ -308,17 +334,27 @@ class BoardAgent(FrameworkAgent):
         async def commit(candidate: Board) -> None:
             """Make a board current, after its own housekeeping."""
 
-            nonlocal board, sound
-            board = await settle(candidate)
-            _, _, dear, broken = classify(board.messages)
+            nonlocal board
+            bid = board.bid
+            fresh = await settle(candidate)
+            fresh.bid = bid
+            _, _, dear, broken = classify(fresh.messages)
             if broken or dear:
-                if board.text != sound:
-                    events.append({"stage": "repair",
+                if fresh.text != sound.get(bid, ""):
+                    events.append({"stage": "repair", "bid": bid,
                                    "why": "cost" if dear and not broken else "error",
                                    "said": format_messages(broken or dear)[:300]})
-                    board = await look(sound)
+                    fresh = await look(sound.get(bid, text))
+                    fresh.bid = bid
             else:
-                sound = board.text
+                sound[bid] = fresh.text
+            board = fresh
+            for i, b in enumerate(branches):
+                if b.bid == bid:
+                    branches[i] = fresh
+                    break
+            else:
+                branches.append(fresh)
             offer(board.text, board.accepted and is_done(board.text))
             changed.set()
             changed.clear()
@@ -518,18 +554,19 @@ class BoardAgent(FrameworkAgent):
                     took = True
             return took
 
-        def pick(model: str) -> Goal | None:
-            """The least-tried unclaimed goal, in file order among equals; with
-            none unclaimed, one the other model holds, so a 158s reply does not
-            idle the fast model. Measured on p09: 4 minutes of 20 went that way."""
+        def pick(model: str) -> tuple[Board, Goal] | None:
+            """The best branch's least-tried unclaimed goal; with none unclaimed
+            anywhere, one the other model holds, so a 158s reply does not idle
+            the fast model. Measured on p09: 4 minutes of 20 went that way."""
 
-            free = [g for g in board.goals if g.key not in claimed and g.text]
-            if not free:
-                free = [g for g in board.goals if g.text and claimed.get(g.key) != model]
-            if not free:
-                return None
-            return min(free, key=lambda g: (tries.get(g.key, 0) >= LAST_IN_LINE,
-                                            tries.get(g.key, 0), g.line))
+            for shared in (False, True):
+                for b in sorted(branches, key=lambda b: b.score):
+                    free = [g for g in b.goals if g.text and (
+                        g.key not in claimed if not shared else claimed.get(g.key) != model)]
+                    if free:
+                        return b, min(free, key=lambda g: (
+                            tries.get(g.key, 0) >= LAST_IN_LINE, tries.get(g.key, 0), g.line))
+            return None
 
         async def unstick() -> None:
             """Every goal last in line: the worst one's declaration starts over."""
@@ -564,10 +601,14 @@ class BoardAgent(FrameworkAgent):
             idle = 0
             while time_left() > 0 and can_ask() and not finished:
                 async with lock:
-                    if board.accepted and is_done(board.text):
+                    if any(b.accepted and is_done(b.text) for b in branches):
                         finished = True
                         return
-                    goal = pick(model)
+                    picked = pick(model)
+                    goal = picked[1] if picked else None
+                    if picked:
+                        focus(picked[0])
+                    base = board
                     if goal is not None and goal.key not in swept:
                         swept.add(goal.key)
                         if await sweep(goal):
@@ -589,7 +630,10 @@ class BoardAgent(FrameworkAgent):
                     async with lock:
                         plans[goal.key] = plan
                         events.append({"kind": "plan", "by": other, "chars": len(plan)})
-                        ask = prompt_for(goal, model) if board.find(goal.key) else ""
+                        now = live(base.bid)
+                        if now:
+                            focus(now)
+                        ask = prompt_for(goal, model) if now and now.find(goal.key) else ""
                     if not ask:
                         async with lock:
                             claimed.pop(goal.key, None)
@@ -621,7 +665,33 @@ class BoardAgent(FrameworkAgent):
                                                   if goal.key in said else "nothing yet", "cut")
                         tries[goal.key] = tries.get(goal.key, 0) + 1
                         continue
-                    here = board.find(goal.key)
+                    now = live(base.bid)
+                    here = now.find(goal.key) if now else None
+                    if here is not None:
+                        focus(now)
+                    elif base.find(goal.key) is not None and len(branches) < BEAM + 1:
+                        # The goal moved on under this reply. Judged against the
+                        # file it was asked about, an accepted answer is a second
+                        # way forward, and a second way is a branch, not waste.
+                        nonlocal next_bid
+                        fork = Board(base.text, list(base.goals), list(base.messages),
+                                     base.accepted, next_bid)
+                        next_bid += 1
+                        sound[fork.bid] = sound.get(base.bid, base.text)
+                        branches.append(fork)
+                        focus(fork)
+                        here = fork.find(goal.key)
+                        edits = interpret(reply, board, here, graded)
+                        took = await apply(model, here, edits) if edits else False
+                        if took and live(fork.bid):
+                            events.append({"stage": "fork", "from": base.bid, "to": fork.bid,
+                                           "goal": goal.text[:60]})
+                            prune()
+                        else:
+                            if live(fork.bid):
+                                branches.remove(live(fork.bid))
+                            events.append({"kind": "stale", "by": model})
+                        continue
                     if here is None:
                         events.append({"kind": "stale", "by": model})
                         continue
@@ -657,6 +727,7 @@ class BoardAgent(FrameworkAgent):
                 text = await self._resolve_answers(
                     problem, text, names, services, ledger, events)
 
+            board = Board(text, bid=0)
             await commit(await look(text))
             tasks = [asyncio.ensure_future(worker(m)) for m in models]
             try:
@@ -665,10 +736,13 @@ class BoardAgent(FrameworkAgent):
                 finished = True
                 await asyncio.wait(tasks, timeout=LOOSE_DRAIN_S)
 
-            if is_done(board.text):
-                won = await deliver(board.text, "board_loop")
+            done = [b for b in branches if b.accepted and is_done(b.text)]
+            if done:
+                won = await deliver(done[0].text, "board_loop")
                 if won:
                     return won
+            if branches:
+                board = min(branches, key=lambda b: b.score)
             offer(board.text, False)
             return result(best, "best_effort", False)
         except (BudgetExceeded, BudgetAccountingError, LeanRuntimeError, LLMCallError) as exc:
