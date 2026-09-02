@@ -832,3 +832,22 @@ def test_a_model_that_narrates_is_asked_for_the_shared_lemma_with_reasoning_off(
              if m == "qwen-b" and "graded together" in p]
     assert share and all(k["reasoning"] == {"enabled": False} for k in share)
 
+
+def test_a_have_with_a_proof_body_has_its_claim_audited_too():
+    # Measured on putnam_2020_a2 (v7.25): `have h3 : ∀ x ∈ Icc 0 k, …` was false
+    # at k = 1 but came with a proof body, so only the body's residue was
+    # audited and the false claim went up on the board.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = WitnessLean(), ScriptLLM({
+        "model-a": ["have bad : x = 3 := by\n  omega\nhave key : True := by trivial\nexact key",
+                    '{"counterexample": {"x": "0"}}',
+                    "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    assert "have bad" not in result.solution
+    assert any(e.get("kind") == "audit" and e.get("verdict") == "refuted"
+               and e.get("goal") == "x = 3" for e in result.metadata["events"])
+    assert result.metadata["accepted_by_repl"] is True
+

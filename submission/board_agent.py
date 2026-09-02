@@ -283,6 +283,30 @@ def extract_file(text: str, goals: Sequence[Goal]) -> str:
     return "\n".join(lines)
 
 
+def have_extract_file(lines: Sequence[str], at: Sequence[int]) -> tuple[str, dict[int, int]]:
+    """The file with these `have`s' bodies replaced by a request to state the
+    claim; the map from each have's line index to the line Lean answers on."""
+    out, where, shift, i = [], {}, 0, 0
+    marks = set(at)
+    text_lines = render_all("\n".join(lines)).split("\n")
+    while i < len(text_lines):
+        ln = text_lines[i]
+        out.append(ln)
+        head = HAVE_HEAD.match(ln) if i in marks else None
+        if not head:
+            i += 1
+            continue
+        depth = len(head.group(1))
+        j = i + 1
+        while j < len(text_lines) and (not text_lines[j].strip()
+                                       or len(text_lines[j]) - len(text_lines[j].lstrip()) > depth):
+            j += 1
+        out.append(" " * (depth + 2) + EXTRACT)
+        where[i] = len(out)
+        i = j
+    return "\n".join(out), where
+
+
 def statements(messages: Sequence[Any]) -> dict[int, str]:
     """Line -> the statement `extract_goal` printed there, binders and target."""
     out: dict[int, str] = {}
@@ -941,10 +965,11 @@ class BoardAgent(FrameworkAgent):
             return nxt, ""
 
         async def audit(author: str, base: Board, nxt: Board) -> str:
-            """Every goal a step opens is tried against a witness: Lean states
-            the goal, the other model names values for its variables, Lean
-            checks that they satisfy every hypothesis in scope and break the
-            target. The refutation, or "" to let the step in."""
+            """Every statement a step writes is tried against a witness: each
+            new `have` (its body set aside) and each other goal it opens. Lean
+            states it, the auditor names values for its variables, Lean checks
+            that they satisfy every hypothesis in scope and break it. The
+            refutation, or "" to let the step in."""
 
             # Measured (v7.17–v7.19, 12 of 12 audits): a model that narrates
             # names values that violate a hypothesis, at ~9s each; the other
@@ -954,31 +979,67 @@ class BoardAgent(FrameworkAgent):
                               next((m for m in models if m != author), author)))
             had = {g.key for g in base.goals}
             lines = nxt.text.split("\n")
-            fresh = [g for g in nxt.goals if g.key not in had and g.text
-                     and not META.search(target_of(g.text)) and is_stated(lines, g)]
-            for g in fresh:
-                if audited.get(g.key):
-                    return audited[g.key]
-            fresh = [g for g in fresh if g.key not in audited]
-            if not fresh or not can_ask():
+            # Measured on putnam_2020_a2 (v7.25): a false `have h3 : ∀ x ∈ …`
+            # came with a proof body, so only its residue was audited and the
+            # claim went up. The claim is audited whatever the body says.
+            known: dict[str, dict[str, str]] = {}
+            subjects: list[dict[str, Any]] = []
+            for i, ln in enumerate(lines):
+                head = HAVE_HEAD.match(ln)
+                decl = owner(nxt.text, i + 1) if head else ""
+                claim = " ".join(claim_of(head.group(2).strip()).split()) if head else ""
+                if not decl or not claim:
+                    continue
+                if decl not in known:
+                    known[decl] = stated_facts(base.text, decl)
+                if claim in known[decl]:
+                    continue
+                subjects.append({"key": (decl, "have " + claim), "decl": decl, "at": i,
+                                 "what": head.group(2).strip(), "claim": claim})
+            covered = {s["at"] for s in subjects}
+            for g in nxt.goals:
+                if (g.key in had or not g.text or META.search(target_of(g.text))
+                        or not is_stated(lines, g) or enclosing_have(lines, g)[0] in covered):
+                    continue
+                subjects.append({"key": g.key, "decl": g.decl, "goal": g, "what": "",
+                                 "claim": ""})
+            for sub in subjects:
+                if audited.get(sub["key"]):
+                    return audited[sub["key"]]
+            subjects = [sub for sub in subjects if sub["key"] not in audited]
+            if not subjects or not can_ask():
                 return ""
-            stated = statements((await services.lean.check_file(
-                extract_file(nxt.text, fresh), timeout_s=check_timeout_s(nxt.ms))).messages)
+            goals = [sub for sub in subjects if "goal" in sub]
+            haves = [sub for sub in subjects if "at" in sub]
+            if goals:
+                said_ = statements((await services.lean.check_file(
+                    extract_file(nxt.text, [sub["goal"] for sub in goals]),
+                    timeout_s=check_timeout_s(nxt.ms))).messages)
+                for sub in goals:
+                    sub["stmt"] = said_.get(sub["goal"].line, "")
+            if haves:
+                text, where = have_extract_file(lines, [sub["at"] for sub in haves])
+                said_ = statements((await services.lean.check_file(
+                    text, timeout_s=check_timeout_s(nxt.ms))).messages)
+                for sub in haves:
+                    sub["stmt"] = said_.get(where.get(sub["at"], -1), "")
             # Definitions only: a hoisted lemma's proof would be paid again.
             roots = root_names(nxt.text)
             first = proof_span(nxt.text, roots[0]) if roots else None
             prefix = nxt.text[:first[0]] if first else ""
-            parsed = {g.key: split_statement(stated.get(g.line, "")) for g in fresh}
-            asked = [g for g in fresh if parsed[g.key]]
+            for sub in subjects:
+                sub["parsed"] = split_statement(sub["stmt"]) if sub.get("stmt") else None
+            asked = [sub for sub in subjects if sub["parsed"]]
             replies = await asyncio.gather(*(self._call(
-                other, audit_prompt(stated[g.line], prefix.replace("import Mathlib", "")),
-                AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM) for g in asked))
-            for g in fresh:
-                audited[g.key] = ""
-                verdict, values, target = "unstated", {}, target_of(g.text)
-                if parsed[g.key]:
-                    groups, target = parsed[g.key]
-                    reply, stopped = replies[asked.index(g)]
+                other, audit_prompt(sub["stmt"], prefix.replace("import Mathlib", "")),
+                AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM) for sub in asked))
+            for sub in subjects:
+                audited[sub["key"]] = ""
+                verdict, values = "unstated", {}
+                target = sub["claim"] or target_of(sub["goal"].text)
+                if sub["parsed"]:
+                    groups, target = sub["parsed"]
+                    reply, stopped = replies[asked.index(sub)]
                     names = {n for grp in groups for n in binder_names(grp)}
                     given = read_witness(reply)
                     values = {n: v for n, v in (given or {}).items() if n in names}
@@ -994,16 +1055,15 @@ class BoardAgent(FrameworkAgent):
                 events.append({"kind": "audit", "by": other, "goal": target[:100],
                                "verdict": verdict, "values": values})
                 if verdict == "refuted":
-                    _, head = enclosing_have(lines, g)
-                    stmt = head.group(2).strip() if head else f"⊢ {target}"
-                    if head:
-                        withdrawn.setdefault(g.decl, []).append(claim_of(stmt))
+                    stmt = sub["what"] or f"⊢ {target}"
+                    if sub["claim"]:
+                        withdrawn.setdefault(sub["decl"], []).append(claim_of(sub["what"]))
                     at = ", ".join(f"{n} = {v}" for n, v in values.items())
-                    audited[g.key] = (
+                    audited[sub["key"]] = (
                         f"`{stmt}` is false, so the step was not posted: with {at} every "
                         "hypothesis in scope holds and it fails (Lean checked this). Do "
                         "not restate it; state a fact that is true at those values too")
-                    return audited[g.key]
+                    return audited[sub["key"]]
             return ""
 
         async def advance(base: Board, goal: Goal, block: str,
