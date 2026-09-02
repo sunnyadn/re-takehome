@@ -362,11 +362,11 @@ def test_the_graded_theorem_cannot_be_restated_as_a_lemma():
     assert "theorem demo : True := by trivial" not in result.solution
 
 
-def test_the_graded_entry_point_is_the_framework_loop():
+def test_the_graded_entry_point_is_the_board():
     import submission.agent as agent_mod
-    from submission.framework_agent import FrameworkAgent
+    from submission.board_agent import BoardAgent
 
-    assert isinstance(agent_mod.create_agent(), FrameworkAgent)
+    assert isinstance(agent_mod.create_agent(), BoardAgent)
 
 
 def test_a_reply_with_no_lean_is_told_so():

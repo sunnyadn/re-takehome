@@ -1073,12 +1073,12 @@ def repairer_user(problem: Problem, line: Line, handoff: bool) -> str:
 
 
 def create_agent():
-    """The graded entry point: the framework loop.
+    """The graded entry point: the goal board.
 
     Imported here, not at module scope, because that module imports this one."""
 
-    from submission.framework_agent import create_agent as framework_agent
-    return framework_agent()
+    from submission.board_agent import create_agent as board_agent
+    return board_agent()
 
 
 def _unused_search_agent() -> SubmissionAgent:
