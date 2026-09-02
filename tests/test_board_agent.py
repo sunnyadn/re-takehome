@@ -996,3 +996,27 @@ def test_the_same_shared_lemma_under_two_names_is_kept_once():
     dropped = drop_declaration(text, "b_cycle")
     assert "b_cycle" not in dropped and "a_cycle" in dropped and "other" in dropped
 
+
+def test_a_rewrite_that_unfolds_a_variable_everywhere_is_measured_as_inflation():
+    # Measured on rmo_2001_2 (v7.32), p09 (gate29 run 1, gate26 run 4) and
+    # rmo_2000_2: `rw [← Nat.mod_add_div p 9] at *` turned every `p` in every
+    # hypothesis into `p % 9 + 9 * (p / 9)` and the run never recovered.
+    from submission.board_agent import inflated
+    before = ("p q : ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\nm : ℕ\n"
+              "hm : p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2\n⊢ p = q ∨ p = 3 ∧ q = 11")
+    after = ("p q : ℕ\nhp : Nat.Prime (p % 9 + 9 * (p / 9))\nhq : Nat.Prime (q % 9 + 9 * (q / 9))\nm : ℕ\n"
+             "hm : (p % 9 + 9 * (p / 9)) ^ 2 + 7 * (p % 9 + 9 * (p / 9)) * (q % 9 + 9 * (q / 9)) "
+             "+ (q % 9 + 9 * (q / 9)) ^ 2 = m ^ 2\n⊢ p = q")
+    assert inflated(before, after) >= 3.0
+    # a skeleton adds hypotheses and a field_simp reshapes one: neither counts as inflation
+    skeleton = before.replace("⊢", "h1 : 3 ∣ p + q\nh2 : m % 3 = 0\nh3 : p < q\nh4 : q < m\n⊢")
+    assert inflated(before, skeleton) == 1.0
+    reshaped = before.replace("hm : p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2",
+                              "hm : p * p + 7 * (p * q) + q * q = m * m ∧ 0 < m")
+    assert inflated(before, reshaped) < 2.0
+    # unfolding an answer set in one hypothesis is growth without repetition
+    mem = "a b : ℤ\nh : 0 < a ∧ 0 < b\nh_in : (a, b) ∈ putnam_2018_a1_solution\n⊢ True"
+    unfolded = mem.replace("putnam_2018_a1_solution", "{(673, 1358114), (674, 340033), "
+                           "(1009, 2018), (2018, 1009), (340033, 674), (1358114, 673)}")
+    assert inflated(mem, unfolded) == 1.0
+

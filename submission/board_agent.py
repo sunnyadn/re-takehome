@@ -599,6 +599,50 @@ def withdraw(text: str, goal: Goal) -> tuple[str, str]:
     return "\n".join(lines[:above] + [indent + "sorry"] + lines[end:]), head.group(2).strip()
 
 
+INFLATION = 3.0
+
+
+def hypotheses(goal_text: str) -> dict[str, str]:
+    """Name -> printed type for each hypothesis line of a goal (first case only)."""
+    head = goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
+    out: dict[str, str] = {}
+    for line in head.split("\n"):
+        if line[:1].isspace() or line.startswith("case ") or " : " not in line:
+            continue
+        names, typ = line.split(" : ", 1)
+        for n in names.split():
+            out[n] = typ.strip()
+    return out
+
+
+def groups(text: str) -> list[str]:
+    """Every balanced parenthesised expression in a text, nesting included."""
+    out, stack = [], []
+    for i, ch in enumerate(text):
+        if ch == "(":
+            stack.append(i)
+        elif ch == ")" and stack:
+            out.append(text[stack.pop():i + 1])
+    return [g for g in out if len(g) >= 8]
+
+
+def inflated(before: str, after: str) -> float:
+    """How much larger the hypotheses both goals share became, when the growth
+    is one new bracketed expression repeated 3 times or more: a rewrite that
+    unfolds a variable everywhere. Unfolding a set literal is not repetition."""
+    old, new = hypotheses(before), hypotheses(after)
+    shared = [n for n in old if n in new]
+    was = sum(len(old[n]) for n in shared)
+    now_text = "\n".join(new[n] for n in shared)
+    old_text = "\n".join(old[n] for n in shared)
+    if was < 40:
+        return 1.0
+    fresh = [g for g in set(groups(now_text)) if g not in old_text]
+    if not any(now_text.count(g) >= 3 for g in fresh):
+        return 1.0
+    return len(now_text) / was
+
+
 def target_of(goal_text: str) -> str:
     return goal_text.rsplit("⊢", 1)[-1].strip() if "⊢" in goal_text else ""
 
@@ -1047,6 +1091,14 @@ class BoardAgent(FrameworkAgent):
                               "a hypothesis, so the context is still consistent and "
                               "`False` cannot be proved: the witness, rewrite or case "
                               "was wrong. Undo it and choose again")
+            if left and max(inflated(goal.text, g.text) for g in left) >= INFLATION:
+                # Measured on rmo_2001_2, p09 and rmo_2000_2 (5 runs): a rewrite
+                # `at *` unfolded a variable in every hypothesis and both models
+                # then worked on the unfolded form for the rest of the run.
+                return None, ("that step made the existing hypotheses more than "
+                              f"{INFLATION:g}× larger without closing the goal (a rewrite "
+                              "unfolded a variable everywhere). Rewrite only the "
+                              "hypothesis you need, or state the fact you want as a `have`")
             if any(META.search(target_of(g.text)) for g in left):
                 # Measured on rmo_2000_2: `apply lt_irrefl _` left `⊢ Type ?u.350`
                 # and `⊢ Preorder ?α`; each got a sorry and 30 turns, six deep.
