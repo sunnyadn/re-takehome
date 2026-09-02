@@ -6,6 +6,7 @@ still the proof; a reply is read once, as a proof of whatever it names."""
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Sequence
@@ -198,6 +199,9 @@ def read_board(text: str, messages: Sequence[dict[str, Any]], accepted: bool) ->
         goals.append(Goal(line, match.group(1), owner(text, line),
                           min(fits, key=lambda f: f[0])[1] if fits else ""))
     return Board(text, goals, list(messages), accepted)
+
+
+META = re.compile(r"\?[\w.]+|^(?:Type|Sort)\b")
 
 
 def target_of(goal_text: str) -> str:
@@ -488,6 +492,12 @@ class BoardAgent(FrameworkAgent):
                               "a hypothesis, so the context is still consistent and "
                               "`False` cannot be proved: the witness, rewrite or case "
                               "was wrong. Undo it and choose again")
+            if any(META.search(target_of(g.text)) for g in left):
+                # Measured on rmo_2000_2: `apply lt_irrefl _` left `⊢ Type ?u.350`
+                # and `⊢ Preorder ?α`; each got a sorry and 30 turns, six deep.
+                return None, ("that step left a goal Lean could not infer (`Type ?u`, "
+                              "`?α`): an `apply` with `_` for arguments it cannot fill. "
+                              "Give the term in full, e.g. `exact absurd h1 (not_lt.mpr h2)`")
             if any(len(VACUOUS.findall(g.text)) > len(VACUOUS.findall(goal.text)) for g in left):
                 # Measured on p09: `simp ... at h ⊢` left `h : True ⊢ False`, Lean
                 # had no complaint, and five turns went into a goal that was dead.

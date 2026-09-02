@@ -449,3 +449,25 @@ def test_a_step_that_turns_the_goal_into_false_without_a_new_hypothesis_is_refus
     assert steps(result)[0]["accepted"] is False
     assert any("into `False`" in p for _, p in llm.calls)
     assert result.metadata["accepted_by_repl"] is True
+
+
+def test_a_step_that_leaves_a_goal_with_a_metavariable_is_refused():
+    # Measured on rmo_2000_2 (v7.8): `apply lt_irrefl _` then `linarith` left
+    # `⊢ Type ?u.350` and `⊢ Preorder ?α` open, the board gave each a sorry,
+    # both models answered the same line again, six levels deep in 13 minutes.
+    class MetaLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            check = await super().check_file(source)
+            if "apply lt_irrefl _" in source:
+                msgs = [dict(m, data=m["data"].replace("⊢ demo", "⊢ Type ?u.350"))
+                        if "unsolved" in str(m.get("data")) else m for m in check.messages]
+                return LeanCheck(check.accepted, msgs, check.has_sorry, False, 1)
+            return check
+    lean = MetaLean()
+    llm = ScriptLLM({"model-a": ["apply lt_irrefl _", "have key : True := by trivial", "exact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert steps(result)[0]["accepted"] is False
+    assert any("could not infer" in p for _, p in llm.calls)
+    assert result.metadata["accepted_by_repl"] is True
