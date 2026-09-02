@@ -603,3 +603,37 @@ def test_the_sweep_does_not_run_exact_search_on_every_goal():
                                      FakeServices(lean, llm)))
     assert result.metadata["accepted_by_repl"] is True
     assert not any("exact?" in s for s in lean.sources)
+
+
+class WitnessLean(BoardLean):
+    """Real Lean would evaluate the witness file; here any witness file passes."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "(w_" in source:
+            self.sources.append(source)
+            return LeanCheck(True, [], False, False, 1)
+        return await super().check_file(source, timeout_s)
+
+
+def test_a_posted_have_that_a_witness_falsifies_never_reaches_the_board():
+    # Measured on putnam_2018_a1 (v7.10, t=833): `have h_divisors : 3a−2018 ∈
+    # {...} := by sorry` listed three non-divisors of 2018² and everything after
+    # it hung. The other model names values that satisfy every hypothesis and
+    # break the claim; Lean checks them in a file of their own.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = WitnessLean(), ScriptLLM({
+        "model-a": ["have bad : x = 3 := by\n  sorry\nexact key",
+                    '{"counterexample": {"x": "0"}}',
+                    "have key : True := by trivial\nexact key",
+                    "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    witness = [s for s in lean.sources if "(w_" in s]
+    assert witness and "(w_x : x = (0))" in witness[0] and "(x < 2) ∧ ¬ (x = 3)" in witness[0]
+    assert any(e.get("kind") == "audit" and e.get("verdict") == "refuted"
+               for e in result.metadata["events"])
+    assert any("x = 0" in p for _, p in llm.calls)
+    assert "have bad" not in result.solution
+    assert result.metadata["accepted_by_repl"] is True

@@ -6,6 +6,7 @@ still the proof; a reply is read once, as a proof of whatever it names."""
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 import time
 from dataclasses import dataclass, field
@@ -232,6 +233,125 @@ HAVE_HEAD = re.compile(r"^(\s*)(have\b.*?)\s*:=\s*by\s*$")
 CLOSER_TAG = re.compile(r"^closer (\d+)$")
 
 
+# A binder whose type reads as a proposition is a hypothesis of the theorem;
+# the rest are the variables a witness assigns. A wrong call fails to elaborate
+# in the witness file, which counts as "not refuted", never the other way.
+PROP_TOKEN = re.compile(
+    r"[=<>≤≥≠∣∈∉⊆⊂∀∃¬∧∨↔]|\b(?:True|False|Prime|Even|Odd|Coprime|IsLeast|IsGreatest"
+    r"|Irrational|Injective|Surjective|Bijective|Monotone|StrictMono|Antitone|Continuous"
+    r"|Nonempty|Squarefree|IsSquare|Nat\.Prime)\b")
+# Tactics that evaluate a closed statement; none of them uses a hypothesis
+# from the context, so the theorem's hypotheses are proved, not assumed.
+WITNESS_CLOSERS = ("norm_num", "decide", "simp",
+                   "norm_num [Finset.mem_insert, Finset.mem_singleton]",
+                   "simp; norm_num", "norm_num; decide")
+AUDIT_TOKENS = 2500
+AUDIT_SYSTEM = ("You audit one claimed fact inside a Lean 4 proof. You answer with one "
+                "JSON object and nothing else.")
+DECL_NAME = re.compile(r"\s*(?:private\s+)?(?:theorem|lemma)\s+[\w'.]+")
+HAVE_NAME = re.compile(r"^\s*have\s+([A-Za-z_][\w'.]*)\s*(?::|:=)", re.M)
+OPENERS, CLOSERS = "({[⦃", ")}]⦄"
+
+
+def split_top(s: str, sep: str) -> tuple[str, str] | None:
+    """`s` split at the first `sep` outside every bracket; None without one."""
+    depth = 0
+    for i, ch in enumerate(s):
+        depth += (ch in OPENERS) - (ch in CLOSERS)
+        if depth == 0 and s.startswith(sep, i) and not s.startswith(":=", i):
+            return s[:i], s[i + len(sep):]
+    return None
+
+
+def header_binders(text: str, decl: str) -> tuple[list[str], list[str], list[str], set[str]] | None:
+    """A declaration's binder groups read from its header: the groups a witness
+    file keeps, the variable names it assigns, the hypothesis types it must
+    satisfy, and every name the header binds. None when the header is unusual."""
+    span = proof_span(text, decl)
+    head = DECL_HEAD.match(text[span[0]:span[1]]) if span else None
+    name = DECL_NAME.match(head.group(1)) if head else None
+    if not name:
+        return None
+    groups, depth, buf = [], 0, ""
+    for ch in head.group(1)[name.end():]:
+        if depth == 0 and ch == ":":
+            break
+        if depth == 0 and not ch.isspace() and ch not in OPENERS:
+            return None
+        depth += (ch in OPENERS) - (ch in CLOSERS)
+        buf += ch
+        if depth == 0 and ch in CLOSERS:
+            groups.append(buf.strip())
+            buf = ""
+    keep, names, hyps, known = [], [], [], set()
+    for group in groups:
+        parts = split_top(group[1:-1], ":")
+        bound = parts[0].split() if parts else []
+        known.update(bound)
+        if group[0] == "(" and parts and PROP_TOKEN.search(parts[1]):
+            hyps.append(parts[1].strip())
+            continue
+        keep.append(group)
+        if group[0] == "(":
+            names.extend(bound)
+    return keep, names, hyps, known
+
+
+def context_names(goal_text: str) -> set[str]:
+    """The names Lean lists before `⊢`; a `✝` name stays in, so it never matches."""
+    head = goal_text.rsplit("⊢", 1)[0] if "⊢" in goal_text else ""
+    out: set[str] = set()
+    for line in head.split("\n"):
+        if line[:1].isspace() or line.startswith("case ") or " : " not in line:
+            continue
+        out.update(line.split(" : ", 1)[0].split())
+    return out
+
+
+def claim_of(have_statement: str) -> str:
+    """The proposition in `have h : P`; "" when there is no top-level colon."""
+    parts = split_top(have_statement, ":")
+    return parts[1].strip() if parts and parts[0].startswith("have") else ""
+
+
+def witness_file(prefix: str, keep: Sequence[str], values: dict[str, str],
+                 hyps: Sequence[str], claim: str) -> str:
+    """One `example`: at the witness values every hypothesis holds and the
+    claim fails. Only evaluation closes it, so it is a refutation if it checks."""
+    fixed = " ".join(f"(w_{n} : {n} = ({v}))" for n, v in values.items())
+    body = " ∧ ".join([f"({h})" for h in hyps] + [f"¬ ({claim})"])
+    binders = " ".join([*keep, fixed]).strip()
+    return (prefix.rstrip() + f"\n\nexample {binders} : {body} := by\n  subst_vars\n  first\n"
+            + "".join(f"  | ({t}; done)\n" for t in WITNESS_CLOSERS))
+
+
+def audit_prompt(header: str, names: Sequence[str], claim: str, definitions: str) -> str:
+    parts = [f"Theorem being proved:\n{header}"]
+    if definitions.strip():
+        parts.append(f"Definitions in scope:\n{definitions.strip()[:1500]}")
+    parts.append(f"A fact claimed inside its proof, from the hypotheses alone:\n{claim}")
+    parts.append(
+        "Is the fact a consequence of the theorem's hypotheses? If not, give one "
+        f"counterexample: a Lean term for each of {', '.join(names)} that satisfies "
+        "every hypothesis and makes the fact false, as "
+        '{"counterexample": {"' + names[0] + '": "..."}}. Use small concrete values '
+        "and check every hypothesis by hand before answering. If the fact does "
+        'follow, answer {"holds": true}.')
+    return "\n\n".join(parts)
+
+
+def read_witness(reply: str, names: Sequence[str]) -> dict[str, str] | None:
+    """The values a reply names for every variable, or None (holds/unreadable)."""
+    found = re.search(r"\{.*\}", reply, re.S)
+    try:
+        given = json.loads(found.group(0)).get("counterexample") if found else None
+    except (ValueError, AttributeError):
+        return None
+    if not isinstance(given, dict) or any(n not in given for n in names):
+        return None
+    return {n: str(given[n]).strip() for n in names}
+
+
 def tagged_closers(cocktail: Sequence[str]) -> str:
     """The cocktail as one `first`, each alternative announcing itself, so the
     check that closes the goal also says which closer did it."""
@@ -254,15 +374,21 @@ def fired_closer(messages: Sequence[Any], span: tuple[int, int],
     return cocktail[max(hits)[1]] if hits else None
 
 
+def enclosing_have(lines: Sequence[str], goal: Goal) -> tuple[int | None, re.Match | None]:
+    """The nearest shallower line above the goal, and its `have ... := by` head."""
+    i = goal.line - 1
+    above = next((j for j in range(i - 1, -1, -1) if lines[j].strip()
+                  and len(lines[j]) - len(lines[j].lstrip()) < len(goal.indent)), None)
+    return above, (HAVE_HEAD.match(lines[above]) if above is not None else None)
+
+
 def withdraw(text: str, goal: Goal) -> tuple[str, str]:
     """The file with the `have` enclosing this goal, and the rest of its block,
     cut back to one `sorry`; the withdrawn statement second. ("", "") when the
     nearest shallower line above the goal is not a `have ... := by`."""
     lines = text.split("\n")
     i = goal.line - 1
-    above = next((j for j in range(i - 1, -1, -1) if lines[j].strip()
-                  and len(lines[j]) - len(lines[j].lstrip()) < len(goal.indent)), None)
-    head = HAVE_HEAD.match(lines[above]) if above is not None else None
+    above, head = enclosing_have(lines, goal)
     if not head:
         return "", ""
     indent = head.group(1)
@@ -397,6 +523,7 @@ class BoardAgent(FrameworkAgent):
         restated: dict[str, int] = {}
         refused: set[tuple[tuple[str, str], str]] = set()
         withdrawn: dict[str, list[str]] = {}
+        audited: set[tuple[str, str]] = set()
         raised = False
         finished = False
 
@@ -583,12 +710,72 @@ class BoardAgent(FrameworkAgent):
                               "or use the fact instead of simplifying it")
             return nxt, ""
 
+        async def audit(author: str, base: Board, nxt: Board) -> str:
+            """Every `have` a step posts unproven is tried against a witness: the
+            other model names values, Lean checks that they satisfy the theorem's
+            hypotheses and break the claim. The refutation, or "" to let it in."""
+
+            other = next((m for m in models if m != author), author)
+            had = {g.key for g in base.goals}
+            lines = nxt.text.split("\n")
+            for g in nxt.goals:
+                _, head = enclosing_have(lines, g) if g.key not in had else (None, None)
+                claim = claim_of(head.group(2).strip()) if head else ""
+                if not claim or (g.decl, claim) in audited:
+                    continue
+                audited.add((g.decl, claim))
+                found = header_binders(nxt.text, g.decl)
+                span = proof_span(nxt.text, g.decl)
+                if not found or not span:
+                    continue
+                keep, names, hyps, known = found
+                # Only a context of theorem binders and `have`s is implied by the
+                # hypotheses; an intro, case split or by_contra is not, and a
+                # refutation under those would be the v7.3 mistake again.
+                known |= set(HAVE_NAME.findall(nxt.text[span[0]:span[1]]))
+                # Definitions only: a hoisted lemma's proof would be paid again.
+                roots = root_names(nxt.text)
+                first = proof_span(nxt.text, roots[0]) if roots else None
+                prefix = nxt.text[:first[0]] if first else ""
+                verdict, values = "skipped", {}
+                if context_names(g.text) <= known:
+                    verdict = "unverified"
+                    if names and can_ask():
+                        header = DECL_HEAD.match(nxt.text[span[0]:span[1]]).group(1)
+                        reply, _ = await self._call(
+                            other, audit_prompt(header, names, claim,
+                                                prefix.replace("import Mathlib", "")),
+                            AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM, think=True)
+                        values = read_witness(reply, names) or {}
+                        if not values:
+                            verdict = "holds"
+                    if not names or values:
+                        check = await services.lean.check_file(
+                            witness_file(prefix, keep, values, hyps, claim),
+                            timeout_s=CHECK_TIMEOUT_FLOOR_S)
+                        if check.accepted:
+                            verdict = "refuted"
+                events.append({"kind": "audit", "by": other, "have": claim[:100],
+                               "verdict": verdict, "values": values})
+                if verdict == "refuted":
+                    withdrawn.setdefault(g.decl, []).append(claim)
+                    at = ", ".join(f"{n} = {v}" for n, v in values.items()) or "no variables"
+                    return (f"`{head.group(2).strip()}` is false, so it was not posted: "
+                            f"with {at} every hypothesis of `{g.decl}` holds and the "
+                            "statement fails (Lean checked this). Do not restate it; "
+                            "state a fact that is true at those values too")
+            return ""
+
         async def advance(base: Board, goal: Goal, block: str,
                           author: str) -> tuple[Board | None, str]:
             """A step, then its prefixes, then `exact?` in place of a bad proof."""
 
             nonlocal raised
             nxt, why = await judge(base, goal, block)
+            if nxt is not None:
+                bad = await audit(author, base, nxt)
+                if bad:
+                    return None, bad
             if nxt is None and why not in (BUDGET_RETRY, TIMED_OUT):
                 # The first error's line says where to cut; one check instead of
                 # eight. Measured: 3.7 checks per model call, most of them here.
