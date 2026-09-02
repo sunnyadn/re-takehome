@@ -50,7 +50,8 @@ class BoardLean:
                 hyps = "".join(f"{h} : P\n" for h in haves)
                 above = source.split("\n")[i - 2].strip() if i > 1 else ""
                 target = (above.split(":", 1)[1].split(":=")[0].strip()
-                          if above.startswith("have ") and above.endswith(":= by") else decl)
+                          if above.startswith("have ") and above.endswith(":= by")
+                          else "False" if above == "exfalso" else decl)
                 messages.append({"severity": "error", "pos": {"line": i - 2},
                                  "endPos": {"line": i - 1},
                                  "data": f"unsolved goals\n{hyps}⊢ {target}"})
@@ -631,8 +632,10 @@ class WitnessLean(BoardLean):
                 depth = len(line) - len(line.lstrip())
                 above = next((l for l in reversed(lines[:i - 1])
                               if l.strip() and len(l) - len(l.lstrip()) < depth), "")
+                prev = lines[i - 2].strip() if i > 1 else ""
                 claim = (above.split(":", 1)[1].split(":=")[0].strip()
                          if above.strip().startswith("have") else
+                         "False" if prev == "exfalso" else
                          target if above.strip().startswith("theorem") else "True")
                 messages.append({"severity": "info", "pos": {"line": i - 1},
                                  "data": f"theorem extracted_1 {binders} : {claim} := sorry"})
@@ -932,5 +935,34 @@ def test_a_graded_theorems_residual_goal_is_not_audited_as_a_statement():
         FakeServices(lean, llm)))
     audits = [e for e in result.metadata["events"] if e.get("kind") == "audit"]
     assert [a["goal"] for a in audits] == ["x < 5"]
+    assert result.metadata["accepted_by_repl"] is True
+
+
+class DeadEndLean(WitnessLean):
+    """Only the witness against `False` passes: the context is satisfiable."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "(w_" in source:
+            self.sources.append(source)
+            return LeanCheck("¬ (False)" in source, [], False, False, 1)
+        return await super().check_file(source, timeout_s)
+
+
+def test_a_false_goal_in_a_satisfiable_context_is_refused():
+    # Measured on p09 (gate32 run 1): a wrong case split left `h : n % 3 = 1`,
+    # `h_mod : 2 ^ n % 7 = 2`, `¬7 ∣ 2 ^ n - 1 ⊢ False`, satisfiable at n = 1;
+    # both models spent the rest of the run trying to prove it.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = DeadEndLean(), ScriptLLM({
+        "model-a": ["have h1 : x < 1 := by\n  omega\nexfalso\nsorry",
+                    '{"counterexample": {"x": "0"}}', '{"counterexample": {"x": "0"}}',
+                    "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    assert any(e.get("kind") == "audit" and e.get("verdict") == "refuted"
+               and e.get("goal") == "False" for e in result.metadata["events"])
+    assert "exfalso" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
 

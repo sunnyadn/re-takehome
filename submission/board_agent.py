@@ -1059,8 +1059,15 @@ class BoardAgent(FrameworkAgent):
                                  "what": head.group(2).strip(), "claim": claim})
             covered = {s["at"] for s in subjects}
             for g in nxt.goals:
+                # A goal whose target is `False` is provable only if its context
+                # is inconsistent, so a witness for the context alone proves the
+                # branch dead. Measured on p09 (gate32 run 1): `n % 3 = 1`,
+                # `2 ^ n % 7 = 2`, `¬7 ∣ 2 ^ n - 1 ⊢ False`, satisfiable at n = 1,
+                # held both models for the rest of the run.
+                dead_end = target_of(g.text) == "False"
                 if (g.key in had or not g.text or META.search(target_of(g.text))
-                        or not is_stated(lines, g) or enclosing_have(lines, g)[0] in covered):
+                        or not (dead_end or is_stated(lines, g))
+                        or enclosing_have(lines, g)[0] in covered):
                     continue
                 subjects.append({"key": g.key, "decl": g.decl, "goal": g, "what": "",
                                  "claim": ""})
