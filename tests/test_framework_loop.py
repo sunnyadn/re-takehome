@@ -1026,3 +1026,14 @@ def test_a_file_that_is_too_expensive_is_rolled_back_like_a_broken_one():
     repairs = [e for e in result.metadata["events"] if e.get("stage") == "repair"]
     assert repairs and repairs[0]["why"] == "cost"
     assert "costly" not in result.solution
+
+def test_a_reply_that_opens_with_by_keeps_its_block_shape():
+    # Measured on p09: 13 of gpt-oss's 34 replies opened with a lone `by`, and
+    # each came out with its first line dedented and the rest not, which Lean
+    # read as `unexpected token 'have'; expected command`.
+    from submission.framework_agent import screen_step
+    bare = "by\n  intro h\n  have x : True := by\n    trivial\n  exact x"
+    want = "intro h\nhave x : True := by\n  trivial\nexact x"
+    assert screen_step(bare) == want
+    assert screen_step("```lean\n" + bare + "\n```") == want
+    assert screen_step("Sure.\n\n" + bare) == want

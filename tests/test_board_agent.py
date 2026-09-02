@@ -47,7 +47,7 @@ class BoardLean:
                              for h in haves) if haves else False
                 if closed:
                     continue
-                hyps = "".join(f"{h} : True\n" for h in haves)
+                hyps = "".join(f"{h} : P\n" for h in haves)
                 messages.append({"severity": "error", "pos": {"line": i - 2},
                                  "endPos": {"line": i - 1},
                                  "data": f"unsolved goals\n{hyps}⊢ {decl}"})
@@ -99,7 +99,7 @@ def test_the_board_reads_one_goal_per_placeholder_with_its_own_context():
     board = read_board(text, check.messages, check.accepted)
     assert [g.decl for g in board.goals] == ["demo", "demo", "demo_b"]
     assert [g.line for g in board.goals] == [5, 6, 9]
-    assert board.goals[1].text == "k : True\n⊢ demo" and board.goals[2].text == "⊢ demo_b"
+    assert board.goals[1].text == "k : P\n⊢ demo" and board.goals[2].text == "⊢ demo_b"
 
 
 def test_a_reply_is_read_as_proofs_of_what_it_names():
@@ -201,6 +201,49 @@ def test_with_one_goal_left_the_fast_model_is_not_idled_by_the_slow_one():
     # anyway, and the slow reply found its goal gone.
     assert {e["by"] for e in steps(result) if e["accepted"]} == {"model-a"}
     assert {"kind": "stale", "by": "model-b"} in result.metadata["events"]
+
+
+def test_feedback_names_this_step_s_error_and_not_the_other_open_goals():
+    # Measured on p09: with every goal rendered, the first "error" a model was
+    # shown for its rejected step was the other worker's open goal.
+    result, lean, llm, _ = run(TWO, {
+        "model-a": ["no", "linarith", "have key : True := by trivial", "exact key"],
+        "model-b": ["no", "have key : True := by trivial", "exact key"],
+    })
+    told = [p for m, p in llm.calls if m == "model-a" and "rejected" in p]
+    assert told, "the rejection was never fed back"
+    assert "linarith failed" in told[0]
+    assert "⊢ demo_b" not in told[0].split("Lean said")[1]
+
+
+def test_a_hoisted_lemma_goes_below_the_lemmas_already_there():
+    # Measured on p09: a second hoist went above the first and cited it,
+    # `Unknown identifier` twice in one run.
+    from submission.framework import insert_above
+    text = ("import Mathlib\n\ntheorem first_fact : True := by\n  trivial\n\n"
+            "/-- doc -/\ntheorem demo : True := by\n  sorry\n")
+    out = insert_above(text, "demo", "lemma second : True := by\n  sorry")
+    assert out.index("first_fact") < out.index("lemma second") < out.index("/-- doc -/")
+
+
+def test_a_step_that_empties_a_hypothesis_is_refused():
+    # Measured on p09: `simp ... at h ⊢` left `h : True ⊢ False`, no error, and
+    # five turns followed on a goal that could not be closed.
+    class EmptyingLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            check = await super().check_file(source)
+            if "simp at h" in source:
+                msgs = [dict(m, data=m["data"].replace("⊢ demo", "h : True\n⊢ False"))
+                        if "unsolved" in str(m.get("data")) else m for m in check.messages]
+                return LeanCheck(check.accepted, msgs, check.has_sorry, False, 1)
+            return check
+    lean, llm = EmptyingLean(), ScriptLLM({"model-a": ["simp at h", "have key : True := by trivial", "exact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert steps(result)[0]["accepted"] is False
+    assert any("throws the fact away" in p for _, p in llm.calls)
+    assert result.metadata["accepted_by_repl"] is True
 
 
 def test_the_graded_entry_point_can_be_the_board():

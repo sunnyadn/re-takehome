@@ -12,7 +12,7 @@ from typing import Any, Sequence
 # `first` takes the first alternative that does not fail, and `norm_num` can
 # succeed by rewriting without closing; `done` turns that into a failure so the
 # block keeps searching. Never emit an alternative without it.
-from submission.agent import COCKTAIL, PROOF_DECL, wrap_tactic
+from submission.agent import DECL_START, COCKTAIL, PROOF_DECL, wrap_tactic
 
 # A placeholder is a whole line. A term-position `:= sorry` (an answer slot) is
 # not one, and `skip` would not typecheck there anyway.
@@ -501,6 +501,24 @@ def proof_body(block: str, name: str) -> str:
         return body
     head = DECL_HEAD.match(block)
     return reindent(block[head.end():], "") if head else block
+
+
+def insert_above(text: str, name: str, block: str) -> str:
+    """The block just above `name`'s declaration and its doc comment, so it sees
+    every lemma already in the file. `insert_preamble` put a hoisted lemma above
+    the lemma it cited: `Unknown identifier` twice in one p09 run."""
+
+    found = next((m for m in PROOF_HEAD.finditer(text) if m.group(2) == name), None)
+    if found is None:
+        return insert_preamble(text, block)
+    at = text.rfind("\n", 0, found.start(1)) + 1
+    while at > 0:
+        prev_start = text.rfind("\n", 0, at - 1) + 1
+        prev = text[prev_start:at - 1]
+        if not prev.strip() or DECL_START.match(prev):
+            break
+        at = prev_start
+    return text[:at] + block.rstrip() + "\n\n" + text[at:]
 
 
 def enclosing_name(text: str, index: int = 0) -> str:

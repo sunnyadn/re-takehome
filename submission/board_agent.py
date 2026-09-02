@@ -41,6 +41,7 @@ from submission.framework import (
     graded_theorems,
     hand_to_search,
     in_span,
+    insert_above,
     insert_preamble,
     is_done,
     line_of,
@@ -61,6 +62,7 @@ from submission.framework import (
     unreachable,
 )
 from submission.framework_agent import (
+    VACUOUS,
     BUDGET_RETRY,
     FILE_CHARS,
     GOAL_CHARS,
@@ -216,6 +218,7 @@ class BoardAgent(FrameworkAgent):
         names = answer_names(problem.challenge)
         graded = declared_names(problem.challenge)
         text = normalise_imports(problem.challenge, problem.challenge)
+        first_graded = next(iter(root_names(text)), "")
         best = text
         events: list[dict[str, Any]] = []
         models = list(cfg.lines)
@@ -327,7 +330,11 @@ class BoardAgent(FrameworkAgent):
             if expensive and not failures:
                 return None, BUDGET_RETRY
             if failures or expensive:
-                text = format_messages(nxt.messages)[:FEEDBACK_CHARS]
+                # Every other open goal is an `unsolved goals` error too; the
+                # model is told about its own step, not the rest of the board.
+                own = [m for m in nxt.messages
+                       if m in failures or m in expensive or in_span(m, span)]
+                text = format_messages(own)[:FEEDBACK_CHARS]
                 return None, f"{text}\n{notes_for(text)}".strip()
             if unreachable(nxt.messages, nxt.text, -1):
                 return None, ("that step left a goal open inside a branch nothing "
@@ -339,6 +346,12 @@ class BoardAgent(FrameworkAgent):
             left = [g for g in nxt.goals if span[0] <= g.line <= span[1]]
             if left and all(g.text == goal.text for g in left):
                 return None, "that step left the goal exactly as it was"
+            if any(len(VACUOUS.findall(g.text)) > len(VACUOUS.findall(goal.text)) for g in left):
+                # Measured on p09: `simp ... at h ⊢` left `h : True ⊢ False`, Lean
+                # had no complaint, and five turns went into a goal that was dead.
+                return None, ("that step turned a hypothesis into `True` (or `Type`), "
+                              "which throws the fact away; rewrite without `at h`, "
+                              "or use the fact instead of simplifying it")
             return nxt, ""
 
         async def advance(base: Board, goal: Goal, block: str,
@@ -417,7 +430,7 @@ class BoardAgent(FrameworkAgent):
                     took = True
                     continue
                 if edit.kind == "hoist":
-                    lifted = await look(insert_preamble(board.text, edit.block))
+                    lifted = await look(insert_above(board.text, first_graded, edit.block))
                     kept = not classify(lifted.messages)[3]
                     events.append({"kind": "lemma", "by": author, "name": edit.name,
                                    "accepted": kept})

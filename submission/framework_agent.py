@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import textwrap
 import time
 from dataclasses import dataclass, field
 from typing import Any, Sequence
@@ -292,7 +293,7 @@ class State:
     goals: int = 0
 
 
-VACUOUS = re.compile(r"^\S[^:]*:\s*True\s*$", re.M)
+VACUOUS = re.compile(r"^\S[^:]*:\s*(?:True|Type)\s*$", re.M)
 
 
 def emptied(before: State, after: State) -> bool:
@@ -1239,7 +1240,7 @@ def lean_lines(text: str) -> str:
             current = []
     runs.append(current)
     best = max(runs, key=lambda r: len([l for l in r if l.strip()]), default=[])
-    return "\n".join(best).strip()
+    return textwrap.dedent("\n".join(best)).strip()
 
 
 def screen_step(reply: str) -> str:
@@ -1247,7 +1248,14 @@ def screen_step(reply: str) -> str:
 
     blocks = [b for b in FENCED.findall(reply) if b.strip()]
     raw = strip_fences(blocks[-1] if blocks else reply)
-    block = normalise_steps(lean_lines(raw) if not blocks else raw).strip()
+    block = normalise_steps(lean_lines(raw) if not blocks else raw)
+    # A lone `by` on the first line is the model framing its block, not a step.
+    # Measured on p09: `strip()` dedented only the first line after it, and 13
+    # of one model's 34 replies reached Lean as `unexpected token 'have'`.
+    lines = block.split("\n")
+    if lines and lines[0].strip() == "by":
+        lines = lines[1:]
+    block = textwrap.dedent("\n".join(lines)).strip()
     if not block or STEP_BAN.search(block):
         return ""
     # A `sorry` is a placeholder for a goal that gets its own turn: a branch of
