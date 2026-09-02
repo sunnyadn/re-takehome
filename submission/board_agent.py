@@ -130,6 +130,11 @@ class Board:
         return next((g for g in self.goals if g.key == key), None)
 
     def index(self, goal: Goal) -> int:
+        """Where a goal sits among the placeholders, by content first: a goal
+        object from an earlier board keeps its old line number."""
+        keys = [g.key for g in self.goals]
+        if goal.key in keys:
+            return keys.index(goal.key)
         return [g.line for g in self.goals].index(goal.line)
 
 
@@ -598,12 +603,38 @@ class BoardAgent(FrameworkAgent):
 
         async def worker(model: str) -> None:
             nonlocal finished
-            idle = 0
+            idle, faults = 0, 0
             while time_left() > 0 and can_ask() and not finished:
+                try:
+                    if await turn(model):
+                        idle = 0
+                    else:
+                        idle += 1
+                        if idle > 3 and not claimed:
+                            events.append({"stage": "stop", "note": "no goal left to work on"})
+                            return
+                        try:
+                            await asyncio.wait_for(changed.wait(), IDLE_WAIT_S)
+                        except asyncio.TimeoutError:
+                            pass
+                except (BudgetExceeded, BudgetAccountingError, LeanRuntimeError, LLMCallError):
+                    raise
+                except Exception as exc:  # noqa: BLE001 - one bad turn must not zero the problem
+                    faults += 1
+                    events.append({"stage": "worker_error", "by": model,
+                                   "error": f"{type(exc).__name__}: {exc}"[:200]})
+                    if faults >= 3:
+                        return
+
+        async def turn(model: str) -> bool:
+            """One turn for one worker: False when there was no goal to take."""
+
+            nonlocal finished
+            if True:
                 async with lock:
                     if any(b.accepted and is_done(b.text) for b in branches):
                         finished = True
-                        return
+                        return True
                     picked = pick(model)
                     goal = picked[1] if picked else None
                     if picked:
@@ -612,7 +643,7 @@ class BoardAgent(FrameworkAgent):
                     if goal is not None and goal.key not in swept:
                         swept.add(goal.key)
                         if await sweep(goal):
-                            continue
+                            return True
                     if goal is None:
                         if not claimed and board.goals and all(
                                 tries.get(g.key, 0) >= LAST_IN_LINE for g in board.goals):
@@ -631,24 +662,17 @@ class BoardAgent(FrameworkAgent):
                         plans[goal.key] = plan
                         events.append({"kind": "plan", "by": other, "chars": len(plan)})
                         now = live(base.bid)
-                        if now:
+                        moved = now.find(goal.key) if now else None
+                        if moved:
                             focus(now)
-                        ask = prompt_for(goal, model) if now and now.find(goal.key) else ""
+                            goal = moved
+                        ask = prompt_for(goal, model) if moved else ""
                     if not ask:
                         async with lock:
                             claimed.pop(goal.key, None)
-                        continue
+                        return True
                 if goal is None:
-                    idle += 1
-                    if idle > 3 and not claimed:
-                        events.append({"stage": "stop", "note": "no goal left to work on"})
-                        return
-                    try:
-                        await asyncio.wait_for(changed.wait(), IDLE_WAIT_S)
-                    except asyncio.TimeoutError:
-                        pass
-                    continue
-                idle = 0
+                    return False
                 task = asyncio.ensure_future(
                     self._call(model, ask, STEP_TOKENS, services, ledger))
                 loose.append(task)
@@ -664,7 +688,7 @@ class BoardAgent(FrameworkAgent):
                         said[goal.key] = Feedback(model, said[goal.key].text
                                                   if goal.key in said else "nothing yet", "cut")
                         tries[goal.key] = tries.get(goal.key, 0) + 1
-                        continue
+                        return True
                     now = live(base.bid)
                     here = now.find(goal.key) if now else None
                     if here is not None:
@@ -691,18 +715,19 @@ class BoardAgent(FrameworkAgent):
                             if live(fork.bid):
                                 branches.remove(live(fork.bid))
                             events.append({"kind": "stale", "by": model})
-                        continue
+                        return True
                     if here is None:
                         events.append({"kind": "stale", "by": model})
-                        continue
+                        return True
                     edits = interpret(reply, board, here, graded)
                     if not edits:
                         events.append({"kind": "empty", "by": model})
                         said[goal.key] = Feedback(model, said[goal.key].text
                                                   if goal.key in said else "nothing yet", "empty")
                         tries[goal.key] = tries.get(goal.key, 0) + 1
-                        continue
+                        return True
                     await apply(model, here, edits)
+                return True
 
         try:
             cocktail = await usable_cocktail(services)

@@ -320,6 +320,15 @@ def test_both_models_shared_facts_are_kept_when_they_differ():
     assert "theorem fact_a" in first and "theorem fact_b" in first
 
 
+def test_a_goal_object_from_an_older_board_is_found_by_content():
+    # Measured on p09 (v5 run): the plan is asked outside the lock, the other
+    # worker shifted the file meanwhile, and the old goal object's line was
+    # gone; `Board.index` raised ValueError and the problem scored harness_error.
+    old = Goal(16, "  ", "demo", "⊢ demo")
+    moved = Board(TWO, [Goal(4, "  ", "demo_b", "⊢ demo_b"), Goal(19, "  ", "demo", "⊢ demo")])
+    assert moved.index(old) == 1
+
+
 def test_the_graded_entry_point_can_be_the_board():
     from submission.board_agent import create_agent
     assert isinstance(create_agent(), BoardAgent)
