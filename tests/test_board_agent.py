@@ -189,6 +189,20 @@ def test_restating_a_closed_declaration_pushes_feedback_and_counts():
     assert any("already declared" in p for _, p in llm.calls)
 
 
+def test_with_one_goal_left_the_fast_model_is_not_idled_by_the_slow_one():
+    # Measured on p09: one open goal, held by a model whose reply took 158s,
+    # and the other model waited. Both work it; whoever lands first wins.
+    result, lean, llm, wall = run(ONE, {
+        "model-a": ["have key : True := by trivial", "exact key"],
+        "model-b": ["have slow : True := by trivial"],
+    }, delay={"model-b": 0.8}, lines=("model-b", "model-a"))
+    assert result.metadata["accepted_by_repl"] is True
+    # The slow model claimed the only goal first; the fast one finished it
+    # anyway, and the slow reply found its goal gone.
+    assert {e["by"] for e in steps(result) if e["accepted"]} == {"model-a"}
+    assert {"kind": "stale", "by": "model-b"} in result.metadata["events"]
+
+
 def test_the_graded_entry_point_can_be_the_board():
     from submission.board_agent import create_agent
     assert isinstance(create_agent(), BoardAgent)

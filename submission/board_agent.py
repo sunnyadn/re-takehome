@@ -463,9 +463,13 @@ class BoardAgent(FrameworkAgent):
             return took
 
         def pick(model: str) -> Goal | None:
-            """The least-tried unclaimed goal, in file order among equals."""
+            """The least-tried unclaimed goal, in file order among equals; with
+            none unclaimed, one the other model holds, so a 158s reply does not
+            idle the fast model. Measured on p09: 4 minutes of 20 went that way."""
 
             free = [g for g in board.goals if g.key not in claimed and g.text]
+            if not free:
+                free = [g for g in board.goals if g.text and claimed.get(g.key) != model]
             if not free:
                 return None
             return min(free, key=lambda g: (tries.get(g.key, 0) >= LAST_IN_LINE,
@@ -517,7 +521,7 @@ class BoardAgent(FrameworkAgent):
                                 tries.get(g.key, 0) >= LAST_IN_LINE for g in board.goals):
                             await unstick()
                     else:
-                        claimed[goal.key] = model
+                        claimed.setdefault(goal.key, model)
                         wants_plan = (tries.get(goal.key, 0) >= PLAN_AFTER
                                       and not plans.get(goal.key))
                         ask = prompt_for(goal, model)
@@ -553,7 +557,8 @@ class BoardAgent(FrameworkAgent):
                 finally:
                     loose.remove(task)
                 async with lock:
-                    claimed.pop(goal.key, None)
+                    if claimed.get(goal.key) == model:
+                        claimed.pop(goal.key, None)
                     if why == "length":
                         events.append({"kind": "cut", "by": model})
                         said[goal.key] = Feedback(model, said[goal.key].text
