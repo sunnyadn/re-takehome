@@ -863,3 +863,14 @@ def test_a_withdrawn_claim_blocks_only_a_have_that_states_it_again():
     assert not restates("have h2 : 2 ^ (n % 3) % 7 = 1 → n % 3 = 0 := by\n  omega", ["n % 3 = 0"])
     assert not restates("exact (by omega : n % 3 = 0)", ["n % 3 = 0"])
 
+
+def test_the_slow_model_is_asked_for_steps_under_the_read_timeout_budget():
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    result, lean, llm, _ = run(challenge, {
+        "model-a": ["have key : True := by trivial\nexact key"],
+        "qwen-b": ["have key : True := by trivial\nexact key"]}, lines=("model-a", "qwen-b"))
+    steps = [k for k, s in zip(llm.kwargs, llm.systems) if "goal on the board" in s]
+    assert {k["max_tokens"] for k in steps if k["model"] == "model-a"} <= {4000}
+    assert {k["max_tokens"] for k in steps if k["model"] == "qwen-b"} <= {6000}
+    assert steps
+

@@ -275,6 +275,17 @@ def narrates(model: str) -> bool:
     return any(n in model for n in NARRATES)
 
 
+# Measured over 808 gpt-oss step replies at 6000 tokens: p95 146–182 s, 65 past
+# 120 s, and 2 ReadTimeouts at 181 s in the archive, each of which closes the
+# problem's ledger. At the slow rate seen (~30 tok/s) 6000 tokens cannot finish
+# inside the harness's 180 s read timeout; 4000 can. qwen never passed 60 s.
+SLOW_STEP_TOKENS = 4000
+
+
+def step_tokens(model: str) -> int:
+    return STEP_TOKENS if narrates(model) else SLOW_STEP_TOKENS
+
+
 def extract_file(text: str, goals: Sequence[Goal]) -> str:
     """The file with these goals' placeholders asking Lean to state them."""
     lines = render_all(text).split("\n")
@@ -1438,7 +1449,7 @@ class BoardAgent(FrameworkAgent):
                 if goal is None:
                     return False
                 task = asyncio.ensure_future(
-                    self._call(model, ask, STEP_TOKENS, services, ledger, system=BOARD_SYSTEM))
+                    self._call(model, ask, step_tokens(model), services, ledger, system=BOARD_SYSTEM))
                 loose.append(task)
                 try:
                     reply, why = await task
