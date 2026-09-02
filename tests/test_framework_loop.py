@@ -307,6 +307,16 @@ def test_a_shared_fact_can_be_stated_as_its_own_lemma():
     assert result.solution.index(lemma) < result.solution.index("theorem demo")
 
 
+def test_a_restated_theorem_whose_statement_wraps_is_still_only_its_body():
+    # Measured on p09: the hoisted lemma's statement was long enough to wrap,
+    # the header stopped being recognised as the model's own, and the whole
+    # re-declaration went to Lean as new for 481 turns.
+    result, _, _, _ = run(["have key : True := by trivial",
+                           "theorem demo :\n    True := by\n  exact key"])
+    assert result.metadata["accepted_by_repl"] is True
+    assert "theorem demo :\n    True" not in result.solution
+
+
 def test_the_graded_theorem_cannot_be_restated_as_a_lemma():
     result, _, llm, _ = run(["theorem demo : True := by trivial"] * 30)
     assert result.metadata["accepted_by_repl"] is False

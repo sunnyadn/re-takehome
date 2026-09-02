@@ -408,11 +408,13 @@ def unwrap_own(block: str, names: Sequence[str]) -> str:
     """A block that restates the graded theorem is its body, wrongly framed.
 
     Measured on p09: with reasoning off the writer opens with the theorem header
-    and, told the name is taken, opens with the same line minus `theorem`."""
+    and, told the name is taken, opens with the same line minus `theorem`. A
+    statement long enough to wrap kept its header off this path, and the whole
+    re-declaration went to Lean as new: 481 turns of one run were that."""
 
     for name in names:
         head = re.compile(rf"\A\s*(?:private\s+)?(?:theorem|lemma)?\s*{re.escape(name)}\b"
-                          r"[^\n]*?:=\s*by[ \t]*\n")
+                          r"[\s\S]*?:=\s*by[ \t]*\n")
         found = head.match(block)
         if found:
             return reindent(block[found.end():], "")

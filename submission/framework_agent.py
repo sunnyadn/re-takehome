@@ -386,6 +386,19 @@ class FrameworkAgent:
             anchor_goal, anchor_text = moved.goal, moved.text
             return moved
 
+        async def refuse(state: State, why: str) -> State:
+            """Count a declaration the file would not take, and move on at the cap.
+
+            Rejections here returned to the top of the loop without touching
+            either counter, so nothing swapped the model and nothing ended the
+            goal: one p09 run asked the same model 481 times."""
+
+            nonlocal stalls, stuck
+            stalls, stuck = stalls + 1, stuck + 1
+            if stuck < STUCK_LIMIT:
+                return state
+            return await backtrack(state)
+
         async def backtrack(state: State) -> State:
             """Leave a goal nothing works on: sideways if there is another,
             backwards if there is not.
@@ -571,7 +584,26 @@ class FrameworkAgent:
                             break
                         continue
                     named = declaration_name(block)
-                    if named and named not in declared_names(problem.challenge):
+                    if named and named in declared_names(problem.challenge):
+                        feedback = Feedback(author, "that name is the problem's own; "
+                                            "prove it where it stands", "rejected")
+                        state = await refuse(state, "own name")
+                        continue
+                    if named and named in declared_names(state.text):
+                        # A name was only ever checked against the challenge, so
+                        # the theorem this agent hoisted itself read as new and
+                        # Lean refused the second copy. One p09 run spent 481 of
+                        # its 481 turns re-declaring `pow_two_mod_seven`.
+                        events.append({"kind": "lemma", "by": author, "name": named,
+                                       "accepted": False, "why": "declared"})
+                        feedback = Feedback(
+                            author, f"`{named}` is already in the file. Do not "
+                            "declare it again. If the goal at the cursor is its "
+                            "own statement, prove it with tactic lines; otherwise "
+                            "cite it by name.", "rejected")
+                        state = await refuse(state, "re-declared")
+                        continue
+                    if named:
                         nxt = await self._look(
                             insert_preamble(state.text, block), services)
                         kept = not classify(nxt.messages)[3]
@@ -588,12 +620,7 @@ class FrameworkAgent:
                         else:
                             feedback = Feedback(
                                 author, format_messages(nxt.messages)[:FEEDBACK_CHARS])
-                            stuck += 1
-                        continue
-                    if named:
-                        feedback = Feedback(author, "that name is the problem's own; "
-                                            "prove it where it stands", "rejected")
-                        stuck += 1
+                            state = await refuse(state, "lemma")
                         continue
                     if is_probe(block):
                         printed = await self._probe(state, block, services)
