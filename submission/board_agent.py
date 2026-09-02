@@ -90,6 +90,12 @@ LAST_IN_LINE = 6
 MAX_RESTATES = 2
 # A worker with no goal to take waits this long for the board to change.
 IDLE_WAIT_S = 2.0
+# A step that makes the file slower to check by this much is refused as too
+# expensive even when Lean raises no budget error: every later check pays it,
+# and the comparator allows 180s. Measured on p09: one accepted step took the
+# check from 1s to 38s, and the run then lost 5 minutes to a 120s timeout and
+# the container restart that follows it.
+SLOW_STEP_MS = 10_000
 # Live branches: alternative proof files racing on the same problem. A second
 # accepted answer to a goal one model already moved becomes a sibling branch
 # rather than a stale reply. Measured on p09: the run was decided by one such
@@ -120,6 +126,7 @@ class Board:
     messages: list[dict[str, Any]] = field(default_factory=list)
     accepted: bool = False
     bid: int = 0
+    ms: int = 0
 
     @property
     def score(self) -> tuple[int, int]:
@@ -334,7 +341,9 @@ class BoardAgent(FrameworkAgent):
 
         async def look(candidate: str) -> Board:
             check = await services.lean.check_file(render_all(candidate))
-            return read_board(candidate, check.messages, check.accepted)
+            found = read_board(candidate, check.messages, check.accepted)
+            found.ms = check.duration_ms
+            return found
 
         async def commit(candidate: Board) -> None:
             """Make a board current, after its own housekeeping."""
@@ -395,6 +404,12 @@ class BoardAgent(FrameworkAgent):
             _, surplus, expensive, failures = classify(nxt.messages)
             if expensive and not failures:
                 return None, BUDGET_RETRY
+            if not failures and nxt.ms - base.ms > SLOW_STEP_MS:
+                events.append({"stage": "slow", "ms": nxt.ms, "was": base.ms})
+                return None, (f"that step makes the file take {nxt.ms // 1000}s to "
+                              f"check, up from {base.ms // 1000}s; every later step "
+                              "pays that. Use a cheaper tactic: a targeted rw or "
+                              "exact, not simp with a wide lemma set or decide")
             if failures or expensive:
                 # Every other open goal is an `unsolved goals` error too; the
                 # model is told about its own step, not the rest of the board.

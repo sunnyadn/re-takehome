@@ -329,6 +329,24 @@ def test_a_goal_object_from_an_older_board_is_found_by_content():
     assert moved.index(old) == 1
 
 
+def test_a_step_that_makes_every_check_slow_is_refused():
+    # Measured on p09: one accepted step took the check from 1s to 38s, Lean
+    # raised no budget error, and the run lost 5 minutes to the timeout and
+    # container restart that followed.
+    class SlowLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            check = await super().check_file(source)
+            ms = 25_000 if "heavy_tactic" in source else 900
+            return LeanCheck(check.accepted, check.messages, check.has_sorry, False, ms)
+    lean = SlowLean()
+    llm = ScriptLLM({"model-a": ["have key : P := by heavy_tactic", "have key : P := by trivial", "exact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert {"stage": "slow", "ms": 25000, "was": 900} in result.metadata["events"]
+    assert "heavy_tactic" not in result.solution and result.metadata["accepted_by_repl"] is True
+
+
 def test_the_graded_entry_point_can_be_the_board():
     from submission.board_agent import create_agent
     assert isinstance(create_agent(), BoardAgent)
