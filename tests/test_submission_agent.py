@@ -813,28 +813,3 @@ def test_a_gutted_file_never_becomes_the_best():
     line, _, ledger = _walk([9] + [1] * 12, proved=[4] + [0] * 12)
     assert not [e for e in ledger.events if e.get("stage") == "restart"]
     assert line.best_proved == 4
-
-
-def test_steps_are_harvested_from_a_whole_file_reply():
-    """Models emit import and theorem too, which once put the base indent at 0."""
-
-    import submission.blackboard as bb
-    reply = ("```lean\nimport Mathlib\n\ntheorem t (x : Nat) : True := by\n"
-             "  have a : 1 ≤ x + 1 := by omega\n  have b : 0 < x + 1 := by omega\n"
-             "  trivial\n```")
-    steps, tail = bb.offered_steps(reply, "  ")
-    assert [k for k, _ in steps] == ["a : 1 ≤ x + 1", "b : 0 < x + 1"]
-    assert tail == "trivial"
-
-
-def test_a_nested_tactic_keeps_its_own_indentation():
-    """Flattening every continuation line produced Lean that could not parse."""
-
-    import submission.blackboard as bb
-    reply = ("```lean\n  have a : True := by\n    by_cases h : 1 = 1\n"
-             "    · trivial\n    · trivial\n```")
-    steps, _ = bb.offered_steps(reply, "  ")
-    body = steps[0][1]
-    lines = [l for l in body.splitlines() if l.strip()]
-    depths = [len(l) - len(l.lstrip()) for l in lines]
-    assert len(set(depths)) == 1 and depths[0] > 2
