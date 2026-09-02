@@ -96,6 +96,12 @@ IDLE_WAIT_S = 2.0
 # check from 1s to 38s, and the run then lost 5 minutes to a 120s timeout and
 # the container restart that follows it.
 SLOW_STEP_MS = 10_000
+# A goal rejected this often is probed once: if its negation follows from the
+# context by decide/omega/norm_num, the goal is false, the step that made it
+# was wrong, and the branch goes back to before that step. Measured on
+# rmo_2001_2: `h₁ : p = 11 ⊢ p = 1` took five turns of the slow model in a row.
+REFUTE_AFTER = 2
+MAX_REFUTATIONS = 6
 # Live branches: alternative proof files racing on the same problem. A second
 # accepted answer to a goal one model already moved becomes a sibling branch
 # rather than a stale reply. Measured on p09: the run was decided by one such
@@ -280,6 +286,9 @@ class BoardAgent(FrameworkAgent):
         divided: set[tuple[str, str]] = set()
         restated: dict[str, int] = {}
         refused: set[tuple[tuple[str, str], str]] = set()
+        origin: dict[tuple[str, str], str] = {}
+        probed: set[tuple[str, str]] = set()
+        refutations = 0
         raised = False
         finished = False
 
@@ -350,8 +359,13 @@ class BoardAgent(FrameworkAgent):
 
             nonlocal board
             bid = board.bid
+            before = board
             fresh = await settle(candidate)
             fresh.bid = bid
+            had = {g.key for g in before.goals}
+            for g in fresh.goals:
+                if g.key not in had:
+                    origin.setdefault(g.key, before.text)
             _, _, dear, broken = classify(fresh.messages)
             if broken or dear:
                 if fresh.text != sound.get(bid, ""):
@@ -600,6 +614,43 @@ class BoardAgent(FrameworkAgent):
                            "tries": tries.get(worst.key, 0)})
             await commit(await look(fresh_text))
 
+        async def refuted(goal: Goal) -> bool:
+            """One check: does the negation of the goal follow from its context?"""
+
+            target = goal.text.rsplit("⊢", 1)[-1].strip().replace("\n", " ")
+            if not target:
+                return False
+            probe = (f"have refuted : ¬ ({target}) := by\n"
+                     f"  first | decide | omega | norm_num | simp_all")
+            candidate, span = put(board.text, goal, probe)
+            check = await services.lean.check_file(render_all(candidate))
+            # Measured: a goal that stands leaves `unsolved goals` on the have,
+            # which classify files under progress. Any error in the span is a no.
+            bad = [m for m in check.messages
+                   if isinstance(m, dict) and m.get("severity") == "error" and in_span(m, span)]
+            return not bad and not check.timed_out
+
+        async def retreat(goal: Goal) -> bool:
+            """A false goal sends the branch back to before the step that made it,
+            and that step's author is told what the goal was."""
+
+            nonlocal refutations
+            back = origin.get(goal.key)
+            if back is None or refutations >= MAX_REFUTATIONS:
+                return False
+            refutations += 1
+            was = {g.key for g in board.goals}
+            events.append({"stage": "refuted", "goal": goal.text[-80:], "bid": board.bid})
+            await commit(await look(back))
+            for g in board.goals:
+                if g.key not in was:
+                    said[g.key] = Feedback(
+                        "harness", "your step produced a goal that is false in its "
+                        f"own context and has been undone: `{goal.text[-200:]}`. "
+                        "Choose a different decomposition.", "rejected")
+                    tries[g.key] = tries.get(g.key, 0) + 1
+            return True
+
         def prompt_for(goal: Goal, model: str) -> str:
             source, line = view(*render(board.text, board.index(goal))[:1], goal.decl)
             parts = [f"Problem: {problem.description}".strip(),
@@ -658,6 +709,11 @@ class BoardAgent(FrameworkAgent):
                     if goal is not None and goal.key not in swept:
                         swept.add(goal.key)
                         if await sweep(goal):
+                            return True
+                    if (goal is not None and tries.get(goal.key, 0) >= REFUTE_AFTER
+                            and goal.key not in probed):
+                        probed.add(goal.key)
+                        if await refuted(goal) and await retreat(goal):
                             return True
                     if goal is None:
                         if not claimed and board.goals and all(

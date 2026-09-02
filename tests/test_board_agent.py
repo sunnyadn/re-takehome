@@ -347,6 +347,21 @@ def test_a_step_that_makes_every_check_slow_is_refused():
     assert "heavy_tactic" not in result.solution and result.metadata["accepted_by_repl"] is True
 
 
+def test_a_goal_rejected_twice_is_probed_for_refutation_once():
+    # Measured on rmo_2001_2: `h₁ : p = 11 ⊢ p = 1` took five turns of the slow
+    # model in a row. Whether omega refutes a real goal is checked on the pod;
+    # here the probe is shown to be sent once and the run to go on.
+    result, lean, llm, _ = run(ONE, {"model-a": ["linarith", "exact?", "linarith",
+                                                 "have key : P := by trivial", "exact key"]},
+                               lines=("model-a",))
+    probes = [s for s in lean.sources if "have refuted : ¬ (demo)" in s]
+    assert len(probes) == 1
+    # BoardLean answers the probe with `unsolved goals` on the have (as Lean
+    # does for a goal that stands), so nothing was undone.
+    assert not any(e.get("stage") == "refuted" for e in result.metadata["events"])
+    assert result.metadata["accepted_by_repl"] is True
+
+
 def test_the_graded_entry_point_can_be_the_board():
     from submission.board_agent import create_agent
     assert isinstance(create_agent(), BoardAgent)
