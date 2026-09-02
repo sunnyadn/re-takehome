@@ -246,6 +246,48 @@ def test_a_step_that_empties_a_hypothesis_is_refused():
     assert result.metadata["accepted_by_repl"] is True
 
 
+class ShadowLean(BoardLean):
+    """A second `have` of a name already in scope shadows the first, as Lean does."""
+
+    async def check_file(self, source, timeout_s=None):
+        check = await super().check_file(source)
+        msgs = []
+        for m in check.messages:
+            d = str(m.get("data", ""))
+            if "unsolved" in d:
+                names = [l.split(" :")[0] for l in d.split("\n")[1:] if " : " in l]
+                for n in set(names):
+                    if names.count(n) > 1:
+                        d = d.replace(f"{n} : P", f"{n}✝ : P", names.count(n) - 1)
+                m = dict(m, data=d)
+            msgs.append(m)
+        return LeanCheck(check.accepted, msgs, check.has_sorry, False, 1)
+
+
+def test_a_step_that_only_shadows_an_existing_hypothesis_is_refused():
+    # Measured on p10: `have h2 ...` accepted 18 times over, each shadowing the
+    # last; the goal text was never the same twice, so nothing called it a stall.
+    lean = ShadowLean()
+    llm = ScriptLLM({"model-a": ["have key : P := by trivial", "have key : P := by trivial",
+                                 "exact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert [e["accepted"] for e in steps(result)][:2] == [True, False]
+    assert any("re-declared a name" in p for _, p in llm.calls)
+    assert result.solution.count("have key") == 1
+
+
+def test_a_byte_identical_step_is_not_sent_to_lean_twice():
+    result, lean, llm, _ = run(ONE, {"model-a": ["linarith", "linarith", "linarith",
+                                                 "have key : P := by trivial", "exact key"]},
+                               lines=("model-a",))
+    repeats = [e for e in result.metadata["events"] if e.get("kind") == "repeat"]
+    assert len(repeats) == 2
+    # The one check Lean ran on it, plus the cocktail sweep that names it too.
+    assert sum("\n  linarith\n" in s for s in lean.sources) == 1
+
+
 def test_the_graded_entry_point_can_be_the_board():
     from submission.board_agent import create_agent
     assert isinstance(create_agent(), BoardAgent)

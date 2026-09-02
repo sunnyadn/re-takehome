@@ -232,6 +232,7 @@ class BoardAgent(FrameworkAgent):
         swept: set[tuple[str, str]] = set()
         divided: set[tuple[str, str]] = set()
         restated: dict[str, int] = {}
+        refused: set[tuple[tuple[str, str], str]] = set()
         raised = False
         finished = False
 
@@ -346,6 +347,12 @@ class BoardAgent(FrameworkAgent):
             left = [g for g in nxt.goals if span[0] <= g.line <= span[1]]
             if left and all(g.text == goal.text for g in left):
                 return None, "that step left the goal exactly as it was"
+            if any(g.text.count("✝") > goal.text.count("✝") for g in left):
+                # Measured on p10: `have h2 ...` accepted 18 times over, each one
+                # shadowing the last, and the goal text never the same twice.
+                return None, ("that step re-declared a name the context already "
+                              "has (Lean shows the old one as `h✝`); use the "
+                              "existing hypothesis instead of stating it again")
             if any(len(VACUOUS.findall(g.text)) > len(VACUOUS.findall(goal.text)) for g in left):
                 # Measured on p09: `simp ... at h ⊢` left `h : True ⊢ False`, Lean
                 # had no complaint, and five turns went into a goal that was dead.
@@ -420,7 +427,19 @@ class BoardAgent(FrameworkAgent):
                     if here is None:
                         events.append({"kind": "stale", "by": author})
                         continue
+                    if (here.key, edit.body) in refused:
+                        # Measured on p10: five byte-identical replies in a row.
+                        events.append({"kind": "repeat", "by": author})
+                        said[goal.key] = Feedback(
+                            author, "that is byte for byte the step already rejected "
+                            "on this goal; Lean will say the same thing. Try a "
+                            "different route: " + said[goal.key].text[:600]
+                            if goal.key in said else "that step was already rejected here")
+                        tries[goal.key] = tries.get(goal.key, 0) + 1
+                        continue
                     nxt, why = await advance(board, here, edit.body, author)
+                    if nxt is None:
+                        refused.add((here.key, edit.body))
                     events.append({"kind": "step", "by": author, "accepted": nxt is not None})
                     if nxt is None:
                         said[goal.key] = Feedback(author, why)
