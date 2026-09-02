@@ -478,10 +478,17 @@ class FrameworkAgent:
                 # every later step, including a correct lemma, because the check
                 # judges the whole file. Nothing recovers from that but a
                 # rollback to the last file Lean had no error in.
-                if classify(state.messages)[3]:
+                # A step that is expensive rather than wrong is committed the
+                # same way and costs the same: 16 of one run's 153 checks died
+                # on heartbeats at a `simp ... at *` already in the file, every
+                # later step was refused for a price it had not set, and the
+                # file was being kept as the one to roll back to.
+                _, _, dear, broken = classify(state.messages)
+                if broken or dear:
                     if state.text != sound:
                         events.append({"stage": "repair",
-                                       "said": format_messages(classify(state.messages)[3])[:300],
+                                       "why": "cost" if dear and not broken else "error",
+                                       "said": format_messages(broken or dear)[:300],
                                        "was": state.text[-300:]})
                         state = await self._look(sound, services, state.focus)
                 else:

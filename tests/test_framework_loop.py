@@ -940,3 +940,40 @@ def test_a_goal_with_nowhere_to_park_is_backed_out_of():
     assert [e for e in result.metadata["events"] if e.get("stage") == "backtrack"]
     assert "descend" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
+
+
+class TooExpensiveOnce(FakeLean):
+    """The third check leaves a heartbeat cost the file keeps until rolled back."""
+
+    def __init__(self):
+        super().__init__()
+        self.seen = 0
+
+    async def check_file(self, source, timeout_s=None):
+        if "vm_probe" in source or "first" in source or "exact?" in source:
+            return await super().check_file(source)
+        self.seen += 1
+        if self.seen >= 3 and "costly" in source:
+            self.sources.append(source)
+            return LeanCheck(False, [{"severity": "error",
+                                      "pos": {"line": skip_line(source) or 1},
+                                      "data": "(deterministic) timeout at `whnf`, maximum "
+                                              "number of heartbeats (400000) has been reached"}],
+                             True, False, 1)
+        return await super().check_file(source)
+
+
+def test_a_file_that_is_too_expensive_is_rolled_back_like_a_broken_one():
+    # Measured on p09: a `simp ... at *` already in the file cost 16 of one
+    # run's 153 checks their heartbeats. It is not a failure, so the rollback
+    # never fired and the file was kept as the one to roll back to; every later
+    # step was then refused for a price it had not set.
+    lean, llm = TooExpensiveOnce(), FakeLLM(
+        ["have costly : True := by trivial", "have key : True := by trivial", "exact key"])
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=CHALLENGE),
+        FakeServices(lean, llm)))
+    repairs = [e for e in result.metadata["events"] if e.get("stage") == "repair"]
+    assert repairs and repairs[0]["why"] == "cost"
+    assert "costly" not in result.solution
