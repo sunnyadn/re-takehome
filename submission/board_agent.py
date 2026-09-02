@@ -114,11 +114,22 @@ MAX_RESTATES = 2
 # A worker with no goal to take waits this long for the board to change.
 IDLE_WAIT_S = 2.0
 # What the model is told when its step ran the whole check into the timeout.
-TIMED_OUT = ("that step timed out: the file no longer checks within 120s. The tactic "
+TIMED_OUT = ("that step timed out: the file no longer checks in time. The tactic "
              "is far too expensive (decide, omega or nlinarith over a large range, "
              "simp with a wide lemma set); the step was removed. Use interval_cases "
              "on a bounded variable, or state the cases as a disjunction and prove "
              "each with norm_num")
+# A check is cut at a few times what the current file costs, never the harness's
+# 120s: the slow-step guard refuses anything adding SLOW_STEP_MS anyway, and a
+# timeout also forces a container restart (measured putnam_2018_a1: 36..82s each).
+CHECK_TIMEOUT_FLOOR_S = 30
+CHECK_TIMEOUT_CAP_S = 120
+
+
+def check_timeout_s(base_ms: int) -> int:
+    return min(CHECK_TIMEOUT_CAP_S, max(CHECK_TIMEOUT_FLOOR_S, (3 * base_ms + 20_000) // 1000))
+
+
 # A step that makes the file slower to check by this much is refused as too
 # expensive even when Lean raises no budget error: every later check pays it,
 # and the comparator allows 180s. Measured on p09: one accepted step took the
@@ -445,8 +456,9 @@ class BoardAgent(FrameworkAgent):
                 branches.remove(worst)
                 events.append({"stage": "prune", "bid": worst.bid, "goals": len(worst.goals)})
 
-        async def look(candidate: str) -> Board:
-            check = await services.lean.check_file(render_all(candidate))
+        async def look(candidate: str, base: Board | None = None) -> Board:
+            check = await services.lean.check_file(
+                render_all(candidate), timeout_s=check_timeout_s((base or board).ms))
             found = read_board(candidate, check.messages, check.accepted)
             found.ms = check.duration_ms
             return found
@@ -510,7 +522,7 @@ class BoardAgent(FrameworkAgent):
 
             nonlocal failed_at
             candidate, span = put(base.text, goal, block)
-            nxt = await look(candidate)
+            nxt = await look(candidate, base)
             _, surplus, expensive, failures = classify(nxt.messages)
             lines = [l for l in (message_line(m) for m in failures) if l and span[0] <= l <= span[1]]
             failed_at = (min(lines) - span[0]) if lines else 0

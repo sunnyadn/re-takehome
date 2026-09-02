@@ -565,3 +565,28 @@ def test_a_closer_that_fires_is_flattened_from_its_own_trace_in_one_check():
     closed = max(i for i, s in enumerate(lean.sources) if "\n  first\n" in s)
     flat = next(i for i, s in enumerate(lean.sources) if "\n  omega\n" in s)
     assert flat - closed == 1
+
+
+def test_a_step_is_checked_under_a_timeout_scaled_to_the_base_file():
+    # Measured on putnam_2018_a1 (v7.12): the base file checked in 1.3s all
+    # run, four steps ran to the harness's 120s timeout, and each timeout also
+    # forced a container restart (36..82s). The slow-step guard refuses any
+    # step adding over 10s anyway, so the check can be cut far sooner.
+    class TimedLean(BoardLean):
+        def __init__(self):
+            super().__init__()
+            self.timeouts: list[tuple[str, int | None]] = []
+
+        async def check_file(self, source, timeout_s=None):
+            self.timeouts.append((source, timeout_s))
+            check = await super().check_file(source)
+            return LeanCheck(check.accepted, check.messages, check.has_sorry,
+                             check.timed_out, 1_300)
+    lean = TimedLean()
+    llm = ScriptLLM({"model-a": ["have key : True := by trivial", "exact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["accepted_by_repl"] is True
+    steps = [t for s, t in lean.timeouts if "have key" in s and "#print axioms" not in s]
+    assert steps and all(t is not None and t <= 30 for t in steps), steps
