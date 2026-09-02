@@ -4,7 +4,7 @@ import time
 
 from re_harness import Problem
 from re_harness.lean import LeanCheck
-from submission.agent import Config
+from submission.agent import COCKTAIL, Config
 from submission.board_agent import (
     Board, BoardAgent, Goal, interpret, read_board, render_all,
 )
@@ -510,3 +510,58 @@ def test_a_step_that_times_out_is_not_retried_by_prefix_or_search():
     assert sum("decide +kernel" in s for s in lean.sources) == 1
     assert any("timed out" in p for _, p in llm.calls)
     assert result.metadata["accepted_by_repl"] is True
+
+
+def test_a_closer_that_fires_is_flattened_from_its_own_trace_in_one_check():
+    # Measured on rmo_2000_2 (v7.8): the closers `first` block closed a goal 9
+    # times, and each time `_collapse_last` spent up to 12 more 9.5s checks
+    # guessing which alternative had fired, all of them missing. The winner
+    # has to announce itself in the check that closes the goal.
+    class TracingLean(BoardLean):
+        """`omega` closes the goal; every other closer fails. Failed alternatives
+        keep their trace (the stricter of Lean's two possible behaviours)."""
+        async def check_file(self, source, timeout_s=None):
+            self.sources.append(source)
+            lines = source.split("\n")
+            msgs, closed = [], False
+            for i, line in enumerate(lines, start=1):
+                body = line.strip()
+                if body == "first":
+                    alts = []
+                    j = i
+                    while j < len(lines) and lines[j].strip().startswith("|"):
+                        alts.append((j + 1, lines[j].strip()))
+                        j += 1
+                    for n, alt in alts:
+                        tag = re.search(r'trace "([^"]+)"', alt)
+                        if tag:
+                            msgs.append({"severity": "information", "pos": {"line": n - 1},
+                                         "data": tag.group(1)})
+                        if tag and "omega" in alt:
+                            closed = True
+                            break
+                    else:
+                        msgs.append({"severity": "error", "pos": {"line": i - 1},
+                                     "data": "no closer"})
+                elif body == "skip" and closed:
+                    closed = False
+                elif body == "skip":
+                    msgs.append({"severity": "error", "pos": {"line": i - 2},
+                                 "endPos": {"line": i - 1}, "data": "unsolved goals\n⊢ demo"})
+                elif body == "omega":
+                    closed = True
+                elif body in COCKTAIL:
+                    msgs.append({"severity": "error", "pos": {"line": i - 1},
+                                 "data": f"{body} failed"})
+            errors = [m for m in msgs if m["severity"] == "error"]
+            return LeanCheck(not errors, msgs, "sorry" in source, False, 1)
+    lean = TracingLean()
+    llm = ScriptLLM({"model-a": []})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["accepted_by_repl"] is True
+    assert "  omega\n" in result.solution and "first" not in result.solution
+    closed = max(i for i, s in enumerate(lean.sources) if "\n  first\n" in s)
+    flat = next(i for i, s in enumerate(lean.sources) if "\n  omega\n" in s)
+    assert flat - closed == 1

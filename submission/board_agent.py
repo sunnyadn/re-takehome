@@ -218,6 +218,31 @@ META = re.compile(r"\?[\w.]+|^(?:Type|Sort)\b")
 HAVE_HEAD = re.compile(r"^(\s*)(have\b.*?)\s*:=\s*by\s*$")
 
 
+CLOSER_TAG = re.compile(r"^closer (\d+)$")
+
+
+def tagged_closers(cocktail: Sequence[str]) -> str:
+    """The cocktail as one `first`, each alternative announcing itself, so the
+    check that closes the goal also says which closer did it."""
+    return "first\n" + "\n".join(f'| (trace "closer {i}"; {t}; done)'
+                                  for i, t in enumerate(cocktail))
+
+
+def fired_closer(messages: Sequence[Any], span: tuple[int, int],
+                 cocktail: Sequence[str]) -> str | None:
+    """The alternative that closed the goal: the last tag reported inside the
+    block, whether or not Lean kept the tags of the alternatives that failed."""
+    hits = []
+    for m in messages:
+        if not isinstance(m, dict) or m.get("severity") != "information":
+            continue
+        tag = CLOSER_TAG.match(str(m.get("data", "")).strip())
+        line = message_line(m)
+        if tag and line is not None and span[0] <= line <= span[1]:
+            hits.append((line, int(tag.group(1))))
+    return cocktail[max(hits)[1]] if hits else None
+
+
 def withdraw(text: str, goal: Goal) -> tuple[str, str]:
     """The file with the `have` enclosing this goal, and the rest of its block,
     cut back to one `sorry`; the withdrawn statement second. ("", "") when the
@@ -587,14 +612,19 @@ class BoardAgent(FrameworkAgent):
         async def sweep(goal: Goal) -> bool:
             """The free closers, then `exact?`, once per goal."""
 
-            for kind, block in (("closers", sweep_body(cocktail)), ("search", "exact?")):
-                nxt, _ = await judge(board, goal, block)
+            base = board
+            for kind, block in (("closers", tagged_closers(cocktail)), ("search", "exact?")):
+                nxt, _ = await judge(base, goal, block)
                 events.append({"kind": kind, "by": "harness", "accepted": nxt is not None})
                 if nxt is not None:
                     if kind == "closers":
-                        state = await self._collapse_last(
-                            State(text=nxt.text, focus=0), services)
-                        nxt = await look(state.text)
+                        tactic = fired_closer(nxt.messages, put(base.text, goal, block)[1], cocktail)
+                        flat = await look(put(base.text, goal, tactic)[0]) if tactic else None
+                        if flat is not None and flat.find(goal.key) is None and not any(
+                                classify(flat.messages)[2:]):
+                            nxt = flat
+                        events.append({"kind": "collapse", "tactic": tactic,
+                                       "accepted": nxt is flat})
                     await commit(nxt)
                     return True
             return False
