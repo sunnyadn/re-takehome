@@ -622,24 +622,23 @@ class BoardAgent(FrameworkAgent):
             return nxt, why
 
         async def sweep(goal: Goal) -> bool:
-            """The free closers, then `exact?`, once per goal."""
+            """The free closers, once per goal. (`exact?` used to follow: measured
+            1 of 51 goals closed over 24 runs, and a slow one restarts the container.)"""
 
             base = board
-            for kind, block in (("closers", tagged_closers(cocktail)), ("search", "exact?")):
-                nxt, _ = await judge(base, goal, block)
-                events.append({"kind": kind, "by": "harness", "accepted": nxt is not None})
-                if nxt is not None:
-                    if kind == "closers":
-                        tactic = fired_closer(nxt.messages, put(base.text, goal, block)[1], cocktail)
-                        flat = await look(put(base.text, goal, tactic)[0]) if tactic else None
-                        if flat is not None and flat.find(goal.key) is None and not any(
-                                classify(flat.messages)[2:]):
-                            nxt = flat
-                        events.append({"kind": "collapse", "tactic": tactic,
-                                       "accepted": nxt is flat})
-                    await commit(nxt)
-                    return True
-            return False
+            block = tagged_closers(cocktail)
+            nxt, _ = await judge(base, goal, block)
+            events.append({"kind": "closers", "by": "harness", "accepted": nxt is not None})
+            if nxt is None:
+                return False
+            tactic = fired_closer(nxt.messages, put(base.text, goal, block)[1], cocktail)
+            flat = await look(put(base.text, goal, tactic)[0]) if tactic else None
+            if flat is not None and flat.find(goal.key) is None and not any(
+                    classify(flat.messages)[2:]):
+                nxt = flat
+            events.append({"kind": "collapse", "tactic": tactic, "accepted": nxt is flat})
+            await commit(nxt)
+            return True
 
         async def take_back(author: str, goal: Goal) -> None:
             """The `have` this goal is the body of comes off the board, with the

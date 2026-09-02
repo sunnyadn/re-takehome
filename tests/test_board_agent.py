@@ -590,3 +590,16 @@ def test_a_step_is_checked_under_a_timeout_scaled_to_the_base_file():
     assert result.metadata["accepted_by_repl"] is True
     steps = [t for s, t in lean.timeouts if "have key" in s and "#print axioms" not in s]
     assert steps and all(t is not None and t <= 30 for t in steps), steps
+
+
+def test_the_sweep_does_not_run_exact_search_on_every_goal():
+    # Measured over 24 board runs on the pods: the `exact?` sweep closed 1 of
+    # 51 goals it was tried on, and under the scaled check timeout a slow
+    # `exact?` now also costs a container restart.
+    lean = BoardLean()
+    llm = ScriptLLM({"model-a": ["have key : True := by trivial", "exact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["accepted_by_repl"] is True
+    assert not any("exact?" in s for s in lean.sources)
