@@ -410,3 +410,19 @@ def test_the_board_tells_the_model_a_sorry_posts_a_subgoal():
     step_systems = [s for s in llm.systems if "competition mathematician" not in s]
     assert step_systems and all("`sorry`" in s and "goal on the board" in s for s in step_systems)
     assert not any("Give every `have` a body" in s for s in step_systems)
+
+
+def test_after_the_plan_the_next_step_is_asked_as_a_skeleton_of_sorries():
+    # Measured on rmo_2001_2: the plan arrived at t=173 and 37 replies then ran
+    # past the token cap trying to write it whole. Asked as a skeleton, the plan
+    # goes on the board as goals and both workers take them.
+    skeleton = "have key : P := by\n  sorry\nhave more : P := by\n  sorry\nexact key"
+    result, lean, llm, _ = run(ONE, {
+        "model-a": ["linarith", "exact?", skeleton, "exact key", "exact key", "exact key"],
+    }, lines=("model-a",))
+    asked = [p for m, p in llm.calls if "Write the plan as a skeleton" in p]
+    assert len(asked) == 1 and "mathematician was asked" in asked[0]
+    assert {"kind": "skeleton", "by": "model-a"} in result.metadata["events"]
+    # Both sorries were posted: a later check rendered two placeholders.
+    assert any(src.count("skip") >= 2 for src in lean.sources)
+    assert result.metadata["accepted_by_repl"] is True

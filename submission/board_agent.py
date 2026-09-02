@@ -645,7 +645,7 @@ class BoardAgent(FrameworkAgent):
                            "tries": tries.get(worst.key, 0)})
             await commit(await look(fresh_text))
 
-        def prompt_for(goal: Goal, model: str) -> str:
+        def prompt_for(goal: Goal, model: str, skeleton: bool = False) -> str:
             source, line = view(*render(board.text, board.index(goal))[:1], goal.decl)
             parts = [f"Problem: {problem.description}".strip(),
                      "File:\n" + source[-FILE_CHARS:],
@@ -657,6 +657,16 @@ class BoardAgent(FrameworkAgent):
                              f"answered:\n{plans[goal.key]}")
             if said.get(goal.key):
                 parts.append(f"{said[goal.key].lead(model)}:\n{said[goal.key].text}")
+            if skeleton:
+                # Measured on rmo_2001_2: the plan was right at t=173 and both
+                # models then tried to write all of it in one reply, 37 times
+                # past the token cap. The plan goes on the board as statements.
+                parts.append("Write the plan as a skeleton: one `have` per fact "
+                             "in the order the plan uses them, each with the "
+                             "statement in full and the body `:= by sorry`, then "
+                             "the one tactic line that closes the goal from those "
+                             "facts. Do not prove any fact here; each becomes a "
+                             "goal of its own.")
             parts.append("Reply with one ```lean code block containing only tactic "
                          "lines, and nothing before or after it. No explanation.")
             return "\n\n".join(parts)
@@ -726,7 +736,9 @@ class BoardAgent(FrameworkAgent):
                         if moved:
                             focus(now)
                             goal = moved
-                        ask = prompt_for(goal, model) if moved else ""
+                        ask = prompt_for(goal, model, skeleton=True) if moved else ""
+                        if ask:
+                            events.append({"kind": "skeleton", "by": model})
                     if not ask:
                         async with lock:
                             claimed.pop(goal.key, None)
