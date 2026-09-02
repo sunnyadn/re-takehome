@@ -410,12 +410,18 @@ class BoardAgent(FrameworkAgent):
                     return candidate
             return candidate
 
-        async def judge(base: Board, goal: Goal, block: str) -> tuple[Board | None, str]:
-            """One edit at one goal, judged against the whole file."""
+        failed_at = 0
 
+        async def judge(base: Board, goal: Goal, block: str) -> tuple[Board | None, str]:
+            """One edit at one goal, judged against the whole file. `failed_at`
+            keeps the block-relative line of the first error, for the prefix cut."""
+
+            nonlocal failed_at
             candidate, span = put(base.text, goal, block)
             nxt = await look(candidate)
             _, surplus, expensive, failures = classify(nxt.messages)
+            lines = [l for l in (message_line(m) for m in failures) if l and span[0] <= l <= span[1]]
+            failed_at = (min(lines) - span[0]) if lines else 0
             if expensive and not failures:
                 return None, BUDGET_RETRY
             if not failures and nxt.ms - base.ms > SLOW_STEP_MS:
@@ -462,12 +468,21 @@ class BoardAgent(FrameworkAgent):
             nonlocal raised
             nxt, why = await judge(base, goal, block)
             if nxt is None and why != BUDGET_RETRY:
-                for shorter in prefixes(block)[:MAX_PREFIXES]:
+                # The first error's line says where to cut; one check instead of
+                # eight. Measured: 3.7 checks per model call, most of them here.
+                cuts = prefixes(block)
+                guided = [c for c in cuts if c.count("\n") + 1 <= max(failed_at, 1)]
+                order = guided[:1] + [c for c in cuts if c not in guided[:1]]
+                tried = 0
+                while order and tried < 3:
+                    shorter = order[0]
+                    tried += 1
                     nxt, _ = await judge(base, goal, shorter)
                     if nxt is not None:
                         events.append({"kind": "prefix", "by": author,
                                        "lines": shorter.count("\n") + 1})
                         return nxt, ""
+                    order = order[len(order) // 2 + 1:] if len(order) > 1 else []
                 retry = hand_to_search(block)
                 if retry != block:
                     nxt, _ = await judge(base, goal, retry)

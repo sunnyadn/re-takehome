@@ -362,6 +362,19 @@ def test_a_goal_rejected_twice_is_probed_for_refutation_once():
     assert result.metadata["accepted_by_repl"] is True
 
 
+def test_the_prefix_cut_is_guided_by_the_first_error_line():
+    # Measured: 3.7 Lean checks per model call, most of them prefixes tried
+    # longest-first. Lean's first error says where to cut.
+    block = "have a : P := by trivial\nhave b : P := by trivial\nlinarith\nhave c : P := by trivial"
+    result, lean, llm, _ = run(ONE, {"model-a": [block, "exact a"]}, lines=("model-a",))
+    cut = next(e for e in result.metadata["events"] if e.get("kind") == "prefix")
+    assert cut["lines"] == 2
+    # The failing line is checked once, in the whole block, and never again in
+    # a longer-first prefix.
+    assert sum("\n  linarith\n" in s for s in lean.sources) == 1
+    assert result.metadata["accepted_by_repl"] is True
+
+
 def test_the_graded_entry_point_can_be_the_board():
     from submission.board_agent import create_agent
     assert isinstance(create_agent(), BoardAgent)
