@@ -103,6 +103,11 @@ PLAN_AFTER = 2
 # A goal this many rejections deep is still open, only last in line. Time and
 # money are the exits; a goal is never declared hopeless by count alone.
 LAST_IN_LINE = 6
+# A goal inside a `have ... := by` that has been rejected this many times takes
+# the `have` down with it, and everything after it in its block: the board goes
+# back to before the decomposition. Measured on rmo_2000_2: a false `have`
+# posted at t=64 made every later goal a contradiction and the lemma unprovable.
+WITHDRAW_AFTER = 4
 # When every goal is last in line, the declaration holding the worst of them
 # goes back to its statement, this many times at most.
 MAX_RESTATES = 2
@@ -202,6 +207,30 @@ def read_board(text: str, messages: Sequence[dict[str, Any]], accepted: bool) ->
 
 
 META = re.compile(r"\?[\w.]+|^(?:Type|Sort)\b")
+
+
+HAVE_HEAD = re.compile(r"^(\s*)(have\b.*?)\s*:=\s*by\s*$")
+
+
+def withdraw(text: str, goal: Goal) -> tuple[str, str]:
+    """The file with the `have` enclosing this goal, and the rest of its block,
+    cut back to one `sorry`; the withdrawn statement second. ("", "") when the
+    nearest shallower line above the goal is not a `have ... := by`."""
+    lines = text.split("\n")
+    i = goal.line - 1
+    above = next((j for j in range(i - 1, -1, -1) if lines[j].strip()
+                  and len(lines[j]) - len(lines[j].lstrip()) < len(goal.indent)), None)
+    head = HAVE_HEAD.match(lines[above]) if above is not None else None
+    if not head:
+        return "", ""
+    indent = head.group(1)
+    end = i + 1
+    while end < len(lines) and (not lines[end].strip()
+                                or len(lines[end]) - len(lines[end].lstrip()) >= len(indent)):
+        end += 1
+    while end - 1 > i and not lines[end - 1].strip():
+        end -= 1
+    return "\n".join(lines[:above] + [indent + "sorry"] + lines[end:]), head.group(2).strip()
 
 
 def target_of(goal_text: str) -> str:
@@ -325,6 +354,7 @@ class BoardAgent(FrameworkAgent):
         divided: set[tuple[str, str]] = set()
         restated: dict[str, int] = {}
         refused: set[tuple[tuple[str, str], str]] = set()
+        withdrawn: dict[str, list[str]] = {}
         raised = False
         finished = False
 
@@ -559,6 +589,26 @@ class BoardAgent(FrameworkAgent):
                     return True
             return False
 
+        async def take_back(author: str, goal: Goal) -> None:
+            """The `have` this goal is the body of comes off the board, with the
+            rest of its block; the goal it was posted on is told why."""
+
+            fresh, statement = withdraw(board.text, goal)
+            if not fresh:
+                return
+            events.append({"kind": "withdraw", "by": author, "have": statement[:120],
+                           "tries": tries.get(goal.key, 0)})
+            withdrawn.setdefault(goal.decl, []).append(statement)
+            await commit(await look(fresh))
+            back = next((g for g in reversed(board.goals) if g.decl == goal.decl
+                         and g.line <= goal.line), None)
+            if back is not None:
+                said[back.key] = Feedback(
+                    author, f"`{statement}` was posted here as a `have` and withdrawn "
+                    f"after {WITHDRAW_AFTER} failed attempts to prove it. The board is "
+                    "back to before it. Do not restate that fact; prove this goal "
+                    "another way, or through facts that are easier to prove", "withdrawn")
+
         async def apply(author: str, goal: Goal, edits: list[Edit]) -> bool:
             """Every edit a reply asked for, each against the board as it stands."""
 
@@ -589,6 +639,12 @@ class BoardAgent(FrameworkAgent):
                             "on this goal; Lean will say the same thing. Try a "
                             "different route: " + said[goal.key].text[:600]
                             if goal.key in said else "that step was already rejected here")
+                        tries[goal.key] = tries.get(goal.key, 0) + 1
+                        continue
+                    if any(w in edit.body for w in withdrawn.get(here.decl, ())):
+                        events.append({"kind": "restated", "by": author})
+                        said[goal.key] = Feedback(author, "that step restates a fact "
+                                                  "already withdrawn from this declaration")
                         tries[goal.key] = tries.get(goal.key, 0) + 1
                         continue
                     nxt, why = await advance(board, here, edit.body, author)
@@ -831,6 +887,9 @@ class BoardAgent(FrameworkAgent):
                         tries[goal.key] = tries.get(goal.key, 0) + 1
                         return True
                     await apply(model, here, edits)
+                    still = board.find(goal.key)
+                    if still is not None and tries.get(goal.key, 0) >= WITHDRAW_AFTER:
+                        await take_back(model, still)
                 return True
 
         try:

@@ -471,3 +471,20 @@ def test_a_step_that_leaves_a_goal_with_a_metavariable_is_refused():
     assert steps(result)[0]["accepted"] is False
     assert any("could not infer" in p for _, p in llm.calls)
     assert result.metadata["accepted_by_repl"] is True
+
+
+def test_a_have_whose_goal_keeps_failing_is_withdrawn_with_everything_after_it():
+    # Measured on rmo_2000_2 (v7.8): `have h1 : y^3 > ... := by sorry` posted a
+    # false fact at t=64; every goal after it lived in a contradiction and the
+    # lemma goal itself could never close. The board has to be able to take a
+    # decomposition back.
+    result, lean, llm, _ = run(ONE, {
+        "model-a": ["have key : P := by\n  sorry\nexact key",
+                    "linarith", "linarith", "linarith", "linarith",
+                    "have other : True := by trivial", "exact other"],
+    }, lines=("model-a",))
+    events = result.metadata["events"]
+    assert any(e.get("kind") == "withdraw" and "key : P" in e.get("have", "") for e in events)
+    assert any("withdrawn" in p for _, p in llm.calls)
+    assert "have key : P" not in result.solution
+    assert result.metadata["accepted_by_repl"] is True

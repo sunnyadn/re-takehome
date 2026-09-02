@@ -272,6 +272,8 @@ class Feedback:
             return ("Your last reply ran out of tokens before its code block ended, so "
                     "none of it could be used. You are writing a whole proof; write the "
                     "next step and stop. What Lean last said was")
+        if self.kind == "withdrawn":
+            return "A decomposition posted at this goal was taken back"
         if self.kind == "drift":
             return ("These facts compiled but left the goal standing, so they have been "
                     "removed. Reshape the goal or close it directly. They were")
