@@ -69,6 +69,7 @@ from submission.framework_agent import (
     VACUOUS,
     BUDGET_RETRY,
     FILE_CHARS,
+    NARRATES,
     GOAL_CHARS,
     LOOSE_DRAIN_S,
     MAX_PREFIXES,
@@ -259,6 +260,10 @@ def split_top(s: str, sep: str) -> tuple[str, str] | None:
         if depth == 0 and s.startswith(sep, i) and not s.startswith(":=", i):
             return s[:i], s[i + len(sep):]
     return None
+
+
+def narrates(model: str) -> bool:
+    return any(n in model for n in NARRATES)
 
 
 def extract_file(text: str, goals: Sequence[Goal]) -> str:
@@ -719,7 +724,12 @@ class BoardAgent(FrameworkAgent):
             checks that they satisfy every hypothesis in scope and break the
             target. The refutation, or "" to let the step in."""
 
-            other = next((m for m in models if m != author), author)
+            # Measured (v7.17–v7.19, 12 of 12 audits): a model that narrates
+            # names values that violate a hypothesis, at ~9s each; the other
+            # answers in ~1.4s. The auditor is whoever finds counterexamples.
+            other = next((m for m in models if m != author and not narrates(m)),
+                         next((m for m in models if not narrates(m)),
+                              next((m for m in models if m != author), author)))
             had = {g.key for g in base.goals}
             fresh = [g for g in nxt.goals if g.key not in had and g.text
                      and not META.search(target_of(g.text))]

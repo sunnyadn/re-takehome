@@ -662,23 +662,25 @@ def test_a_posted_have_that_a_witness_falsifies_never_reaches_the_board():
     assert result.metadata["accepted_by_repl"] is True
 
 
-def test_an_auditor_that_narrates_its_reasoning_is_asked_with_reasoning_off():
-    # Measured on rmo_2000_2 (v7.16, one16a): every qwen audit came back
-    # `length` at 2500 tokens, 4k-7k chars of narration and no JSON, so five
-    # audits in a row verified nothing. gpt-oss answered `{"holds": true}` in 15 chars.
+def test_a_model_that_narrates_is_not_the_auditor_while_one_that_answers_is_there():
+    # Measured on rmo_2000_2 / putnam_2018_a1 (v7.17–v7.19): qwen as auditor
+    # named values that violated a hypothesis in 12 of 12 audits at ~9s each;
+    # gpt-oss answered correctly in ~1.4s. The auditor is the model that finds
+    # counterexamples, even when it audits its own step.
     challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
     lean, llm = WitnessLean(), ScriptLLM({
         "model-a": ["have bad : x = 3 := by\n  sorry\nexact key",
+                    '{"counterexample": {"x": "0"}}',
                     "have key : True := by trivial\nexact key"],
-        "qwen-b": ['{"counterexample": {"x": "0"}}', "have key : True := by trivial\nexact key"]})
+        "qwen-b": ["have key : True := by trivial\nexact key"] * 3})
     agent = BoardAgent(Config(lines=("model-a", "qwen-b"), budget_usd=1.0, time_limit_s=600.0))
     result = asyncio.run(agent.solve(
         Problem(id="demo", description="prove it", challenge=challenge),
         FakeServices(lean, llm)))
-    audits = [k for k, s in zip(llm.kwargs, llm.systems) if "You audit" in s]
-    by_qwen = [k for k in audits if k["model"] == "qwen-b"]
-    assert by_qwen and all(k["reasoning"] == {"enabled": False} for k in by_qwen)
-    assert any(e.get("kind") == "audit" for e in result.metadata["events"])
+    audits = [k["model"] for k, s in zip(llm.kwargs, llm.systems) if "You audit" in s]
+    assert audits and "qwen-b" not in audits
+    assert any(e.get("kind") == "audit" and e.get("verdict") == "refuted"
+               for e in result.metadata["events"])
 
 
 def test_a_goal_under_an_intro_is_audited_in_the_context_lean_states():
