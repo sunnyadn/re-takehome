@@ -898,7 +898,9 @@ def test_only_a_problem_with_two_theorems_is_offered_a_shared_lemma():
     assert not any("theorem" in t and "standalone" in t for t in one)
     assert not [e for e in one_events if e.get("stage") == "share"]
     assert any("standalone Lean 4 `theorem`" in t for t in two)
-    assert any("its own `theorem`" in t for t in two)
+    # The step contract stays the same for both: inviting a declaration there
+    # as well took 19 of one run's 69 turns and Lean kept 2.
+    assert all("only tactic lines" in t for t in two if "standalone" not in t)
 
 
 def test_an_answer_slot_is_a_declaration_but_not_a_second_theorem():
