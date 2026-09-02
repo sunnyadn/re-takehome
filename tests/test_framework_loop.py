@@ -873,3 +873,25 @@ def test_a_step_that_turns_a_fact_into_True_is_recorded():
         Problem(id="demo", description="prove it", challenge=CHALLENGE),
         FakeServices(lean, llm)))
     assert {"stage": "emptied", "by": "model-a", "kind": "step"} in result.metadata["events"]
+
+
+TWO = ("import Mathlib\n\ntheorem demo : True := by\n  sorry\n\n"
+       "theorem demo_b : True := by\n  sorry\n")
+
+
+def asked_for(challenge):
+    lean, llm = FakeLean(), FakeLLM(["have key : True := by trivial", "exact key"])
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    return wrote(llm)[0][1]
+
+
+def test_only_a_problem_with_two_theorems_is_offered_a_shared_lemma():
+    # Measured on p09: the one fact its two theorems share was proved once
+    # inside each of them. Fifteen of the sixteen have a single theorem, and
+    # inviting a declaration there would trade a working contract for nothing.
+    one, two = asked_for(CHALLENGE), asked_for(TWO)
+    assert "only tactic lines" in one and "its own `theorem`" not in one
+    assert "its own `theorem`" in two and "only tactic lines" not in two

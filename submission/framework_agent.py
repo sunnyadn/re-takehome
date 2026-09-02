@@ -879,10 +879,25 @@ class FrameworkAgent:
                          f"answered:\n{plan}")
         if feedback:
             parts.append(f"{feedback.lead(model)}:\n{feedback.text}")
+        # Measured on p09: the one fact its two theorems share was proved once
+        # inside each of them, because a step was only ever tactic lines. The
+        # hoist has always been here; nothing ever asked for it.
+        shared = declared_names(problem.challenge)
+        if len(shared) > 1:
+            parts.append(
+                f"This problem is graded on {len(shared)} theorems and they share "
+                "their mathematics. A fact more than one of them needs cannot live "
+                "inside either proof: state it as its own `theorem` above them, "
+                "with a `sorry` body if you cannot prove it yet, and it becomes a "
+                "goal like any other.")
         # Measured on p09: qwen narrates instead of answering unless the
         # contract is the last thing it reads.
         parts.append("Reply with one ```lean code block containing only tactic "
-                     "lines, and nothing before or after it. No explanation.")
+                     "lines, and nothing before or after it. No explanation."
+                     if len(shared) <= 1 else
+                     "Reply with one ```lean code block: either tactic lines for "
+                     "the goal above, or one whole `theorem`. Nothing before or "
+                     "after it. No explanation.")
         reply, why = await self._call(
             model, "\n\n".join(parts), STEP_TOKENS, services, ledger)
         if why == "length":
