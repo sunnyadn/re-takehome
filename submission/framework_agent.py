@@ -126,6 +126,7 @@ LIGHTER = ("linarith", "norm_num", "positivity", "simp", "omega", "ring")
 # The cocktail is ordered by how often each tactic wins, so the one that fired
 # is usually near the front.
 COLLAPSE_TRIES = 12
+LOOSE_DRAIN_S = 30.0
 MAX_DELETIONS = 12
 # Each try is one check, and a check is 60ms against a reply's seconds.
 MAX_PREFIXES = 8
@@ -329,6 +330,7 @@ class FrameworkAgent:
         # not writing is the one asked for the mathematics.
         turn_of = 0
         plan = ""
+        loose: list[asyncio.Task[str]] = []
         swept: set[tuple[str, tuple[str, int]]] = set()
         divided: set[str] = set()
         stalls = 0
@@ -482,22 +484,34 @@ class FrameworkAgent:
                         events.append({"kind": "plan", "by": planner, "chars": len(plan)})
                         turn_of, stalls = turn_of + 1, 0
                         author = models[turn_of % len(models)]
-                    # Measured on p09: 87% of the clock is model latency, and
-                    # one model answers in 33s where the other answers in 1.8s,
-                    # so waiting for it leaves the other idle. That run spent
-                    # 1.4% of its money and all of its time. Once a goal has
-                    # refused a step, both are asked at once and Lean picks; a
-                    # goal that yields at once still costs one call.
+                    # Measured on p09: the two answer at the same rate and one
+                    # is 20x slower, so waiting for both spends the clock on
+                    # nothing. Lean judges whoever arrives first; the other is
+                    # already in flight and is the spare if the first is wrong.
                     asked = [author] + ([m for m in models if m != author]
                                         if stalls else [])
-                    replies = await asyncio.gather(*[
-                        self._ask_step(problem, state, feedback, m, services,
-                                       ledger, plan) for m in asked])
-                    tries = [(m, b) for m, b in zip(asked, replies) if b and b != CUT]
-                    block = tries[0][1] if tries else replies[0]
-                    spare = tries[1:]
-                    if tries:
-                        author = tries[0][0]
+                    flight = {}
+                    for who in asked:
+                        task = asyncio.ensure_future(self._ask_step(
+                            problem, state, feedback, who, services, ledger, plan))
+                        flight[task] = who
+                        loose.append(task)
+                    block, spare, cut = "", [], False
+                    while flight and not block:
+                        done, _ = await asyncio.wait(
+                            list(flight), return_when=asyncio.FIRST_COMPLETED)
+                        for task in done:
+                            who, reply = flight.pop(task), task.result()
+                            cut = cut or reply == CUT
+                            if not reply or reply == CUT:
+                                continue
+                            if block:
+                                spare.append((who, reply))
+                            else:
+                                block, author = reply, who
+                    spare += [(who, task) for task, who in flight.items()]
+                    if not block and cut:
+                        block = CUT
                     kind = "step"
                     if not block or block == CUT:
                         # A refused reply is a failed turn. Skipping it silently
@@ -554,7 +568,10 @@ class FrameworkAgent:
                     # sweep that closed a goal nested under the cursor and left
                     # the same one there ran 640 times on p09 and asked nobody.
                     nxt, why = None, "the sweep left the goal exactly as it was"
-                for other, alternative in (spare if nxt is None else []):
+                for other, later in (spare if nxt is None else []):
+                    alternative = later if isinstance(later, str) else await later
+                    if not alternative or alternative == CUT:
+                        continue
                     nxt, why2 = await self._advance(state, alternative, services)
                     events.append({"kind": "second", "by": other,
                                    "accepted": nxt is not None})
@@ -661,6 +678,12 @@ class FrameworkAgent:
         except (BudgetExceeded, BudgetAccountingError, LeanRuntimeError) as exc:
             events.append({"stage": "abort", "error": type(exc).__name__})
             return result(best, "aborted", False)
+        finally:
+            # A reply still in flight has been reserved against the budget, and
+            # a reservation nothing settles poisons the ledger. It is waited
+            # out, never cancelled.
+            if loose:
+                await asyncio.wait(loose, timeout=LOOSE_DRAIN_S)
 
     async def _look(self, text: str, services: Services, focus: int = 0) -> State:
         """One check does both jobs: it adjudicates, and it prints the next goal."""

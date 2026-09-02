@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 from re_harness import LLMCallError, Problem
 from re_harness.lean import LeanCheck
@@ -798,4 +799,51 @@ def test_a_sweep_is_judged_by_the_turn_and_not_by_its_own_span():
         Problem(id="demo", description="prove it", challenge=CHALLENGE),
         FakeServices(lean, llm)))
     assert {"kind": "closers", "by": "harness", "accepted": False} in result.metadata["events"]
+    assert result.metadata["accepted_by_repl"] is True
+
+
+class OneIsSlow:
+    """`model-b` answers 0.4s after `model-a`, which is the whole point."""
+
+    def __init__(self):
+        self.calls, self.replied_b = [], None
+        self.script = {"model-a": ["have bad : True := by first | (rfl; done)",
+                                   "have key : True := by trivial", "exact key"],
+                       "model-b": ["have slow : True := by first | (rfl; done)"]}
+
+    async def complete(self, *, model, messages, **kwargs):
+        if "competition mathematician" in messages[0]["content"]:
+            return said(PLAN, 0.001)
+        self.calls.append(model)
+        if model == "model-b":
+            await asyncio.sleep(0.4)
+            self.replied_b = time.monotonic()
+        left = self.script[model]
+        return said(left.pop(0) if left else "have junk : True := by trivial", 0.01)
+
+
+class TimedLean(FakeLean):
+    """Remembers when Lean was first shown the fast model's step."""
+
+    def __init__(self):
+        super().__init__()
+        self.saw_key = None
+
+    async def check_file(self, source, timeout_s=None):
+        if "have key" in source and self.saw_key is None:
+            self.saw_key = time.monotonic()
+        return await super().check_file(source)
+
+
+def test_the_fast_line_is_checked_without_waiting_for_the_slow_one():
+    # Measured on p09: both lines land a step at the same rate and one answers
+    # 20x slower, so the turn must be judged on whoever arrives first.
+    lean, llm = TimedLean(), OneIsSlow()
+    agent = FrameworkAgent(Config(lines=("model-a", "model-b"), budget_usd=1.0,
+                                  time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=CHALLENGE),
+        FakeServices(lean, llm)))
+    assert lean.saw_key is not None and llm.replied_b is not None
+    assert lean.saw_key < llm.replied_b
     assert result.metadata["accepted_by_repl"] is True
