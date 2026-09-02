@@ -511,6 +511,16 @@ def split_facts(block: str) -> tuple[list[str], str]:
     return facts, "\n".join(rest).strip("\n")
 
 
+def restates(block: str, claims: Sequence[str]) -> bool:
+    """Whether a block posts a `have` whose claim is one of these."""
+    gone = {" ".join(c.split()) for c in claims}
+    for line in block.split("\n"):
+        head = HAVE_HEAD.match(line) or re.match(r"^(\s*)(have\b.*?)\s*:=", line)
+        if head and " ".join(claim_of(head.group(2).strip()).split()) in gone:
+            return True
+    return False
+
+
 def stated_facts(text: str, decl: str) -> dict[str, str]:
     """Claim -> name for every `have` already inside a declaration's proof."""
     span = proof_span(text, decl)
@@ -1229,7 +1239,11 @@ class BoardAgent(FrameworkAgent):
                             if goal.key in said else "that step was already rejected here")
                         tries[goal.key] = tries.get(goal.key, 0) + 1
                         continue
-                    if any(w in edit.body for w in withdrawn.get(here.decl, ())):
+                    # Measured on p09 (gate26 run 4): a substring match locked the
+                    # worker out for 19 min once `n % 3 = 0` had been withdrawn,
+                    # since the goal itself reads `⊢ n % 3 = 0`. Only a `have`
+                    # stating the withdrawn claim again is a restatement.
+                    if restates(edit.body, withdrawn.get(here.decl, ())):
                         events.append({"kind": "restated", "by": author})
                         said[goal.key] = Feedback(author, "that step restates a fact "
                                                   "already withdrawn from this declaration")

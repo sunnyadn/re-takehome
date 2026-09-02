@@ -851,3 +851,15 @@ def test_a_have_with_a_proof_body_has_its_claim_audited_too():
                and e.get("goal") == "x = 3" for e in result.metadata["events"])
     assert result.metadata["accepted_by_repl"] is True
 
+
+def test_a_withdrawn_claim_blocks_only_a_have_that_states_it_again():
+    # Measured on p09 (gate26 run 4): after `have h_case : n % 3 = 0` was
+    # withdrawn, every step containing the text `n % 3 = 0` was refused before
+    # Lean saw it, and the goal itself was `⊢ n % 3 = 0`: 330 refusals in 19 min.
+    from submission.board_agent import restates
+    assert restates("have h2 : n % 3 = 0 := by\n  omega", ["n % 3 = 0"])
+    assert restates("have h2 :  n % 3 = 0  := by omega", ["n % 3 = 0"])
+    assert not restates("rcases h with h | h\nomega", ["n % 3 = 0"])
+    assert not restates("have h2 : 2 ^ (n % 3) % 7 = 1 → n % 3 = 0 := by\n  omega", ["n % 3 = 0"])
+    assert not restates("exact (by omega : n % 3 = 0)", ["n % 3 = 0"])
+
