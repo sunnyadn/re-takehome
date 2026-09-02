@@ -349,17 +349,15 @@ def test_a_step_that_makes_every_check_slow_is_refused():
     assert "heavy_tactic" not in result.solution and result.metadata["accepted_by_repl"] is True
 
 
-def test_a_goal_rejected_twice_is_probed_for_refutation_once():
-    # Measured on rmo_2001_2: `h₁ : p = 11 ⊢ p = 1` took five turns of the slow
-    # model in a row. Whether omega refutes a real goal is checked on the pod;
-    # here the probe is shown to be sent once and the run to go on.
+def test_a_goal_rejected_twice_is_never_probed_for_refutation():
+    # Measured on p09 (v7.3): the probe `have refuted : ¬ (target) := by decide
+    # | omega` "refuted" six true goals, `⊢ False` under `n % 3 = 1` among them,
+    # and undid the proof. Refuting a goal needs a consistent context, which is
+    # exactly what a proof by contradiction does not have.
     result, lean, llm, _ = run(ONE, {"model-a": ["linarith", "exact?", "linarith",
                                                  "have key : P := by trivial", "exact key"]},
                                lines=("model-a",))
-    probes = [s for s in lean.sources if "have refuted : ¬ (demo)" in s]
-    assert len(probes) == 1
-    # BoardLean answers the probe with `unsolved goals` on the have (as Lean
-    # does for a goal that stands), so nothing was undone.
+    assert not any("have refuted" in s for s in lean.sources)
     assert not any(e.get("stage") == "refuted" for e in result.metadata["events"])
     assert result.metadata["accepted_by_repl"] is True
 
