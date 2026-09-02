@@ -185,6 +185,15 @@ def read_board(text: str, messages: Sequence[dict[str, Any]], accepted: bool) ->
     return Board(text, goals, list(messages), accepted)
 
 
+def salvage(reply: str) -> str:
+    """A reply cut mid-statement, less the statement it was cut in. Measured on
+    rmo_2001_2: 37 of 70 step replies from one model ended at the token cap."""
+
+    text = reply + ("\n```" if reply.count("```") % 2 else "")
+    cuts = prefixes(screen_step(text, allow_sorry=True))
+    return cuts[0] if cuts else ""
+
+
 def put(text: str, goal: Goal, block: str, trailing: bool = True) -> tuple[str, tuple[int, int]]:
     """The block where the goal's placeholder is, and the lines it now covers."""
 
@@ -233,7 +242,7 @@ class Edit:
 def interpret(reply: str, board: Board, goal: Goal, graded: Sequence[str]) -> list[Edit]:
     """Read a reply once, as proofs of whatever it names."""
 
-    block = screen_step(reply)
+    block = screen_step(reply, allow_sorry=True)
     if not block:
         return []
     if is_probe(block):
@@ -770,11 +779,14 @@ class BoardAgent(FrameworkAgent):
                     if claimed.get(goal.key) == model:
                         claimed.pop(goal.key, None)
                     if why == "length":
-                        events.append({"kind": "cut", "by": model})
-                        said[goal.key] = Feedback(model, said[goal.key].text
-                                                  if goal.key in said else "nothing yet", "cut")
-                        tries[goal.key] = tries.get(goal.key, 0) + 1
-                        return True
+                        reply = salvage(reply)
+                        kept = reply.count("\n") + 1 if reply else 0
+                        events.append({"kind": "cut", "by": model, "kept": kept})
+                        if not kept:
+                            said[goal.key] = Feedback(model, said[goal.key].text
+                                                      if goal.key in said else "nothing yet", "cut")
+                            tries[goal.key] = tries.get(goal.key, 0) + 1
+                            return True
                     now = live(base.bid)
                     here = now.find(goal.key) if now else None
                     if here is not None:

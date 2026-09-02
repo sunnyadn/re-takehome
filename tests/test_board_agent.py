@@ -72,6 +72,8 @@ class ScriptLLM:
             return said("Take the obvious route.", 0.001)
         queue = self.scripts.get(model, [])
         reply = queue.pop(0) if queue else "have junk : True := by trivial"
+        if isinstance(reply, tuple):
+            return said(reply[0], 0.01, reply[1])
         return said(reply, 0.01)
 
 
@@ -378,3 +380,25 @@ def test_the_prefix_cut_is_guided_by_the_first_error_line():
 def test_the_graded_entry_point_can_be_the_board():
     from submission.board_agent import create_agent
     assert isinstance(create_agent(), BoardAgent)
+
+
+def test_a_reply_cut_by_the_token_limit_keeps_its_complete_steps():
+    # Measured on rmo_2001_2: 37 of 70 qwen step calls ended in `length` at
+    # 6000 tokens with 13k-24k chars written, and every one was thrown away.
+    cut = ("```lean\nhave key : True := by trivial\nhave more : True := by\n"
+           "  trivi", "length")
+    result, lean, llm, _ = run(ONE, {"model-a": ["no", cut, "exact key"]}, lines=("model-a",))
+    assert {"kind": "cut", "by": "model-a", "kept": 1} in result.metadata["events"]
+    assert result.metadata["accepted_by_repl"] is True
+    assert "have more" not in result.solution
+
+
+def test_a_step_may_post_a_subgoal_with_sorry():
+    # Measured on rmo_2001_2: `have h_gcd : ... := by sorry` was the one
+    # decomposition either model offered, and it came back as "no Lean".
+    result, lean, llm, _ = run(ONE, {
+        "model-a": ["no", "have key : True := by\n  sorry\nexact key", "exact key"],
+    }, lines=("model-a",))
+    assert [e["accepted"] for e in steps(result)][:1] == [True]
+    assert result.metadata["accepted_by_repl"] is True
+    assert "sorry" not in result.solution

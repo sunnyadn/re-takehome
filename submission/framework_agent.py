@@ -1240,8 +1240,9 @@ def lean_lines(text: str) -> str:
     return textwrap.dedent("\n".join(best)).strip()
 
 
-def screen_step(reply: str) -> str:
-    """A step is tactic lines. Prose around them is dropped, not spliced."""
+def screen_step(reply: str, allow_sorry: bool = False) -> str:
+    """A step is tactic lines. Prose around them is dropped, not spliced.
+    On the board a `sorry` is a subgoal being posted, so the board allows it."""
 
     blocks = [b for b in FENCED.findall(reply) if b.strip()]
     raw = strip_fences(blocks[-1] if blocks else reply)
@@ -1258,8 +1259,8 @@ def screen_step(reply: str) -> str:
     # A `sorry` is a placeholder for a goal that gets its own turn: a branch of
     # an `induction ... with`, or the body of a lemma being introduced. Anywhere
     # else it is the model closing the goal it was asked to prove.
-    if (re.search(r"\bsorry\b", block) and "with" not in block and "|" not in block
-            and not declaration_name(block)):
+    if (re.search(r"\bsorry\b", block) and not allow_sorry and "with" not in block
+            and "|" not in block and not declaration_name(block)):
         return ""
     # A step that does nothing still enters the file and every later prompt.
     if all(l.strip() in ("", "skip") for l in block.splitlines()):
