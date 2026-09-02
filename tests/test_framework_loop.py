@@ -776,3 +776,26 @@ def test_a_sweep_that_leaves_the_goal_untouched_is_not_progress():
         FakeServices(lean, llm)))
     assert {"kind": "closers", "by": "harness", "accepted": False} in result.metadata["events"]
     assert result.metadata["accepted_by_repl"] is True
+
+
+class SweepThatCollapsesBack(FakeLean):
+    """The sweep's own span renames the goal; collapsing the block puts it back."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "first" in source and "vm_probe" not in source:
+            self.sources.append(source)
+            return unsolved(skip_line(source), "Nested")
+        return await super().check_file(source)
+
+
+def test_a_sweep_is_judged_by_the_turn_and_not_by_its_own_span():
+    # Measured on p09: `_advance` saw a new goal, `_collapse_last` put the old
+    # one back 13 bytes later, and the pair ran 900 checks asking nobody.
+    lean, llm = SweepThatCollapsesBack(), FakeLLM(
+        ["have key : True := by trivial", "exact key"])
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=CHALLENGE),
+        FakeServices(lean, llm)))
+    assert {"kind": "closers", "by": "harness", "accepted": False} in result.metadata["events"]
+    assert result.metadata["accepted_by_repl"] is True

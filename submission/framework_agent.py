@@ -547,6 +547,7 @@ class FrameworkAgent:
                     events.append({"stage": "stop", "note": "budget headroom"})
                     break
 
+                began = state
                 nxt, why = await self._advance(state, block, services)
                 if nxt is not None and kind != "step" and stalled(state, nxt):
                     # Only a model's turn was ever counted against a goal, so a
@@ -613,6 +614,14 @@ class FrameworkAgent:
                     # A 39-way block left in the file is re-elaborated by every
                     # later check, and there is one per goal the sweep closes.
                     state = await self._collapse_last(state, services)
+                if kind != "step" and stalled(began, state):
+                    # Measured on p09: the sweep's own span made the goal look
+                    # new for one check, and collapsing the block put the same
+                    # goal back 13 bytes later. The turn is what has to move.
+                    events[-1] = {"kind": kind, "by": author, "accepted": False}
+                    feedback = Feedback(kind, "the sweep left the goal exactly as it was")
+                    state = await self._look(began.text, services, began.focus)
+                    continue
                 offer(state.text, state.accepted and is_done(state.text))
 
                 if state.goal != anchor_goal:
