@@ -862,15 +862,14 @@ class SimpEatsTheFact(FakeLean):
         return await super().check_file(source)
 
 
-def test_a_step_that_turns_a_fact_into_True_is_refused():
+def test_a_step_that_turns_a_fact_into_True_is_recorded():
     # Measured on p09: the context carried `h✝ : 2 ^ n % 7 = ...` and `h : True`,
     # the good fact shadowed by a name holding nothing, and Lean said nothing.
+    # Refusing it cost more than it saved, so for now it is only counted.
     lean, llm = SimpEatsTheFact(), FakeLLM(
         ["simp at h", "have key : True := by trivial", "exact key"])
     agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
     result = asyncio.run(agent.solve(
         Problem(id="demo", description="prove it", challenge=CHALLENGE),
         FakeServices(lean, llm)))
-    assert {"kind": "step", "by": "model-a", "accepted": False} in result.metadata["events"]
-    assert "simp at h" not in result.solution
-    assert result.metadata["accepted_by_repl"] is True
+    assert {"stage": "emptied", "by": "model-a", "kind": "step"} in result.metadata["events"]

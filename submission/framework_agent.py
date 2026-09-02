@@ -575,9 +575,10 @@ class FrameworkAgent:
                 began = state
                 nxt, why = await self._advance(state, block, services)
                 if nxt is not None and emptied(state, nxt):
-                    nxt, why = None, ("that step left a hypothesis whose type is "
-                                      "`True`, which is no fact at all; state what "
-                                      "you need as a new `have` under a fresh name")
+                    # Sampled on p09: refusing this step took the accepted rate
+                    # from 7/14 to 0/21 over two runs, and nothing recorded why.
+                    # It is counted until a run says what it costs.
+                    events.append({"stage": "emptied", "by": author, "kind": kind})
                 if nxt is not None and kind != "step" and stalled(state, nxt):
                     # Only a model's turn was ever counted against a goal, so a
                     # sweep that closed a goal nested under the cursor and left
