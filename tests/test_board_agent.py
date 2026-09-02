@@ -304,6 +304,19 @@ def test_the_model_sees_every_statement_and_only_its_own_body():
     assert shown.split("\n")[at - 1].strip() == "skip"
 
 
+def test_both_models_shared_facts_are_kept_when_they_differ():
+    # Measured on p09: the form of the one shared lemma, chosen by a single
+    # call at t=50s, decided 4 of 6 runs. Two true statements cost nothing.
+    result, lean, llm, _ = run(TWO, {
+        "model-a": ["theorem fact_a : True := by\n  sorry", "have key : P := by trivial", "exact key"],
+        "model-b": ["theorem fact_b : True := by\n  sorry", "have key : P := by trivial", "exact key"],
+    })
+    shares = [e for e in result.metadata["events"] if e.get("stage") == "share"]
+    assert [(e["name"], e["kept"]) for e in shares] == [("fact_a", True), ("fact_b", True)]
+    first = next(s for s in lean.sources if "theorem demo" in s and "fact_b" in s)
+    assert "theorem fact_a" in first and "theorem fact_b" in first
+
+
 def test_the_graded_entry_point_can_be_the_board():
     from submission.board_agent import create_agent
     assert isinstance(create_agent(), BoardAgent)

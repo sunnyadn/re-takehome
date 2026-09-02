@@ -984,35 +984,32 @@ class FrameworkAgent:
     async def _share(self, problem: Problem, text: str, services: Services,
                      ledger: Ledger, events: list[dict[str, Any]]) -> str:
         """The fact several theorems need, hoisted above them before any step.
+        Both models are asked at once and every distinct statement that
+        elaborates is kept: a true lemma costs nothing, and which form the
+        proof wants (`%` or `[MOD]`) decided 4 of 6 p09 runs at t=50s."""
 
-        Measured on p09: inviting this inside the step loop was read 52 times
-        and taken 0, because a step there is tactic lines and the models keep
-        the contract. Asked on its own it is a question they can answer."""
-
-        note = ""
-        for attempt in range(2):
-            ask = (f"Problem: {problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
-                   f"These {graded_theorems(problem.challenge)} theorems are "
-                   "graded together and share their mathematics. Name the one fact "
-                   "more than one of them needs, and state it as a standalone Lean 4 "
-                   "`theorem` above them. Reply with one ```lean block holding that "
-                   "declaration and nothing else. Leave its body `sorry`; proving it "
-                   "is a later turn." + note)
-            said, _ = await self._call(self.config.lines[attempt % len(self.config.lines)],
-                                       ask, STEP_TOKENS, services, ledger, think=True)
+        ask = (f"Problem: {problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
+               f"These {graded_theorems(problem.challenge)} theorems are "
+               "graded together and share their mathematics. Name the one fact "
+               "more than one of them needs, and state it as a standalone Lean 4 "
+               "`theorem` above them. Reply with one ```lean block holding that "
+               "declaration and nothing else. Leave its body `sorry`; proving it "
+               "is a later turn.")
+        replies = await asyncio.gather(*(
+            self._call(line, ask, STEP_TOKENS, services, ledger, think=True)
+            for line in self.config.lines[:2]))
+        for said, _ in replies:
             block = strip_fences(said).strip()
             named = declaration_name(block)
-            if not named or named in declared_names(problem.challenge):
-                note = "\n\nYour last reply declared no new theorem."
+            if not named or named in declared_names(text):
+                events.append({"stage": "share", "name": named, "kept": False})
                 continue
             candidate = insert_preamble(text, as_goal(block) or block)
             check = await services.lean.check_file(candidate)
             kept = not classify(check.messages)[3]
             events.append({"stage": "share", "name": named, "kept": kept})
             if kept:
-                return candidate
-            note = ("\n\nThat statement did not elaborate. Lean said:\n"
-                    + format_messages(check.messages)[:FEEDBACK_CHARS])
+                text = candidate
         return text
 
     async def _define(self, problem: Problem, text: str, services: Services,
