@@ -539,7 +539,7 @@ def test_a_closer_that_fires_is_flattened_from_its_own_trace_in_one_check():
                     for n, alt in alts:
                         tag = re.search(r'trace "([^"]+)"', alt)
                         if tag:
-                            msgs.append({"severity": "information", "pos": {"line": n - 1},
+                            msgs.append({"severity": "info", "pos": {"line": n - 1},
                                          "data": tag.group(1)})
                         if tag and "omega" in alt:
                             closed = True
@@ -633,7 +633,7 @@ class WitnessLean(BoardLean):
                               if l.strip() and len(l) - len(l.lstrip()) < depth), "")
                 claim = (above.split(":", 1)[1].split(":=")[0].strip()
                          if above.strip().startswith("have") else "True")
-                messages.append({"severity": "information", "pos": {"line": i - 1},
+                messages.append({"severity": "info", "pos": {"line": i - 1},
                                  "data": f"theorem extracted_1 {binders} : {claim} := sorry"})
         return LeanCheck(False, messages, True, False, 1)
 

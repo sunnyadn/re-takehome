@@ -368,7 +368,7 @@ def fired_closer(messages: Sequence[Any], span: tuple[int, int],
     block, whether or not Lean kept the tags of the alternatives that failed."""
     hits = []
     for m in messages:
-        if not isinstance(m, dict) or m.get("severity") != "information":
+        if not isinstance(m, dict) or m.get("severity") not in INFO:
             continue
         tag = CLOSER_TAG.match(str(m.get("data", "")).strip())
         line = message_line(m)
