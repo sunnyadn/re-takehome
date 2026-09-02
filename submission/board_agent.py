@@ -742,12 +742,15 @@ class BoardAgent(FrameworkAgent):
                     verdict = "unverified"
                     if names and can_ask():
                         header = DECL_HEAD.match(nxt.text[span[0]:span[1]]).group(1)
-                        reply, _ = await self._call(
+                        # Measured (rmo_2000_2 v7.16): with reasoning on, qwen
+                        # narrates 4k-7k chars into the reply and never reaches
+                        # the JSON at 2500 tokens; the per-model default answers.
+                        reply, stopped = await self._call(
                             other, audit_prompt(header, names, claim,
                                                 prefix.replace("import Mathlib", "")),
-                            AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM, think=True)
+                            AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM)
                         values = read_witness(reply, names) or {}
-                        if not values:
+                        if not values and stopped != "length" and "holds" in reply:
                             verdict = "holds"
                     if not names or values:
                         check = await services.lean.check_file(

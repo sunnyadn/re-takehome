@@ -67,6 +67,7 @@ class ScriptLLM:
         prompt = messages[-1]["content"]
         self.calls.append((model, prompt))
         self.systems = getattr(self, "systems", []) + [messages[0]["content"]]
+        self.kwargs = getattr(self, "kwargs", []) + [dict(kwargs, model=model)]
         if self.delay.get(model):
             await asyncio.sleep(self.delay[model])
         if "competition mathematician" in messages[0]["content"]:
@@ -637,3 +638,23 @@ def test_a_posted_have_that_a_witness_falsifies_never_reaches_the_board():
     assert any("x = 0" in p for _, p in llm.calls)
     assert "have bad" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
+
+
+def test_an_auditor_that_narrates_its_reasoning_is_asked_with_reasoning_off():
+    # Measured on rmo_2000_2 (v7.16, one16a): every qwen audit came back
+    # `length` at 2500 tokens, 4k-7k chars of narration and no JSON, so five
+    # audits in a row verified nothing. gpt-oss answered `{"holds": true}` in 15 chars.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = WitnessLean(), ScriptLLM({
+        "model-a": ["have bad : x = 3 := by\n  sorry\nexact key",
+                    "have key : True := by trivial\nexact key"],
+        "qwen-b": ['{"counterexample": {"x": "0"}}', "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a", "qwen-b"), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    audits = [k for k, s in zip(llm.kwargs, llm.systems) if "You audit" in s]
+    assert audits and all(k["model"] == "qwen-b" for k in audits)
+    assert all(k["reasoning"] == {"enabled": False} for k in audits)
+    assert any(e.get("kind") == "audit" for e in result.metadata["events"])
+
