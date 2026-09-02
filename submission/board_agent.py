@@ -113,6 +113,12 @@ WITHDRAW_AFTER = 4
 MAX_RESTATES = 2
 # A worker with no goal to take waits this long for the board to change.
 IDLE_WAIT_S = 2.0
+# What the model is told when its step ran the whole check into the timeout.
+TIMED_OUT = ("that step timed out: the file no longer checks within 120s. The tactic "
+             "is far too expensive (decide, omega or nlinarith over a large range, "
+             "simp with a wide lemma set); the step was removed. Use interval_cases "
+             "on a bounded variable, or state the cases as a disjunction and prove "
+             "each with norm_num")
 # A step that makes the file slower to check by this much is refused as too
 # expensive even when Lean raises no budget error: every later check pays it,
 # and the comparator allows 180s. Measured on p09: one accepted step took the
@@ -483,6 +489,10 @@ class BoardAgent(FrameworkAgent):
             _, surplus, expensive, failures = classify(nxt.messages)
             lines = [l for l in (message_line(m) for m in failures) if l and span[0] <= l <= span[1]]
             failed_at = (min(lines) - span[0]) if lines else 0
+            if any("TIMEOUT" in str(m.get("data")) for m in failures):
+                # Measured on putnam_2018_a1: a timed-out check cost 120s plus a
+                # container restart, and the prefix cut then paid it again.
+                return None, TIMED_OUT
             if expensive and not failures:
                 return None, BUDGET_RETRY
             if not failures and nxt.ms - base.ms > SLOW_STEP_MS:
@@ -542,7 +552,7 @@ class BoardAgent(FrameworkAgent):
 
             nonlocal raised
             nxt, why = await judge(base, goal, block)
-            if nxt is None and why != BUDGET_RETRY:
+            if nxt is None and why not in (BUDGET_RETRY, TIMED_OUT):
                 # The first error's line says where to cut; one check instead of
                 # eight. Measured: 3.7 checks per model call, most of them here.
                 cuts = prefixes(block)

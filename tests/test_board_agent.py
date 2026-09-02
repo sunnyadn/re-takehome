@@ -488,3 +488,25 @@ def test_a_have_whose_goal_keeps_failing_is_withdrawn_with_everything_after_it()
     assert any("withdrawn" in p for _, p in llm.calls)
     assert "have key : P" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
+
+
+def test_a_step_that_times_out_is_not_retried_by_prefix_or_search():
+    # Measured on putnam_2018_a1 (v7.10): one divisor enumeration timed the
+    # check out at 120s, the container restarted, and the prefix cut then ran
+    # the same tactic into the same timeout. Six minutes for one reply.
+    class SlowLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            if "decide +kernel" in source:
+                self.sources.append(source)
+                return LeanCheck(False, [{"severity": "error", "data": "TIMEOUT after 120s"}],
+                                 False, True, 120_000)
+            return await super().check_file(source)
+    lean = SlowLean()
+    llm = ScriptLLM({"model-a": ["have big : True := by\n  decide +kernel\nexact big",
+                                 "have key : True := by trivial", "exact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert sum("decide +kernel" in s for s in lean.sources) == 1
+    assert any("timed out" in p for _, p in llm.calls)
+    assert result.metadata["accepted_by_repl"] is True
