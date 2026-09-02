@@ -200,6 +200,17 @@ def read_board(text: str, messages: Sequence[dict[str, Any]], accepted: bool) ->
     return Board(text, goals, list(messages), accepted)
 
 
+def target_of(goal_text: str) -> str:
+    return goal_text.rsplit("⊢", 1)[-1].strip() if "⊢" in goal_text else ""
+
+
+def hyp_count(goal_text: str) -> int:
+    """Hypothesis lines: those before `⊢` that carry a `:`, `case` lines aside."""
+
+    head = goal_text.rsplit("⊢", 1)[0] if "⊢" in goal_text else goal_text
+    return sum(1 for l in head.split("\n") if ":" in l and not l.startswith("case "))
+
+
 def salvage(reply: str) -> str:
     """A reply cut mid-statement, less the statement it was cut in. Measured on
     rmo_2001_2: 37 of 70 step replies from one model ended at the token cap."""
@@ -469,6 +480,14 @@ class BoardAgent(FrameworkAgent):
                 return None, ("that step re-declared a name the context already "
                               "has (Lean shows the old one as `h✝`); use the "
                               "existing hypothesis instead of stating it again")
+            if any(target_of(g.text) == "False" and target_of(goal.text) != "False"
+                   and hyp_count(g.text) <= hyp_count(goal.text) for g in left):
+                # Measured on rmo_2001_2: a wrong witness left `hp : Nat.Prime 3,
+                # hq : Nat.Prime 11 ⊢ False` and 14 turns went into it.
+                return None, ("that step turned the goal into `False` without adding "
+                              "a hypothesis, so the context is still consistent and "
+                              "`False` cannot be proved: the witness, rewrite or case "
+                              "was wrong. Undo it and choose again")
             if any(len(VACUOUS.findall(g.text)) > len(VACUOUS.findall(goal.text)) for g in left):
                 # Measured on p09: `simp ... at h ⊢` left `h : True ⊢ False`, Lean
                 # had no complaint, and five turns went into a goal that was dead.

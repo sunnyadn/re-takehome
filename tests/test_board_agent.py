@@ -426,3 +426,26 @@ def test_after_the_plan_the_next_step_is_asked_as_a_skeleton_of_sorries():
     # Both sorries were posted: a later check rendered two placeholders.
     assert any(src.count("skip") >= 2 for src in lean.sources)
     assert result.metadata["accepted_by_repl"] is True
+
+
+def test_a_step_that_turns_the_goal_into_false_without_a_new_hypothesis_is_refused():
+    # Measured on rmo_2001_2 (v7.6): a wrong witness left `hp : Nat.Prime 3,
+    # hq : Nat.Prime 11 ⊢ False`, Lean had no complaint, and 14 turns went into
+    # a goal whose context is consistent. `by_contra` adds a hypothesis; a
+    # `False` that arrives without one is the step being wrong.
+    class FalsifyingLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            check = await super().check_file(source)
+            if "norm_num [h]" in source:
+                msgs = [dict(m, data=m["data"].replace("⊢ demo", "⊢ False"))
+                        if "unsolved" in str(m.get("data")) else m for m in check.messages]
+                return LeanCheck(check.accepted, msgs, check.has_sorry, False, 1)
+            return check
+    lean = FalsifyingLean()
+    llm = ScriptLLM({"model-a": ["norm_num [h]", "have key : True := by trivial", "exact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert steps(result)[0]["accepted"] is False
+    assert any("into `False`" in p for _, p in llm.calls)
+    assert result.metadata["accepted_by_repl"] is True
