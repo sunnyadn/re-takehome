@@ -997,8 +997,11 @@ class FrameworkAgent:
                "`theorem` above them. Reply with one ```lean block holding that "
                "declaration and nothing else. Leave its body `sorry`; proving it "
                "is a later turn.")
+        # Measured on p09 (6 of 6 runs): with reasoning on, qwen answered this
+        # with a page of prose and no declaration; only gpt-oss's lemma stayed.
         replies = await asyncio.gather(*(
-            self._call(line, ask, STEP_TOKENS, services, ledger, think=True)
+            self._call(line, ask, STEP_TOKENS, services, ledger,
+                       think=not any(n in line for n in NARRATES))
             for line in self.config.lines[:2]))
         for said, _ in replies:
             block = strip_fences(said).strip()

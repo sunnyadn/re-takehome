@@ -817,3 +817,18 @@ def test_a_hoisted_lemma_a_witness_breaks_does_not_enter_the_file():
                for e in result.metadata["events"])
     assert result.metadata["accepted_by_repl"] is True
 
+
+def test_a_model_that_narrates_is_asked_for_the_shared_lemma_with_reasoning_off():
+    # Measured on p09 (gate22, 6 of 6 runs): qwen's shared-lemma reply was
+    # prose, `kept: False, name: ''`; the run that got only `2^3 % 7 = 1` from
+    # the other model failed where the cycle lemma runs succeeded.
+    lean, llm = BoardLean(), ScriptLLM({
+        "model-a": ["no", "have key : True := by trivial", "exact key"],
+        "qwen-b": ["no", "have key : True := by trivial", "exact key"]})
+    agent = BoardAgent(Config(lines=("model-a", "qwen-b"), budget_usd=1.0, time_limit_s=600.0))
+    asyncio.run(agent.solve(Problem(id="demo", description="prove it", challenge=TWO),
+                            FakeServices(lean, llm)))
+    share = [k for k, (m, p) in zip(llm.kwargs, llm.calls)
+             if m == "qwen-b" and "graded together" in p]
+    assert share and all(k["reasoning"] == {"enabled": False} for k in share)
+
