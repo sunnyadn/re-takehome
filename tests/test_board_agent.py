@@ -48,9 +48,12 @@ class BoardLean:
                 if closed:
                     continue
                 hyps = "".join(f"{h} : P\n" for h in haves)
+                above = source.split("\n")[i - 2].strip() if i > 1 else ""
+                target = (above.split(":", 1)[1].split(":=")[0].strip()
+                          if above.startswith("have ") and above.endswith(":= by") else decl)
                 messages.append({"severity": "error", "pos": {"line": i - 2},
                                  "endPos": {"line": i - 1},
-                                 "data": f"unsolved goals\n{hyps}⊢ {decl}"})
+                                 "data": f"unsolved goals\n{hyps}⊢ {target}"})
         errors = [m for m in messages if m["severity"] == "error"]
         return LeanCheck(not errors, messages, "sorry" in source, False, 1)
 
@@ -607,13 +610,32 @@ def test_the_sweep_does_not_run_exact_search_on_every_goal():
 
 
 class WitnessLean(BoardLean):
-    """Real Lean would evaluate the witness file; here any witness file passes."""
+    """Real Lean would state each goal and evaluate the witness file; here
+    `extract_goal` states the theorem's binders, `intro` names and the enclosing
+    `have`'s claim, and any witness file passes."""
 
     async def check_file(self, source, timeout_s=None):
         if "(w_" in source:
             self.sources.append(source)
             return LeanCheck(True, [], False, False, 1)
-        return await super().check_file(source, timeout_s)
+        if "extract_goal" not in source:
+            return await super().check_file(source, timeout_s)
+        lines, messages, binders = source.split("\n"), [], ""
+        for i, line in enumerate(lines, start=1):
+            head = re.match(r"\s*theorem \w+ (.*) : (.*) := by", line)
+            if head:
+                binders, target = head.groups()
+            if line.strip().startswith("intro "):
+                binders += f" ({line.split()[1]} : {target.split('→')[0].strip()})"
+            if line.strip().endswith("extract_goal"):
+                depth = len(line) - len(line.lstrip())
+                above = next((l for l in reversed(lines[:i - 1])
+                              if l.strip() and len(l) - len(l.lstrip()) < depth), "")
+                claim = (above.split(":", 1)[1].split(":=")[0].strip()
+                         if above.strip().startswith("have") else "True")
+                messages.append({"severity": "information", "pos": {"line": i - 1},
+                                 "data": f"theorem extracted_1 {binders} : {claim} := sorry"})
+        return LeanCheck(False, messages, True, False, 1)
 
 
 def test_a_posted_have_that_a_witness_falsifies_never_reaches_the_board():
@@ -654,7 +676,28 @@ def test_an_auditor_that_narrates_its_reasoning_is_asked_with_reasoning_off():
         Problem(id="demo", description="prove it", challenge=challenge),
         FakeServices(lean, llm)))
     audits = [k for k, s in zip(llm.kwargs, llm.systems) if "You audit" in s]
-    assert audits and all(k["model"] == "qwen-b" for k in audits)
-    assert all(k["reasoning"] == {"enabled": False} for k in audits)
+    by_qwen = [k for k in audits if k["model"] == "qwen-b"]
+    assert by_qwen and all(k["reasoning"] == {"enabled": False} for k in by_qwen)
     assert any(e.get("kind") == "audit" for e in result.metadata["events"])
+
+
+def test_a_goal_under_an_intro_is_audited_in_the_context_lean_states():
+    # Measured on putnam_2018_a1 (v7.16, one16b): the proof opened with
+    # `constructor; intro h_eq`, so every later goal carried a name the header
+    # did not bind and 0 of 88 turns were audited; a false `h_bound` went up.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) : x < 2 → True := by\n  sorry\n"
+    lean, llm = WitnessLean(), ScriptLLM({
+        "model-a": ["intro hx\nhave bad : x = 3 := by\n  sorry\nexact key",
+                    '{"counterexample": {"x": "0"}}',
+                    "intro hx\nhave key : True := by trivial\nexact key",
+                    "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    witness = [s for s in lean.sources if "(w_" in s]
+    assert witness and "(x : ℕ) (w_x : x = (0)) : (x < 2) ∧ ¬ (x = 3)" in witness[0]
+    assert any(e.get("kind") == "audit" and e.get("verdict") == "refuted"
+               for e in result.metadata["events"])
+    assert "have bad" not in result.solution
 
