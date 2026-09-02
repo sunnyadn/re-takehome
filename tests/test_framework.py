@@ -366,3 +366,14 @@ def test_a_definition_slot_takes_a_term_and_is_not_a_goal():
     assert fw.definition_slots(filled) == ()
     # Once it holds a term the cursor moves on to the theorem below it.
     assert len(fw.placeholders(filled)) == 1
+
+
+def test_a_multi_line_have_loses_its_old_body_when_handed_to_search():
+    # Measured on p09: the old body dangled under the new one-line proof and
+    # Lean answered `unexpected token 'have'`, which the model then chased.
+    block = ("have h : 2 ^ n % 7 = 1 := by\n"
+             "  have inner : True := by trivial\n"
+             "  omega\n"
+             "exact h")
+    assert fw.hand_to_search(block) == (
+        "have h : 2 ^ n % 7 = 1 := by exact?\nexact h")

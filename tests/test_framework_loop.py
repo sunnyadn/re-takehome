@@ -724,3 +724,55 @@ def test_the_part_of_a_block_lean_takes_is_kept():
     assert "have key : True := by trivial" in result.solution
     assert "bad_lemma" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
+
+
+class TellsThemApart(FakeLean):
+    """The step's error and the `exact?` retry's error are different words."""
+
+    async def check_file(self, source, timeout_s=None):
+        for name, said in (("bad_lemma", "unknown identifier 'bad_lemma'"),
+                           ("exact?", "`exact?` could not close the goal")):
+            if name in source and "vm_probe" not in source:
+                self.sources.append(source)
+                return LeanCheck(False, [{"severity": "error",
+                                          "pos": {"line": skip_line(source) or 1},
+                                          "data": said}], True, False, 1)
+        return await super().check_file(source)
+
+
+def test_a_rejected_step_is_answered_with_its_own_error_not_the_retry_s():
+    # Measured on p09: 11 of 21 steps were told `exact?` had failed, which is
+    # not what the model wrote, so it resubmitted the same block.
+    lean, llm = TellsThemApart(), FakeLLM(
+        ["have bad : True := by exact bad_lemma",
+         "have key : True := by trivial", "exact key"])
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=CHALLENGE),
+        FakeServices(lean, llm)))
+    answered = wrote(llm)[1][1]
+    assert "bad_lemma" in answered
+    assert "`exact?` could not close the goal" not in answered.split("A search attempt")[0]
+
+
+class SweepThatSticks(FakeLean):
+    """The cocktail elaborates and leaves the very same goal behind."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "first" in source and "vm_probe" not in source:
+            self.sources.append(source)
+            return unsolved(skip_line(source))
+        return await super().check_file(source)
+
+
+def test_a_sweep_that_leaves_the_goal_untouched_is_not_progress():
+    # Measured on p09: this ran 640 times over 1058s, growing the file 13 bytes
+    # a turn, and no model was asked once.
+    lean, llm = SweepThatSticks(), FakeLLM(
+        ["have key : True := by trivial", "exact key"])
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=CHALLENGE),
+        FakeServices(lean, llm)))
+    assert {"kind": "closers", "by": "harness", "accepted": False} in result.metadata["events"]
+    assert result.metadata["accepted_by_repl"] is True

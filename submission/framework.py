@@ -476,9 +476,22 @@ UNKNOWN_NAME = re.compile(r"[Uu]nknown (identifier|constant)|environment does no
 
 
 def hand_to_search(block: str) -> str:
-    """Rule 1 of the framework, applied mechanically.
+    """A `have` stated right and proved wrong: `exact?` names the lemma or nothing does.
 
-    A `have` whose body names something Lean does not know is a fact stated
-    correctly with the wrong lemma; `exact?` names it or nothing does."""
+    Measured on p09: a multi-line `have ... := by` left its old body dangling
+    under the new one-line proof, and Lean answered with a syntax error."""
 
-    return HAVE_BODY.sub(r"\1by exact?", block)
+    lines, out, i = block.split("\n"), [], 0
+    while i < len(lines):
+        line = lines[i]
+        i += 1
+        found = HAVE_BODY.match(line)
+        if not found:
+            out.append(line)
+            continue
+        out.append(f"{found.group(1)}by exact?")
+        depth = len(line) - len(line.lstrip())
+        while i < len(lines) and (not lines[i].strip()
+                                  or len(lines[i]) - len(lines[i].lstrip()) > depth):
+            i += 1
+    return "\n".join(out)

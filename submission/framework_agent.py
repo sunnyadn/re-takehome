@@ -287,6 +287,14 @@ class State:
     goals: int = 0
 
 
+def stalled(before: State, after: State) -> bool:
+    """A step that grew the file and left the proof state exactly as it was."""
+
+    return (bool(before.goal) and after.goal == before.goal
+            and after.text != before.text
+            and len(placeholders(after.text)) >= len(placeholders(before.text)))
+
+
 @dataclass
 class Turn:
     """One proposal and what became of it."""
@@ -540,6 +548,11 @@ class FrameworkAgent:
                     break
 
                 nxt, why = await self._advance(state, block, services)
+                if nxt is not None and kind != "step" and stalled(state, nxt):
+                    # Only a model's turn was ever counted against a goal, so a
+                    # sweep that closed a goal nested under the cursor and left
+                    # the same one there ran 640 times on p09 and asked nobody.
+                    nxt, why = None, "the sweep left the goal exactly as it was"
                 for other, alternative in (spare if nxt is None else []):
                     nxt, why2 = await self._advance(state, alternative, services)
                     events.append({"kind": "second", "by": other,
@@ -550,25 +563,26 @@ class FrameworkAgent:
                     why = why2
                 if nxt is None and why != BUDGET_RETRY and kind == "step":
                     # One wrong name at line ten is not a reason to lose lines
-                    # one to nine. Lean is the cheap resource, so it is asked
-                    # how much of the reply it will take.
+                    # one to nine. The error kept is still the model's own; a
+                    # prefix's error describes a block it never wrote.
                     for shorter in prefixes(block)[:MAX_PREFIXES]:
-                        nxt, why2 = await self._advance(state, shorter, services)
+                        nxt, _ = await self._advance(state, shorter, services)
                         if nxt is not None:
                             events.append({"kind": "prefix", "by": author,
                                            "lines": shorter.count("\n") + 1})
                             block, why = shorter, ""
                             break
-                        why = why2
                 if nxt is None and why != BUDGET_RETRY:
                     # The fact may be right and only its proof wrong, which is
                     # exactly what `exact?` is for. One free check decides.
                     retry = hand_to_search(block)
                     if retry != block:
-                        nxt, why2 = await self._advance(state, retry, services)
+                        # Measured on p09: reporting this attempt's error told
+                        # the model `exact?` had failed, which is not what it
+                        # wrote; 11 of 21 steps were answered that way.
+                        nxt, _ = await self._advance(state, retry, services)
                         events.append({"kind": "search-retry", "by": author,
                                        "accepted": nxt is not None})
-                        why = why if nxt is not None else why2
                 if nxt is None and why == BUDGET_RETRY and not raised:
                     # A step that only ran out of elaboration budget is not a
                     # wrong step; give it the budget once and re-adjudicate.
