@@ -797,3 +797,23 @@ def test_a_model_that_narrates_is_asked_for_the_answer_term_with_reasoning_off()
              if k["model"] == "qwen-b" and "Give the value of" in p]
     assert asked and all(k["reasoning"] == {"enabled": False} for k in asked)
 
+
+def test_a_hoisted_lemma_a_witness_breaks_does_not_enter_the_file():
+    # Measured on putnam_2020_a2 (v7.23): `binomial_split` was hoisted with a
+    # statement false at j = 0 (ℕ subtraction) and the proof built on it.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = WitnessLean(), ScriptLLM({
+        "model-a": ["theorem bad (x : ℕ) : x = 3 := by\n  sorry",
+                    '{"counterexample": {"x": "0"}}',
+                    "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    assert "theorem bad" not in result.solution
+    assert any(e.get("kind") == "lemma" and e.get("accepted") is False
+               for e in result.metadata["events"])
+    assert any(e.get("kind") == "audit" and e.get("verdict") == "refuted"
+               for e in result.metadata["events"])
+    assert result.metadata["accepted_by_repl"] is True
+

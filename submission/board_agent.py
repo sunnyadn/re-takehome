@@ -434,12 +434,25 @@ def set_elements(term: str) -> list[list[str]] | None:
     return out
 
 
+def drop_declaration(text: str, decl: str) -> str:
+    """The file without one declaration (its head, its proof, its doc comment)."""
+    span = proof_span(text, decl)
+    if not span:
+        return text
+    start = text.rfind("\n\n", 0, span[0])
+    start = 0 if start < 0 else start + 2
+    end = text.find("\n\n", span[1])
+    end = len(text) if end < 0 else end + 2
+    return text[:start] + text[end:]
+
+
 def is_stated(lines: Sequence[str], goal: Goal) -> bool:
     """Whether the goal is the body of a statement the model wrote."""
     i = goal.line - 1
     above = next((j for j in range(i - 1, -1, -1) if lines[j].strip()
                   and len(lines[j]) - len(lines[j].lstrip()) < len(goal.indent)), None)
-    return above is not None and STATED_HEAD.match(lines[above]) is not None
+    return above is not None and (STATED_HEAD.match(lines[above]) is not None
+                                  or DECLARATION.match(lines[above]) is not None)
 
 
 def enclosing_chain(lines: Sequence[str], goal: Goal) -> list[tuple[int, re.Match]]:
@@ -643,7 +656,11 @@ class BoardAgent(FrameworkAgent):
                     break
             chosen = None
             for term, candidate in offers:
-                verdict, values = await self._audit_answer(candidate, term, services, ledger)
+                # The theorem that states the answer's role is the one audited.
+                users = [n for n in root_names(candidate)
+                         if (span := proof_span(candidate, n)) and name in candidate[span[0]:span[1]]]
+                verdict, values = await self._audit_root(
+                    candidate, (users or root_names(candidate))[0], services, ledger, term)
                 events.append({"stage": "define", "name": name, "kept": verdict != "refuted",
                                "term": term[:120], "verdict": verdict, "values": values})
                 if verdict != "refuted" and chosen is None:
@@ -654,18 +671,33 @@ class BoardAgent(FrameworkAgent):
                 text = chosen
         return text
 
-    async def _audit_answer(self, text: str, term: str, services: Services,
-                            ledger: Ledger) -> tuple[str, dict[str, str]]:
-        """A definition tried against the theorem that uses it: Lean states the
-        theorem's goal, each element of an explicit set answer and then the
-        auditor's values are tried as witnesses that the statement fails."""
+    async def _share(self, problem: Problem, text: str, services: Services,
+                     ledger: Ledger, events: list[dict[str, Any]]) -> str:
+        """As the framework's, and each kept statement is audited: a shared
+        lemma that a witness breaks does not enter the file."""
+
+        before = set(root_names(text))
+        text = await super()._share(problem, text, services, ledger, events)
+        for name in [n for n in root_names(text) if n not in before]:
+            verdict, values = await self._audit_root(text, name, services, ledger)
+            events.append({"stage": "share-audit", "name": name, "verdict": verdict,
+                           "values": values})
+            if verdict == "refuted":
+                text = drop_declaration(text, name)
+        return text
+
+    async def _audit_root(self, text: str, decl: str, services: Services,
+                          ledger: Ledger, term: str = "") -> tuple[str, dict[str, str]]:
+        """A declaration's statement tried against a witness: Lean states its
+        goal, each element of an explicit set answer (if `term` is one) and
+        then the auditor's values are tried as values that make it fail."""
 
         roots = root_names(text)
         holes = [(line_of(text, m.start()), m.group(1)) for m in placeholders(text)]
-        at = next(((l, ind) for l, ind in holes if owner(text, l)), None)
+        at = next(((l, ind) for l, ind in holes if owner(text, l) == decl), None)
         if not roots or at is None:
             return "unstated", {}
-        goal = Goal(at[0], at[1], owner(text, at[0]), "")
+        goal = Goal(at[0], at[1], decl, "")
         check = await services.lean.check_file(extract_file(text, [goal]),
                                                timeout_s=CHECK_TIMEOUT_FLOOR_S)
         stmt = statements(check.messages).get(goal.line, "")
@@ -1157,11 +1189,16 @@ class BoardAgent(FrameworkAgent):
                 if edit.kind == "hoist":
                     lifted = await look(insert_above(board.text, first_graded, edit.block))
                     kept = not classify(lifted.messages)[3]
+                    # Measured on putnam_2020_a2 (v7.23): a hoisted `binomial_split`
+                    # was false at j = 0 (ℕ subtraction); a lemma's statement is
+                    # audited like a `have` before it enters the file.
+                    bad = await audit(author, board, lifted) if kept else ""
+                    kept = kept and not bad
                     events.append({"kind": "lemma", "by": author, "name": edit.name,
                                    "accepted": kept})
                     if not kept:
                         said[goal.key] = Feedback(
-                            author, format_messages(lifted.messages)[:FEEDBACK_CHARS])
+                            author, bad or format_messages(lifted.messages)[:FEEDBACK_CHARS])
                         tries[goal.key] = tries.get(goal.key, 0) + 1
                         continue
                     await commit(lifted)
