@@ -66,6 +66,7 @@ class ScriptLLM:
     async def complete(self, *, model, messages, **kwargs):
         prompt = messages[-1]["content"]
         self.calls.append((model, prompt))
+        self.systems = getattr(self, "systems", []) + [messages[0]["content"]]
         if self.delay.get(model):
             await asyncio.sleep(self.delay[model])
         if "competition mathematician" in messages[0]["content"]:
@@ -400,3 +401,12 @@ def test_a_step_may_post_a_subgoal_with_sorry():
     assert [e["accepted"] for e in steps(result)][:1] == [True]
     assert result.metadata["accepted_by_repl"] is True
     assert "sorry" not in result.solution
+
+
+def test_the_board_tells_the_model_a_sorry_posts_a_subgoal():
+    # The cursor loop's system prompt says "give every have a body"; on the
+    # board a `have ... := by sorry` is the decomposition it wants.
+    result, lean, llm, _ = run(ONE, {"model-a": ["no", "exact key"]}, lines=("model-a",))
+    step_systems = [s for s in llm.systems if "competition mathematician" not in s]
+    assert step_systems and all("`sorry`" in s and "goal on the board" in s for s in step_systems)
+    assert not any("Give every `have` a body" in s for s in step_systems)

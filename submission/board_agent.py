@@ -72,6 +72,7 @@ from submission.framework_agent import (
     RAISED_BUDGETS,
     SLOW_COMPILE_MS,
     STEP_TOKENS,
+    FRAMEWORK_SYSTEM,
     Feedback,
     FrameworkAgent,
     State,
@@ -79,6 +80,22 @@ from submission.framework_agent import (
     notes_for,
     screen_step,
 )
+
+# The cursor loop's prompt, less "give every have a body": on the board a
+# `have` may end in `sorry` and becomes a goal of its own.
+BOARD_SYSTEM = FRAMEWORK_SYSTEM.replace(
+    "  obtain, subst, left, right, exfalso, interval_cases, by_contra, show, rw.\n"
+    "  A reshaping step goes alone, because it changes the goal for everything after.\n"
+    "- it asserts a new fact: a `have`. Give every `have` a body. Independent `have`s\n"
+    "  may be sent together; Lean names each one that fails.",
+    "  obtain, subst, left, right, exfalso, interval_cases, by_contra, show, rw.\n"
+    "  A reshaping step goes alone, because it changes the goal for everything after.\n"
+    "- it asserts a new fact: a `have`. A `have` whose proof is short gets its body;\n"
+    "  one whose proof is long ends in `:= by sorry` and becomes a goal on the board,\n"
+    "  proved in its own turn. When the proof left is more than about twenty lines,\n"
+    "  post its facts this way and prove one of them, do not write it all at once:\n"
+    "  a reply that runs past the token limit keeps only its complete steps.")
+assert "goal on the board" in BOARD_SYSTEM
 
 # Two rejections on a goal buy it a plan from the other model, as before.
 PLAN_AFTER = 2
@@ -717,7 +734,7 @@ class BoardAgent(FrameworkAgent):
                 if goal is None:
                     return False
                 task = asyncio.ensure_future(
-                    self._call(model, ask, STEP_TOKENS, services, ledger))
+                    self._call(model, ask, STEP_TOKENS, services, ledger, system=BOARD_SYSTEM))
                 loose.append(task)
                 try:
                     reply, why = await task
