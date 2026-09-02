@@ -703,3 +703,30 @@ def test_a_goal_under_an_intro_is_audited_in_the_context_lean_states():
                for e in result.metadata["events"])
     assert "have bad" not in result.solution
 
+
+def test_a_fact_posted_inside_a_have_lands_above_the_outermost_have():
+    # Measured on rmo_2000_2 (v7.19): every goal two rejections deep got a
+    # skeleton at its own depth, so `have`s nested seven levels, 25 goals were
+    # open at once and the withdraw count restarted with each layer.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    result, lean, llm, _ = run(challenge, {
+        "model-a": ["have outer : True := by\n  sorry\nexact outer",
+                    "have inner : 1 = 1 := by\n  sorry\nhave key : True := by trivial\nexact key",
+                    "have key2 : True := by trivial\nexact key2"]}, lines=("model-a",))
+    text = result.solution
+    assert "have inner" in text and text.index("have inner") < text.index("have outer")
+    assert any(e.get("kind") == "lifted" and e.get("from_depth") == 1
+               for e in result.metadata["events"])
+    assert result.metadata["accepted_by_repl"] is True
+
+
+def test_a_fact_already_on_the_board_is_not_posted_twice():
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    result, lean, llm, _ = run(challenge, {
+        "model-a": ["have outer : True := by\n  sorry\nexact outer",
+                    "have again : True := by\n  sorry\nhave key : True := by trivial\nexact key"]},
+        lines=("model-a",))
+    assert "have again" not in result.solution
+    assert any(e.get("kind") == "lifted" and e.get("dup") == 1
+               for e in result.metadata["events"])
+    assert result.metadata["accepted_by_repl"] is True

@@ -233,6 +233,7 @@ HAVE_HEAD = re.compile(r"^(\s*)(have\b.*?)\s*:=\s*by\s*$")
 
 
 CLOSER_TAG = re.compile(r"^closer (\d+)$")
+HAVE_NAME = re.compile(r"^\s*have\s+([A-Za-z_][\w'.]*)\s*(?::|:=)")
 
 
 # Tactics that evaluate a closed statement; none of them uses a hypothesis
@@ -388,6 +389,50 @@ def enclosing_have(lines: Sequence[str], goal: Goal) -> tuple[int | None, re.Mat
     above = next((j for j in range(i - 1, -1, -1) if lines[j].strip()
                   and len(lines[j]) - len(lines[j].lstrip()) < len(goal.indent)), None)
     return above, (HAVE_HEAD.match(lines[above]) if above is not None else None)
+
+
+def enclosing_chain(lines: Sequence[str], goal: Goal) -> list[tuple[int, re.Match]]:
+    """Every `have ... := by` the goal sits inside, nearest first."""
+    chain, probe = [], goal
+    while True:
+        above, head = enclosing_have(lines, probe)
+        if not head:
+            return chain
+        chain.append((above, head))
+        probe = Goal(above + 1, head.group(1), goal.decl, goal.text)
+
+
+def split_facts(block: str) -> tuple[list[str], str]:
+    """The `have ... := by sorry` statements at the top level of a block, and
+    the block without them."""
+    lines = normalise_steps(block).split("\n")
+    body = [l for l in lines if l.strip()]
+    base = min((len(l) - len(l.lstrip()) for l in body), default=0)
+    facts, rest, i = [], [], 0
+    while i < len(lines):
+        line = lines[i]
+        head = HAVE_HEAD.match(line)
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        if head and len(head.group(1)) == base and nxt.strip() == "sorry" \
+                and len(nxt) - len(nxt.lstrip()) > base:
+            facts.append(f"{line.strip()}\n  sorry")
+            i += 2
+            continue
+        rest.append(line)
+        i += 1
+    return facts, "\n".join(rest).strip("\n")
+
+
+def stated_facts(text: str, decl: str) -> dict[str, str]:
+    """Claim -> name for every `have` already inside a declaration's proof."""
+    span = proof_span(text, decl)
+    out: dict[str, str] = {}
+    for line in (text[span[0]:span[1]] if span else "").split("\n"):
+        head = HAVE_HEAD.match(line)
+        name = HAVE_NAME.match(line) if head else None
+        if head and name:
+            out[" ".join(claim_of(head.group(2).strip()).split())] = name.group(1)
+    return out
 
 
 def withdraw(text: str, goal: Goal) -> tuple[str, str]:
@@ -865,6 +910,56 @@ class BoardAgent(FrameworkAgent):
                     "back to before it. Do not restate that fact; prove this goal "
                     "another way, or through facts that are easier to prove", "withdrawn")
 
+        async def lift_and_advance(base: Board, goal: Goal, block: str,
+                                   author: str) -> tuple[Board | None, str]:
+            """A fact posted with `sorry` inside a `have` goes above the outermost
+            `have` instead: facts live at the shallowest scope. Measured on
+            rmo_2000_2 (v7.19): skeletons nested seven deep, 25 open goals, the
+            theorem's whole plan restated inside a `ring_nf` residue, and the
+            withdraw count reset by every new layer."""
+
+            lines = base.text.split("\n")
+            chain = enclosing_chain(lines, goal)
+            facts, rest = split_facts(block)
+            if not chain or not facts:
+                return await advance(base, goal, block, author)
+            known = stated_facts(base.text, goal.decl)
+            fresh, dup = [], []
+            for f in facts:
+                head = HAVE_HEAD.match(f.split("\n")[0])
+                claim = " ".join(claim_of(head.group(2).strip()).split())
+                (dup if claim in known else fresh).append((f, known.get(claim)))
+            if dup and not fresh and not rest:
+                names = ", ".join(f"`{n}`" for _, n in dup)
+                return None, (f"every fact in that step is already on the board ({names}); "
+                              "prove this goal from those facts, or close it directly")
+            outer, head = chain[-1]
+            lifted = [reindent(f, head.group(1)) for f, _ in fresh]
+            text = "\n".join(lines[:outer] + lifted + lines[outer:])
+            shift = sum(f.count("\n") + 1 for f in lifted)
+            moved = Goal(goal.line + shift, goal.indent, goal.decl, goal.text)
+            staged = Board(text, base.goals, base.messages, base.accepted, base.bid, base.ms)
+            if rest:
+                nxt, why = await advance(staged, moved, rest, author)
+            else:
+                nxt, why = await look(text, base), ""
+                if classify(nxt.messages)[3]:
+                    nxt, why = None, format_messages(classify(nxt.messages)[3])[:FEEDBACK_CHARS]
+                elif nxt is not None:
+                    bad = await audit(author, base, nxt)
+                    if bad:
+                        nxt, why = None, bad
+            if nxt is None:
+                return None, (why + f"\n(a fact stated inside `{head.group(2).strip()[:60]}` "
+                              "is posted before that `have`, at the top of the proof; it can "
+                              "only use the theorem's variables and the facts above it)")
+            events.append({"kind": "lifted", "by": author, "facts": len(lifted),
+                           "dup": len(dup), "from_depth": len(chain)})
+            if dup:
+                said[goal.key] = Feedback(author, "already on the board: " + ", ".join(
+                    f"`{n}`" for _, n in dup), "lifted")
+            return nxt, ""
+
         async def apply(author: str, goal: Goal, edits: list[Edit]) -> bool:
             """Every edit a reply asked for, each against the board as it stands."""
 
@@ -903,7 +998,7 @@ class BoardAgent(FrameworkAgent):
                                                   "already withdrawn from this declaration")
                         tries[goal.key] = tries.get(goal.key, 0) + 1
                         continue
-                    nxt, why = await advance(board, here, edit.body, author)
+                    nxt, why = await lift_and_advance(board, here, edit.body, author)
                     if nxt is None:
                         refused.add((here.key, edit.body))
                     events.append({"kind": "step", "by": author, "accepted": nxt is not None})
