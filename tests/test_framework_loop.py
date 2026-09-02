@@ -847,3 +847,30 @@ def test_the_fast_line_is_checked_without_waiting_for_the_slow_one():
     assert lean.saw_key is not None and llm.replied_b is not None
     assert lean.saw_key < llm.replied_b
     assert result.metadata["accepted_by_repl"] is True
+
+
+class SimpEatsTheFact(FakeLean):
+    """The step compiles and leaves `h : True` where a fact used to be."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "simp at h" in source:
+            self.sources.append(source)
+            line = skip_line(source)
+            return LeanCheck(False, [{"severity": "error", "pos": {"line": line or 1},
+                                      "data": "unsolved goals\nn : ℕ\nh : True\n⊢ True"}],
+                             True, False, 1)
+        return await super().check_file(source)
+
+
+def test_a_step_that_turns_a_fact_into_True_is_refused():
+    # Measured on p09: the context carried `h✝ : 2 ^ n % 7 = ...` and `h : True`,
+    # the good fact shadowed by a name holding nothing, and Lean said nothing.
+    lean, llm = SimpEatsTheFact(), FakeLLM(
+        ["simp at h", "have key : True := by trivial", "exact key"])
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=CHALLENGE),
+        FakeServices(lean, llm)))
+    assert {"kind": "step", "by": "model-a", "accepted": False} in result.metadata["events"]
+    assert "simp at h" not in result.solution
+    assert result.metadata["accepted_by_repl"] is True

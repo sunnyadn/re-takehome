@@ -288,6 +288,17 @@ class State:
     goals: int = 0
 
 
+VACUOUS = re.compile(r"^\S[^:]*:\s*True\s*$", re.M)
+
+
+def emptied(before: State, after: State) -> bool:
+    """A hypothesis of type `True` is no fact, so a step that makes one has
+    thrown a fact away. Lean has no complaint about it, and the name it took
+    shadows what was there before."""
+
+    return len(VACUOUS.findall(after.goal)) > len(VACUOUS.findall(before.goal))
+
+
 def stalled(before: State, after: State) -> bool:
     """A step that grew the file and left the proof state exactly as it was."""
 
@@ -563,6 +574,10 @@ class FrameworkAgent:
 
                 began = state
                 nxt, why = await self._advance(state, block, services)
+                if nxt is not None and emptied(state, nxt):
+                    nxt, why = None, ("that step left a hypothesis whose type is "
+                                      "`True`, which is no fact at all; state what "
+                                      "you need as a new `have` under a fresh name")
                 if nxt is not None and kind != "step" and stalled(state, nxt):
                     # Only a model's turn was ever counted against a goal, so a
                     # sweep that closed a goal nested under the cursor and left
