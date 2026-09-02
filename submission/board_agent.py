@@ -583,11 +583,40 @@ def salvage(reply: str) -> str:
     return cuts[0] if cuts else ""
 
 
+HAVE_OPEN = re.compile(r"^(\s*)(have|suffices|show|obtain)\b")
+
+
+def fold_heads(block: str) -> str:
+    """A statement split over several lines, joined onto its first line, so
+    that every reader of the board (audit, lift, withdraw, restate) sees it.
+    Lean does not mind the line length."""
+    lines, out, i = block.split("\n"), [], 0
+    while i < len(lines):
+        line = lines[i]
+        head = HAVE_OPEN.match(line)
+        if head and ":=" not in line:
+            depth, j, joined = len(head.group(1)), i + 1, line.rstrip()
+            while j < len(lines) and lines[j].strip() and \
+                    len(lines[j]) - len(lines[j].lstrip()) > depth:
+                joined += " " + lines[j].strip()
+                if ":=" in lines[j]:
+                    j += 1
+                    break
+                j += 1
+            if ":=" in joined:
+                out.append(joined)
+                i = j
+                continue
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
 def put(text: str, goal: Goal, block: str, trailing: bool = True) -> tuple[str, tuple[int, int]]:
     """The block where the goal's placeholder is, and the lines it now covers."""
 
     lines = text.split("\n")
-    body = reindent(normalise_steps(block), goal.indent)
+    body = reindent(normalise_steps(fold_heads(block)), goal.indent)
     if trailing:
         body = f"{body}\n{goal.indent}sorry"
     lines[goal.line - 1] = body

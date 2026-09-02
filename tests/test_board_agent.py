@@ -899,3 +899,21 @@ def test_a_goal_a_model_repeats_itself_on_goes_to_the_end_of_its_line():
     assert goals[:3] == ["demo", "demo", "demo_b"]
     assert result.metadata["accepted_by_repl"] is True
 
+
+def test_a_statement_split_over_lines_is_still_audited():
+    # Measured on putnam_2018_a1 (v7.23): `have h_cases :` followed by six
+    # indented disjuncts and `:= by` on the last line matched no reader of the
+    # board, so it was neither audited nor lifted nor withdrawable.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = WitnessLean(), ScriptLLM({
+        "model-a": ["have bad :\n    x = 3 ∨\n    x = 4 := by\n  sorry\nexact key",
+                    '{"counterexample": {"x": "0"}}',
+                    "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    assert any(e.get("kind") == "audit" and e.get("verdict") == "refuted"
+               and e.get("goal") == "x = 3 ∨ x = 4" for e in result.metadata["events"])
+    assert "have bad" not in result.solution
+
