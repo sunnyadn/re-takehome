@@ -907,3 +907,36 @@ def test_an_answer_slot_is_a_declaration_but_not_a_second_theorem():
     import submission.framework as fw
     assert fw.graded_theorems(ANSWER_CHALLENGE) == 1
     assert fw.graded_theorems(TWO) == 2
+
+
+class DeadEnd(FakeLean):
+    """One accepted step opens a goal nothing closes, and there is no second
+    placeholder to park on."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "descend" in source and "vm_probe" not in source:
+            self.sources.append(source)
+            line = skip_line(source)
+            if source.count("have ") > 1:
+                return LeanCheck(False, [{"severity": "error", "pos": {"line": line or 1},
+                                          "data": "linarith failed to find a contradiction"}],
+                                 True, False, 1)
+            return unsolved(line, "Dead")
+        return await super().check_file(source)
+
+
+def test_a_goal_with_nowhere_to_park_is_backed_out_of():
+    # Measured on p09: rejected steps counted only towards `park`, so one goal
+    # with nothing to park to held the cursor for 512s and 40 model calls, on a
+    # goal that was not true. The loop could descend and never climb.
+    lean, llm = DeadEnd(), FakeLLM(
+        ["have descend : True := by trivial"]
+        + [f"have b{i} : True := by trivial" for i in range(6)]
+        + ["have key : True := by trivial", "exact key"])
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=CHALLENGE),
+        FakeServices(lean, llm)))
+    assert [e for e in result.metadata["events"] if e.get("stage") == "backtrack"]
+    assert "descend" not in result.solution
+    assert result.metadata["accepted_by_repl"] is True

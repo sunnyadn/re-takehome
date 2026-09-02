@@ -350,6 +350,7 @@ class FrameworkAgent:
         raised = False
         spare: list[tuple[str, str]] = []
         anchor_goal, anchor_text, on_goal, stuck = "", text, 0, 0
+        prior_text = text
         sound = text
         reverted: dict[str, int] = {}
         tried: dict[str, int] = {}
@@ -384,6 +385,27 @@ class FrameworkAgent:
             stalls, plan, feedback, on_goal, stuck = 0, "", None, 0, 0
             anchor_goal, anchor_text = moved.goal, moved.text
             return moved
+
+        async def backtrack(state: State) -> State:
+            """Leave a goal nothing works on: sideways if there is another,
+            backwards if there is not.
+
+            Measured on p09: rejected steps only ever counted towards `park`,
+            so a single goal with nowhere to park held the cursor for 512s and
+            40 model calls, on a goal that was not true to begin with."""
+
+            nonlocal prior_text
+            moved = await park(state, "rejected")
+            if moved.goal != state.goal:
+                return moved
+            if reverted.get(state.goal, 0) >= MAX_REVERTS or prior_text == state.text:
+                return moved
+            reverted[state.goal] = reverted.get(state.goal, 0) + 1
+            events.append({"stage": "backtrack", "goal": state.goal[:60]})
+            gone, prior_text = prior_text, state.text
+            back = await self._look(gone, services)
+            tried[back.goal] = 0
+            return back
 
         def result(source: str, how: str, accepted: bool) -> AgentResult:
             # Turns are many and alike; a stage is rare and is why the run went
@@ -643,7 +665,7 @@ class FrameworkAgent:
                     if kind == "step":
                         tried[state.goal] = tried.get(state.goal, 0) + 1
                         if tried[state.goal] >= PARK_AFTER:
-                            state = await park(state, "rejected")
+                            state = await backtrack(state)
                     continue
                 state, feedback, stalls = nxt, None, 0
                 if kind == "closers":
@@ -661,6 +683,7 @@ class FrameworkAgent:
                 offer(state.text, state.accepted and is_done(state.text))
 
                 if state.goal != anchor_goal:
+                    prior_text = anchor_text
                     anchor_goal, anchor_text, on_goal, stuck = state.goal, state.text, 0, 0
                     plan = ""
                     continue
