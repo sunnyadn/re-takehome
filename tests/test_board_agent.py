@@ -175,6 +175,20 @@ def test_a_rejected_prefix_keeps_the_lines_that_were_right():
     assert result.metadata["accepted_by_repl"] is True
 
 
+def test_restating_a_closed_declaration_pushes_feedback_and_counts():
+    # Both goals share a body; a reply that restates the closed sibling must
+    # not spin. Measured on p09: a rejection path that touched no counter ran
+    # one model 481 times.
+    challenge = ("import Mathlib\n\ntheorem demo : True := by\n  sorry\n\n"
+                 "theorem demo_b : True := by\n  trivial\n")
+    result, lean, llm, _ = run(challenge, {
+        "model-a": ["no", "no", "theorem demo_b : True := by trivial",
+                    "have key : True := by trivial", "exact key"],
+    }, lines=("model-a",))
+    assert [e for e in result.metadata["events"] if e.get("kind") == "drop"]
+    assert any("already declared" in p for _, p in llm.calls)
+
+
 def test_the_graded_entry_point_can_be_the_board():
     from submission.board_agent import create_agent
     assert isinstance(create_agent(), BoardAgent)

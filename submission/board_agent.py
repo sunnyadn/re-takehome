@@ -10,7 +10,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
-from re_harness import AgentResult, Problem, Services
+from re_harness import AgentResult, LLMCallError, Problem, Services
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
@@ -398,6 +398,10 @@ class BoardAgent(FrameworkAgent):
                     continue
                 if edit.kind == "drop":
                     events.append({"kind": "drop", "by": author, "name": edit.name})
+                    said[goal.key] = Feedback(
+                        author, f"`{edit.name}` is already declared; work the goal "
+                        "you were shown, do not restate it", "rejected")
+                    tries[goal.key] = tries.get(goal.key, 0) + 1
                     continue
                 if edit.kind == "step":
                     if here is None:
@@ -593,7 +597,12 @@ class BoardAgent(FrameworkAgent):
                     problem, text, names, services, ledger, events)
 
             await commit(await look(text))
-            await asyncio.gather(*(worker(m) for m in models))
+            tasks = [asyncio.ensure_future(worker(m)) for m in models]
+            try:
+                await asyncio.gather(*tasks)
+            finally:
+                finished = True
+                await asyncio.wait(tasks, timeout=LOOSE_DRAIN_S)
 
             if is_done(board.text):
                 won = await deliver(board.text, "board_loop")
@@ -601,7 +610,7 @@ class BoardAgent(FrameworkAgent):
                     return won
             offer(board.text, False)
             return result(best, "best_effort", False)
-        except (BudgetExceeded, BudgetAccountingError, LeanRuntimeError) as exc:
+        except (BudgetExceeded, BudgetAccountingError, LeanRuntimeError, LLMCallError) as exc:
             events.append({"stage": "abort", "error": type(exc).__name__})
             return result(best, "aborted", False)
         finally:
