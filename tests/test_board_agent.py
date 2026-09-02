@@ -288,6 +288,22 @@ def test_a_byte_identical_step_is_not_sent_to_lean_twice():
     assert sum("\n  linarith\n" in s for s in lean.sources) == 1
 
 
+def test_the_model_sees_every_statement_and_only_its_own_body():
+    # Measured on p09: the last 8000 chars of the file cut the shared lemma's
+    # statement off the top, and the model cited a lemma it could not see.
+    from submission.board_agent import view
+    from submission.framework import render
+    text = ("import Mathlib\n\ntheorem lemma_a (n : ℕ) :\n    n + 0 = n := by\n  simp\n  omega\n\n"
+            "theorem lemma_b : True := by\n  sorry\n\n"
+            "/-- doc -/\ntheorem demo : True := by\n  have k : True := trivial\n  sorry\n")
+    shown, at = view(render(text, 1)[0], "demo")
+    assert "n + 0 = n := by\n  -- proved, 2 lines elided" in shown
+    assert "simp" not in shown
+    assert "theorem lemma_b : True := by\n  sorry" in shown
+    assert "have k : True := trivial\n  skip" in shown
+    assert shown.split("\n")[at - 1].strip() == "skip"
+
+
 def test_the_graded_entry_point_can_be_the_board():
     from submission.board_agent import create_agent
     assert isinstance(create_agent(), BoardAgent)

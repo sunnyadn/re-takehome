@@ -31,6 +31,7 @@ from submission.agent import (
 )
 from submission.framework import (
     DECLARATION,
+    DECL_HEAD,
     as_goal,
     axiom_probe,
     classify,
@@ -164,6 +165,29 @@ def put(text: str, goal: Goal, block: str, trailing: bool = True) -> tuple[str, 
         body = f"{body}\n{goal.indent}sorry"
     lines[goal.line - 1] = body
     return "\n".join(lines), (goal.line, goal.line + body.count("\n"))
+
+
+def view(source: str, decl: str) -> tuple[str, int]:
+    """The file as the model should read it: every statement in full, and only
+    the body of the declaration being worked on. The `skip` line is recomputed.
+    Measured on p09: the last 8000 chars of the file cut the shared lemma's
+    statement off the top, and the model cited a lemma it could not see."""
+
+    out, kept_lines = [], 0
+    for name in root_names(source):
+        span = proof_span(source, name)
+        if not span or name == decl:
+            continue
+        body = source[span[0]:span[1]]
+        head = DECL_HEAD.match(body)
+        if not head or "skip" in body or "sorry" in body:
+            continue
+        lines = len([l for l in body[head.end():].split("\n") if l.strip()])
+        out.append((span, f"{head.group(1)}\n  -- proved, {lines} lines elided\n\n"))
+    for (start, end), replacement in sorted(out, reverse=True):
+        source = source[:start] + replacement + source[end:]
+    at = next((i for i, l in enumerate(source.split("\n"), start=1) if l.strip() == "skip"), 0)
+    return source, at
 
 
 @dataclass
@@ -520,7 +544,7 @@ class BoardAgent(FrameworkAgent):
             await commit(await look(fresh_text))
 
         def prompt_for(goal: Goal, model: str) -> str:
-            source, line = render(board.text, board.index(goal))
+            source, line = view(*render(board.text, board.index(goal))[:1], goal.decl)
             parts = [f"Problem: {problem.description}".strip(),
                      "File:\n" + source[-FILE_CHARS:],
                      "What Lean reports as open, with its hypotheses. The first goal "
