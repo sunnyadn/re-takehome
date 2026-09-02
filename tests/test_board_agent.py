@@ -781,3 +781,19 @@ def test_an_answer_term_a_witness_breaks_is_not_used():
     assert defines[0]["values"] == {"a": "0", "b": "3"}
     assert "(2, 0)" in result.solution and "(0, 3)" not in result.solution
 
+
+def test_a_model_that_narrates_is_asked_for_the_answer_term_with_reasoning_off():
+    challenge = ("import Mathlib\n\nabbrev demo_solution : Set (ℕ × ℕ) := by\n  sorry\n\n"
+                 "theorem demo (a b : ℕ) : a + b = 2 ↔ (a, b) ∈ demo_solution := by\n  sorry\n")
+    lean, llm = AnswerLean(), ScriptLLM({
+        "model-a": ["({(1, 1), (2, 0), (0, 2)} : Set (ℕ × ℕ))", '{"holds": true}',
+                    "have key : True := by trivial\nexact key"] * 2,
+        "qwen-b": ["({(1, 1), (2, 0), (0, 2)} : Set (ℕ × ℕ))",
+                   "have key : True := by trivial\nexact key"] * 2})
+    agent = BoardAgent(Config(lines=("model-a", "qwen-b"), budget_usd=1.0, time_limit_s=600.0))
+    asyncio.run(agent.solve(Problem(id="demo", description="prove it", challenge=challenge),
+                            FakeServices(lean, llm)))
+    asked = [k for k, p in zip(llm.kwargs, [p for _, p in llm.calls])
+             if k["model"] == "qwen-b" and "Give the value of" in p]
+    assert asked and all(k["reasoning"] == {"enabled": False} for k in asked)
+

@@ -622,7 +622,10 @@ class BoardAgent(FrameworkAgent):
                        "and nothing else. It is the answer itself, not a proof of it, "
                        "so no tactics and no `by`. A finite set is written as its "
                        "elements, `({(1, 2), (3, 4)} : T)`, never as a set-builder." + note)
-                said, _ = await self._call(model, ask, ANSWER_TOKENS, services, ledger, think=True)
+                # Measured one23b: with reasoning on, qwen answered the term
+                # question with a page of derivation twice; gpt-oss alone offered.
+                said, _ = await self._call(model, ask, ANSWER_TOKENS, services, ledger,
+                                           think=not narrates(model))
                 term = " ".join(strip_fences(said).split("\n"))[:FEEDBACK_CHARS].strip()
                 if not term or term.startswith("by "):
                     note = "\n\nYour last reply was not a term."
