@@ -966,3 +966,33 @@ def test_a_false_goal_in_a_satisfiable_context_is_refused():
     assert "exfalso" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
 
+
+def test_a_fact_already_proved_in_scope_is_not_proved_again():
+    # Measured on p09 (gate33 run 1): the same claim proved twice in one
+    # declaration, one `have` inside the other, and both models working on both.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    result, lean, llm, _ = run(challenge, {
+        "model-a": ["have h1 : x < 5 := by\n  omega\nhave key : True := by trivial\nexact key"]
+                   * 1 + ["have h1' : x < 5 := by\n  omega\nexact key"],
+        "model-b": ["have h1 : x < 5 := by\n  omega",
+                    "have again : x < 5 := by\n  omega\nhave key : True := by trivial\nexact key",
+                    "have key : True := by trivial\nexact key"]},
+        lines=("model-b",))
+    assert any(e.get("kind") == "restated" and e.get("of") == ["h1"]
+               for e in result.metadata["events"])
+    assert "have again" not in result.solution
+    assert result.metadata["accepted_by_repl"] is True
+
+
+def test_the_same_shared_lemma_under_two_names_is_kept_once():
+    # Measured on p09 (gate33 run 1): both models proposed `2 ^ n % 7 = 2 ^ (n % 3) % 7`
+    # under different names, and the board proved both.
+    from submission.board_agent import signature, drop_declaration
+    text = ("import Mathlib\ntheorem a_cycle (n : ℕ) : 2 ^ n % 7 = 2 ^ (n % 3) % 7 := by\n  sorry\n\n"
+            "theorem b_cycle (n : ℕ) :  2 ^ n % 7 = 2 ^ (n % 3) % 7 := by\n  sorry\n\n"
+            "theorem other (n : ℕ) : 2 ^ n % 7 < 7 := by\n  sorry\n")
+    assert signature(text, "a_cycle") == signature(text, "b_cycle")
+    assert signature(text, "a_cycle") != signature(text, "other")
+    dropped = drop_declaration(text, "b_cycle")
+    assert "b_cycle" not in dropped and "a_cycle" in dropped and "other" in dropped
+

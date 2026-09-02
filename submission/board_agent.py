@@ -240,6 +240,7 @@ STATED_HEAD = re.compile(r"^(\s*)((?:have|suffices|show|obtain)\b.*?)\s*:=\s*by\
 
 
 CLOSER_TAG = re.compile(r"^closer (\d+)$")
+DECL_NAME = re.compile(r"\s*(?:private\s+)?(?:theorem|lemma)\s+[\w'.]+")
 HAVE_NAME = re.compile(r"^\s*have\s+([A-Za-z_][\w'.]*)\s*(?::|:=)")
 
 
@@ -467,6 +468,16 @@ def set_elements(term: str) -> list[list[str]] | None:
     return out
 
 
+def signature(text: str, decl: str) -> str:
+    """A declaration's statement with its name and whitespace taken out."""
+    span = proof_span(text, decl)
+    head = DECL_HEAD.match(text[span[0]:span[1]]) if span else None
+    if not head:
+        return decl
+    stmt = DECL_NAME.sub("", head.group(1), count=1) if DECL_NAME.match(head.group(1)) else head.group(1)
+    return " ".join(stmt.rsplit(":=", 1)[0].split())
+
+
 def drop_declaration(text: str, decl: str) -> str:
     """The file without one declaration (its head, its proof, its doc comment)."""
     span = proof_span(text, decl)
@@ -474,9 +485,7 @@ def drop_declaration(text: str, decl: str) -> str:
         return text
     start = text.rfind("\n\n", 0, span[0])
     start = 0 if start < 0 else start + 2
-    end = text.find("\n\n", span[1])
-    end = len(text) if end < 0 else end + 2
-    return text[:start] + text[end:]
+    return text[:start] + text[span[1]:]
 
 
 def is_stated(lines: Sequence[str], goal: Goal) -> bool:
@@ -534,6 +543,29 @@ def restates(block: str, claims: Sequence[str]) -> bool:
         if head and " ".join(claim_of(head.group(2).strip()).split()) in gone:
             return True
     return False
+
+
+def proved_facts(text: str, goal: Goal) -> dict[str, str]:
+    """Claim -> name for every proved `have` (no placeholder in its block) that
+    is in scope at the goal: above it, and its block not yet closed."""
+    lines = text.split("\n")
+    out: dict[str, str] = {}
+    for i in range(goal.line - 1):
+        head = HAVE_HEAD.match(lines[i])
+        name = HAVE_NAME.match(lines[i]) if head else None
+        if not (head and name) or len(head.group(1)) > len(goal.indent):
+            continue
+        depth = len(head.group(1))
+        j = i + 1
+        while j < len(lines) and (not lines[j].strip()
+                                  or len(lines[j]) - len(lines[j].lstrip()) > depth):
+            j += 1
+        between = [l for l in lines[j:goal.line - 1] if l.strip()]
+        if any(len(l) - len(l.lstrip()) < depth for l in between):
+            continue
+        if not any(l.strip() == "sorry" for l in lines[i + 1:j]):
+            out[" ".join(claim_of(head.group(2).strip()).split())] = name.group(1)
+    return out
 
 
 def stated_facts(text: str, decl: str) -> dict[str, str]:
@@ -754,7 +786,16 @@ class BoardAgent(FrameworkAgent):
 
         before = set(root_names(text))
         text = await super()._share(problem, text, services, ledger, events)
+        seen: set[str] = {signature(text, n) for n in before}
         for name in [n for n in root_names(text) if n not in before]:
+            sig = signature(text, name)
+            if sig in seen:
+                # Measured on p09: both models proposed the same lemma under two
+                # names and both were being proved.
+                events.append({"stage": "share-audit", "name": name, "verdict": "duplicate"})
+                text = drop_declaration(text, name)
+                continue
+            seen.add(sig)
             verdict, values = await self._audit_root(text, name, services, ledger)
             events.append({"stage": "share-audit", "name": name, "verdict": verdict,
                            "values": values})
@@ -1292,6 +1333,16 @@ class BoardAgent(FrameworkAgent):
                         events.append({"kind": "restated", "by": author})
                         said[goal.key] = Feedback(author, "that step restates a fact "
                                                   "already withdrawn from this declaration")
+                        tries[goal.key] = tries.get(goal.key, 0) + 1
+                        continue
+                    present = proved_facts(board.text, here)
+                    if restates(edit.body, present):
+                        # Measured on p09: the same claim proved twice in one declaration.
+                        names = [present[c] for c in present if restates(edit.body, [c])]
+                        events.append({"kind": "restated", "by": author, "of": names[:3]})
+                        said[goal.key] = Feedback(author, "that step states a fact already "
+                                                  "on the board as " + ", ".join(f"`{n}`" for n in names[:3])
+                                                  + "; use it, do not prove it again")
                         tries[goal.key] = tries.get(goal.key, 0) + 1
                         continue
                     nxt, why = await lift_and_advance(board, here, edit.body, author)
