@@ -230,6 +230,11 @@ META = re.compile(r"\?[\w.]+|^(?:Type|Sort)\b")
 
 
 HAVE_HEAD = re.compile(r"^(\s*)(have\b.*?)\s*:=\s*by\s*$")
+# A goal whose statement the model wrote itself, as opposed to one Lean derived
+# from an `intro`, `constructor` or `rcases`. Measured (v7.21, 10 min): auditing
+# every new goal was 30 of 95 calls and 48% of the wall clock, under the lock;
+# every false statement ever caught was a `have`.
+STATED_HEAD = re.compile(r"^(\s*)((?:have|suffices|show|obtain)\b.*?)\s*:=\s*by\s*$")
 
 
 CLOSER_TAG = re.compile(r"^closer (\d+)$")
@@ -389,6 +394,14 @@ def enclosing_have(lines: Sequence[str], goal: Goal) -> tuple[int | None, re.Mat
     above = next((j for j in range(i - 1, -1, -1) if lines[j].strip()
                   and len(lines[j]) - len(lines[j].lstrip()) < len(goal.indent)), None)
     return above, (HAVE_HEAD.match(lines[above]) if above is not None else None)
+
+
+def is_stated(lines: Sequence[str], goal: Goal) -> bool:
+    """Whether the goal is the body of a statement the model wrote."""
+    i = goal.line - 1
+    above = next((j for j in range(i - 1, -1, -1) if lines[j].strip()
+                  and len(lines[j]) - len(lines[j].lstrip()) < len(goal.indent)), None)
+    return above is not None and STATED_HEAD.match(lines[above]) is not None
 
 
 def enclosing_chain(lines: Sequence[str], goal: Goal) -> list[tuple[int, re.Match]]:
@@ -776,8 +789,9 @@ class BoardAgent(FrameworkAgent):
                          next((m for m in models if not narrates(m)),
                               next((m for m in models if m != author), author)))
             had = {g.key for g in base.goals}
+            lines = nxt.text.split("\n")
             fresh = [g for g in nxt.goals if g.key not in had and g.text
-                     and not META.search(target_of(g.text))]
+                     and not META.search(target_of(g.text)) and is_stated(lines, g)]
             for g in fresh:
                 if audited.get(g.key):
                     return audited[g.key]
@@ -795,7 +809,6 @@ class BoardAgent(FrameworkAgent):
             replies = await asyncio.gather(*(self._call(
                 other, audit_prompt(stated[g.line], prefix.replace("import Mathlib", "")),
                 AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM) for g in asked))
-            lines = nxt.text.split("\n")
             for g in fresh:
                 audited[g.key] = ""
                 verdict, values, target = "unstated", {}, target_of(g.text)

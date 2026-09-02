@@ -730,3 +730,21 @@ def test_a_fact_already_on_the_board_is_not_posted_twice():
     assert any(e.get("kind") == "lifted" and e.get("dup") == 1
                for e in result.metadata["events"])
     assert result.metadata["accepted_by_repl"] is True
+
+
+def test_only_a_goal_the_model_stated_is_audited():
+    # Measured (v7.21, first 10 min of rmo_2000_2): 30 audits in 95 calls, 48%
+    # of the wall clock under the lock; every false statement ever caught was a
+    # `have`. A goal Lean derived from a tactic is not sent to the auditor.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = WitnessLean(), ScriptLLM({
+        "model-a": ["constructor\n· sorry\n· sorry",
+                    "have key : True := by trivial\nexact key",
+                    "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    assert not any("You audit" in s for s in llm.systems)
+    assert not any(e.get("kind") == "audit" for e in result.metadata["events"])
+
