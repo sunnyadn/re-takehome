@@ -233,10 +233,9 @@ META = re.compile(r"\?[\w.]+|^(?:Type|Sort)\b")
 
 
 HAVE_HEAD = re.compile(r"^(\s*)(have\b.*?)\s*:=\s*by\s*$")
-# A goal whose statement the model wrote itself, as opposed to one Lean derived
-# from an `intro`, `constructor` or `rcases`. Measured (v7.21, 10 min): auditing
-# every new goal was 30 of 95 calls and 48% of the wall clock, under the lock;
-# every false statement ever caught was a `have`.
+# A goal whose statement the model wrote, as opposed to one Lean derived from an
+# `intro` or `rcases`. Measured: auditing every new goal was 48% of the wall
+# clock under the lock, and every false statement caught was a `have`.
 STATED_HEAD = re.compile(r"^(\s*)((?:have|suffices|show|obtain)\b.*?)\s*:=\s*by\s*$")
 
 
@@ -275,10 +274,9 @@ def narrates(model: str) -> bool:
     return any(n in model for n in NARRATES)
 
 
-# Measured over 808 gpt-oss step replies at 6000 tokens: p95 146–182 s, 65 past
-# 120 s, and 2 ReadTimeouts at 181 s in the archive, each of which closes the
-# problem's ledger. At the slow rate seen (~30 tok/s) 6000 tokens cannot finish
-# inside the harness's 180 s read timeout; 4000 can. qwen never passed 60 s.
+# Measured over 808 gpt-oss replies at 6000 tokens: p95 146–182 s and 2
+# ReadTimeouts at the harness's 180 s, each closing the problem's ledger. At the
+# slow rate seen 6000 tokens cannot finish inside 180 s; 4000 can. qwen: max 60 s.
 SLOW_STEP_TOKENS = 4000
 
 
@@ -699,10 +697,8 @@ class BoardAgent(FrameworkAgent):
     async def _define(self, problem: Problem, text: str, services: Services,
                       ledger: Ledger, events: list[dict[str, Any]]) -> str:
         """The answer term is the first claim of the proof and the one no later
-        step can repair, so it is audited like a `have`: every model offers a
-        term, each is tried against the theorem's own statement, and a term a
-        witness breaks is not used. Measured on putnam_2018_a1 (v7.22): a
-        set-builder answer with integer division made the `↔` false at t=0."""
+        step can repair, so every model offers one and each offer is audited
+        against the theorem's own statement; a broken offer is not used."""
 
         for name, kind in definition_slots(text):
             offers: list[tuple[str, str]] = []
@@ -825,10 +821,9 @@ class BoardAgent(FrameworkAgent):
         lock = asyncio.Lock()
         changed = asyncio.Event()
         claimed: dict[tuple[str, str], str] = {}
-        # Measured on putnam_2020_a2 (v7.27): one model sent the same rejected
-        # step to the same goal 274 times in 23 min, 2 s apart, feedback stacked
-        # three deep. A goal a model repeats itself on goes to the end of that
-        # model's line, so the other model sees it first.
+        # Measured on putnam_2020_a2: one model sent the same rejected step to the
+        # same goal 274 times in 23 min. A goal a model repeats itself on goes to
+        # the end of that model's line, so the other model sees it first.
         repeated: set[tuple[tuple[str, str], str]] = set()
         tries: dict[tuple[str, str], int] = {}
         said: dict[tuple[str, str], Feedback] = {}
@@ -1026,23 +1021,19 @@ class BoardAgent(FrameworkAgent):
             return nxt, ""
 
         async def audit(author: str, base: Board, nxt: Board) -> str:
-            """Every statement a step writes is tried against a witness: each
-            new `have` (its body set aside) and each other goal it opens. Lean
-            states it, the auditor names values for its variables, Lean checks
-            that they satisfy every hypothesis in scope and break it. The
-            refutation, or "" to let the step in."""
+            """Every statement a step writes is tried against a witness: Lean
+            states it, the auditor names values, Lean checks that they satisfy
+            every hypothesis and break it. The refutation, or "" to let it in."""
 
-            # Measured (v7.17–v7.19, 12 of 12 audits): a model that narrates
-            # names values that violate a hypothesis, at ~9s each; the other
-            # answers in ~1.4s. The auditor is whoever finds counterexamples.
+            # Measured over 12 audits: a narrating model names values that violate
+            # a hypothesis every time, at ~9 s; the other answers in ~1.4 s.
             other = next((m for m in models if m != author and not narrates(m)),
                          next((m for m in models if not narrates(m)),
                               next((m for m in models if m != author), author)))
             had = {g.key for g in base.goals}
             lines = nxt.text.split("\n")
-            # Measured on putnam_2020_a2 (v7.25): a false `have h3 : ∀ x ∈ …`
-            # came with a proof body, so only its residue was audited and the
-            # claim went up. The claim is audited whatever the body says.
+            # Measured on putnam_2020_a2: a false `have` with a proof body had only
+            # its residue audited. The claim is audited whatever the body says.
             known: dict[str, dict[str, str]] = {}
             subjects: list[dict[str, Any]] = []
             for i, ln in enumerate(lines):
@@ -1059,11 +1050,9 @@ class BoardAgent(FrameworkAgent):
                                  "what": head.group(2).strip(), "claim": claim})
             covered = {s["at"] for s in subjects}
             for g in nxt.goals:
-                # A goal whose target is `False` is provable only if its context
-                # is inconsistent, so a witness for the context alone proves the
-                # branch dead. Measured on p09 (gate32 run 1): `n % 3 = 1`,
-                # `2 ^ n % 7 = 2`, `¬7 ∣ 2 ^ n - 1 ⊢ False`, satisfiable at n = 1,
-                # held both models for the rest of the run.
+                # `⊢ False` is provable only in an inconsistent context, so a witness
+                # for the context alone proves the branch dead. Measured on p09: a
+                # satisfiable `⊢ False` held both models for the rest of the run.
                 dead_end = target_of(g.text) == "False"
                 if (g.key in had or not g.text or META.search(target_of(g.text))
                         or not (dead_end or is_stated(lines, g))
@@ -1218,10 +1207,8 @@ class BoardAgent(FrameworkAgent):
         async def lift_and_advance(base: Board, goal: Goal, block: str,
                                    author: str) -> tuple[Board | None, str]:
             """A fact posted with `sorry` inside a `have` goes above the outermost
-            `have` instead: facts live at the shallowest scope. Measured on
-            rmo_2000_2 (v7.19): skeletons nested seven deep, 25 open goals, the
-            theorem's whole plan restated inside a `ring_nf` residue, and the
-            withdraw count reset by every new layer."""
+            `have`: facts live at the shallowest scope. Measured on rmo_2000_2:
+            skeletons nested 7 deep, 25 open goals, withdraw never firing."""
 
             lines = base.text.split("\n")
             chain = enclosing_chain(lines, goal)
@@ -1298,10 +1285,9 @@ class BoardAgent(FrameworkAgent):
                             if goal.key in said else "that step was already rejected here")
                         tries[goal.key] = tries.get(goal.key, 0) + 1
                         continue
-                    # Measured on p09 (gate26 run 4): a substring match locked the
-                    # worker out for 19 min once `n % 3 = 0` had been withdrawn,
-                    # since the goal itself reads `⊢ n % 3 = 0`. Only a `have`
-                    # stating the withdrawn claim again is a restatement.
+                    # Measured on p09: a substring match locked a worker out for 19
+                    # min once `n % 3 = 0` was withdrawn and the goal read `⊢ n % 3 = 0`.
+                    # Only a `have` stating the claim again is a restatement.
                     if restates(edit.body, withdrawn.get(here.decl, ())):
                         events.append({"kind": "restated", "by": author})
                         said[goal.key] = Feedback(author, "that step restates a fact "
@@ -1322,9 +1308,8 @@ class BoardAgent(FrameworkAgent):
                 if edit.kind == "hoist":
                     lifted = await look(insert_above(board.text, first_graded, edit.block))
                     kept = not classify(lifted.messages)[3]
-                    # Measured on putnam_2020_a2 (v7.23): a hoisted `binomial_split`
-                    # was false at j = 0 (ℕ subtraction); a lemma's statement is
-                    # audited like a `have` before it enters the file.
+                    # Measured on putnam_2020_a2: a hoisted lemma was false at j = 0;
+                    # its statement is audited like a `have` before it enters the file.
                     bad = await audit(author, board, lifted) if kept else ""
                     kept = kept and not bad
                     events.append({"kind": "lemma", "by": author, "name": edit.name,
