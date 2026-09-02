@@ -486,8 +486,14 @@ def is_stated(lines: Sequence[str], goal: Goal) -> bool:
     i = goal.line - 1
     above = next((j for j in range(i - 1, -1, -1) if lines[j].strip()
                   and len(lines[j]) - len(lines[j].lstrip()) < len(goal.indent)), None)
-    return above is not None and (STATED_HEAD.match(lines[above]) is not None
-                                  or DECLARATION.match(lines[above]) is not None)
+    if above is None:
+        return False
+    if STATED_HEAD.match(lines[above]):
+        return True
+    # A declaration's own root goal (the placeholder right under its head) is a
+    # statement the model wrote when the declaration was hoisted; a goal deeper
+    # in a graded theorem's body is not.
+    return DECLARATION.match(lines[above]) is not None and above == i - 1
 
 
 def enclosing_chain(lines: Sequence[str], goal: Goal) -> list[tuple[int, re.Match]]:

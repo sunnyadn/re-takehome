@@ -917,3 +917,20 @@ def test_a_statement_split_over_lines_is_still_audited():
                and e.get("goal") == "x = 3 ∨ x = 4" for e in result.metadata["events"])
     assert "have bad" not in result.solution
 
+
+def test_a_graded_theorems_residual_goal_is_not_audited_as_a_statement():
+    # A step leaves the theorem's own goal open after it; that goal is Lean's,
+    # not a statement the model wrote, and auditing it at every step doubled
+    # the audit calls (v7.25 counted any goal under a `theorem` head).
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = WitnessLean(), ScriptLLM({
+        "model-a": ["have h1 : x < 5 := by\n  omega", '{"holds": true}',
+                    "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    audits = [e for e in result.metadata["events"] if e.get("kind") == "audit"]
+    assert [a["goal"] for a in audits] == ["x < 5"]
+    assert result.metadata["accepted_by_repl"] is True
+
