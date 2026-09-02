@@ -874,3 +874,28 @@ def test_the_slow_model_is_asked_for_steps_under_the_read_timeout_budget():
     assert {k["max_tokens"] for k in steps if k["model"] == "qwen-b"} <= {6000}
     assert steps
 
+
+def test_a_goal_a_model_repeats_itself_on_goes_to_the_end_of_its_line():
+    # Measured on putnam_2020_a2 (v7.27): 274 step calls in 23 min, the same
+    # rejected step to the same goal every 2 s. After a repeat the goal is the
+    # last one that model picks, so it moves to the other open goal and the
+    # other model gets the repeated one.
+    challenge = ("import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n\n"
+                 "theorem demo_b (x : ℕ) (hx : x < 2) : True := by\n  sorry\n")
+    lean, llm = BoardLean(), ScriptLLM({
+        "model-a": ["no", "first\n  | linarith", "first\n  | linarith", "first\n  | linarith"]
+                   + ["have key : True := by trivial\nexact key"] * 3,
+        "model-b": ["no"] + ["have key : True := by trivial\nexact key"] * 3},
+        delay={"model-b": 1.5})
+    agent = BoardAgent(Config(lines=("model-a", "model-b"), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    assert "repeat" in [e.get("kind") for e in result.metadata["events"]]
+    prompts = [p for (m, p), sys_ in zip(llm.calls, llm.systems)
+               if m == "model-a" and "goal on the board" in sys_]
+    goals = [p.split("⊢ ", 1)[1].split("\n", 1)[0] if "⊢ " in p else "" for p in prompts]
+    # the second `demo` prompt is the repeat; the next pick is the other goal
+    assert goals[:3] == ["demo", "demo", "demo_b"]
+    assert result.metadata["accepted_by_repl"] is True
+

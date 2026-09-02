@@ -790,6 +790,11 @@ class BoardAgent(FrameworkAgent):
         lock = asyncio.Lock()
         changed = asyncio.Event()
         claimed: dict[tuple[str, str], str] = {}
+        # Measured on putnam_2020_a2 (v7.27): one model sent the same rejected
+        # step to the same goal 274 times in 23 min, 2 s apart, feedback stacked
+        # three deep. A goal a model repeats itself on goes to the end of that
+        # model's line, so the other model sees it first.
+        repeated: set[tuple[tuple[str, str], str]] = set()
         tries: dict[tuple[str, str], int] = {}
         said: dict[tuple[str, str], Feedback] = {}
         plans: dict[tuple[str, str], str] = {}
@@ -1243,6 +1248,7 @@ class BoardAgent(FrameworkAgent):
                     if (here.key, edit.body) in refused:
                         # Measured on p10: five byte-identical replies in a row.
                         events.append({"kind": "repeat", "by": author})
+                        repeated.add((here.key, author))
                         said[goal.key] = Feedback(
                             author, "that is byte for byte the step already rejected "
                             "on this goal; Lean will say the same thing. Try a "
@@ -1327,14 +1333,17 @@ class BoardAgent(FrameworkAgent):
             anywhere, one the other model holds, so a 158s reply does not idle
             the fast model. Measured on p09: 4 minutes of 20 went that way."""
 
-            for shared in (False, True):
-                for b in sorted(branches, key=lambda b: b.score):
-                    free = [g for g in b.goals if g.text and (
-                        g.key not in claimed if not shared else claimed.get(g.key) != model)]
-                    if free:
-                        return b, min(free, key=lambda g: (
-                            tries.get(g.key, 0) >= LAST_IN_LINE, tries.get(g.key, 0), g.line))
-            return None
+            options = []
+            for rank, b in enumerate(sorted(branches, key=lambda b: b.score)):
+                for g in b.goals:
+                    if g.text and claimed.get(g.key) != model:
+                        options.append(((g.key, model) in repeated, g.key in claimed, rank,
+                                        tries.get(g.key, 0) >= LAST_IN_LINE,
+                                        tries.get(g.key, 0), g.line, b, g))
+            if not options:
+                return None
+            best = min(options, key=lambda o: o[:6])
+            return best[6], best[7]
 
         async def unstick() -> None:
             """Every goal last in line: the worst one's declaration starts over."""
