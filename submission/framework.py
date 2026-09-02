@@ -452,6 +452,57 @@ def prefixes(block: str) -> list[str]:
     return ["\n".join(lines[:at]).rstrip() for at in reversed(starts[1:])]
 
 
+def proof_span(text: str, name: str) -> tuple[int, int] | None:
+    """From a proof's header line to the line before the next column-0 text."""
+
+    for found in PROOF_HEAD.finditer(text):
+        if found.group(2) != name:
+            continue
+        start = text.rfind("\n", 0, found.start(1)) + 1
+        at = text.find("\n", found.end()) + 1
+        while 0 < at < len(text):
+            line = text[at:text.find("\n", at) if text.find("\n", at) >= 0 else len(text)]
+            if line.strip() and not line[0].isspace():
+                break
+            at = text.find("\n", at) + 1 if text.find("\n", at) >= 0 else len(text)
+        return start, at if at > 0 else len(text)
+    return None
+
+
+def open_names(text: str) -> tuple[str, ...]:
+    """Every proof that still holds a placeholder."""
+
+    holes = [p.start() for p in placeholders(text)]
+    named = []
+    for name in root_names(text):
+        span = proof_span(text, name)
+        if span and any(span[0] <= h < span[1] for h in holes):
+            named.append(name)
+    return tuple(named)
+
+
+def restate(text: str, name: str) -> tuple[str, int]:
+    """The file with `name`'s proof cut back to its statement over one `sorry`,
+    and that placeholder's index; (text, -1) when there is no such proof."""
+
+    span = proof_span(text, name)
+    head = DECL_HEAD.match(text[span[0]:span[1]]) if span else None
+    if not head:
+        return text, -1
+    fresh = text[:span[0]] + head.group(1) + "\n  sorry\n\n" + text[span[1]:].lstrip("\n")
+    return fresh, len([p for p in placeholders(fresh) if p.start() < span[0]])
+
+
+def proof_body(block: str, name: str) -> str:
+    """What a reply restating `name` says under its header."""
+
+    body = unwrap_own(block, (name,))
+    if body != block:
+        return body
+    head = DECL_HEAD.match(block)
+    return reindent(block[head.end():], "") if head else block
+
+
 def enclosing_name(text: str, index: int = 0) -> str:
     """The declaration the cursor is inside, which the writer keeps restating.
 

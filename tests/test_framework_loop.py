@@ -317,6 +317,45 @@ def test_a_restated_theorem_whose_statement_wraps_is_still_only_its_body():
     assert "theorem demo :\n    True" not in result.solution
 
 
+# The graded theorem first, so the cursor starts there and the lemma is open
+# behind it, which is where p09 left its hoisted fact once the cursor moved on.
+LEMMA_BEHIND = ("import Mathlib\n\ntheorem demo : True := by\n  sorry\n\n"
+                "lemma helper : True := by\n  induction' n with n ih\n  sorry\n")
+
+
+def run_lemma_behind(replies):
+    lean, llm = FakeLean(), FakeLLM(replies)
+    agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=LEMMA_BEHIND),
+        FakeServices(lean, llm)))
+    return result, lean, llm
+
+
+def test_a_whole_proof_of_another_open_lemma_replaces_that_lemma_s_proof():
+    # Measured on p09: the model answers a lemma still open behind the cursor
+    # with the lemma's whole proof, from its first line. Appended it doubled
+    # its own opening; dropped it was the best turn of the run thrown away.
+    whole = ("lemma helper : True := by\n  induction' n with n ih\n"
+             "  have key : True := by trivial\n  exact key")
+    result, lean, llm = run_lemma_behind(
+        ["no", "no", whole, "have key : True := by trivial", "exact key"])
+    events = result.metadata["events"]
+    assert {"kind": "route", "by": "model-a", "to": "helper"} in events
+    assert result.metadata["accepted_by_repl"] is True
+    assert result.solution.count("induction' n with n ih") == 1
+
+
+def test_a_routed_proof_nothing_survives_of_leaves_the_old_body_in_place():
+    whole = "lemma helper : True := by\n  first | exact? | exact?"
+    result, lean, llm = run_lemma_behind(
+        ["no", "no", whole, "have key : True := by trivial", "exact key"])
+    events = result.metadata["events"]
+    assert {"kind": "route", "by": "model-a", "to": "helper"} in events
+    # The reply was refused whole, so the lemma keeps the body it had.
+    assert "induction' n with n ih" in result.solution
+
+
 def test_the_graded_theorem_cannot_be_restated_as_a_lemma():
     result, _, llm, _ = run(["theorem demo : True := by trivial"] * 30)
     assert result.metadata["accepted_by_repl"] is False

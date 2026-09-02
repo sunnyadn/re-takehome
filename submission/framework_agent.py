@@ -72,6 +72,9 @@ from submission.framework import (
     render,
     replace_cursor,
     sweep_body,
+    open_names,
+    restate,
+    proof_body,
 )
 
 # A step is a few lines; the file it goes into is the context. Wide replies are
@@ -519,7 +522,7 @@ class FrameworkAgent:
 
                 # Never re-run a closer on a goal whose text and file are both
                 # unchanged; a longer file is a changed context.
-                spare = []
+                spare, routed = [], None
                 seen = (state.goal, len(state.text))
                 if state.goal and ("closers", seen) not in swept:
                     block, kind, author = sweep_body(cocktail), "closers", "harness"
@@ -584,6 +587,19 @@ class FrameworkAgent:
                             break
                         continue
                     named = declaration_name(block)
+                    if named and named != enclosing_name(state.text, state.focus) \
+                            and named in open_names(state.text):
+                        # A proof of another open declaration, written from its
+                        # first line. Measured on p09: appended at the cursor it
+                        # doubled its own opening (`induction'` twice), and once
+                        # the cursor had moved on it was dropped whole, 7 turns
+                        # in 8 minutes. It is what the model means: that proof.
+                        fresh, at = restate(state.text, named)
+                        routed, state = state, await self._look(fresh, services, at)
+                        block = drop_own(proof_body(block, named),
+                                         [n for n in root_names(fresh) if n != named])
+                        events.append({"kind": "route", "by": author, "to": named})
+                        named = ""
                     if named and named in declared_names(problem.challenge):
                         feedback = Feedback(author, "that name is the problem's own; "
                                             "prove it where it stands", "rejected")
@@ -684,6 +700,8 @@ class FrameworkAgent:
                         insert_preamble(state.text, RAISED_BUDGETS), services, state.focus)
                     nxt, why = await self._advance(state, block, services)
                 events.append({"kind": kind, "by": author, "accepted": nxt is not None})
+                if nxt is None and routed is not None:
+                    state = routed
                 if nxt is None:
                     # Only a model's own rejections count towards its turn; the
                     # free attempts are the harness's.
@@ -955,8 +973,12 @@ class FrameworkAgent:
         # step. Names elsewhere in the file are taken too, and truncating there
         # keeps whatever is new.
         here = enclosing_name(state.text, state.focus)
+        step = unwrap_own(screen_step(reply), (here,) if here else ())
+        if declaration_name(step) in set(open_names(state.text)) - {here}:
+            # A whole proof of another open declaration is the loop's to route.
+            return step
         taken = [n for n in root_names(state.text) if n != here]
-        return drop_own(unwrap_own(screen_step(reply), (here,) if here else ()), taken)
+        return drop_own(step, taken)
 
     async def _share(self, problem: Problem, text: str, services: Services,
                      ledger: Ledger, events: list[dict[str, Any]]) -> str:
