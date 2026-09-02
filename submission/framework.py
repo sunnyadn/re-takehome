@@ -12,7 +12,7 @@ from typing import Any, Sequence
 # `first` takes the first alternative that does not fail, and `norm_num` can
 # succeed by rewriting without closing; `done` turns that into a failure so the
 # block keeps searching. Never emit an alternative without it.
-from submission.agent import COCKTAIL, wrap_tactic
+from submission.agent import COCKTAIL, PROOF_DECL, wrap_tactic
 
 # A placeholder is a whole line. A term-position `:= sorry` (an answer slot) is
 # not one, and `skip` would not typecheck there anyway.
@@ -363,6 +363,12 @@ def have_spans(text: str) -> list[tuple[int, int, str]]:
 
 
 DECLARATION = re.compile(r"^\s*(?:private\s+)?(?:theorem|lemma)\s+([A-Za-z_][\w']*)")
+
+
+def graded_theorems(challenge: str) -> int:
+    """How many proofs are graded together. An answer slot is not one of them."""
+
+    return sum(1 for line in challenge.splitlines() if PROOF_DECL.match(line))
 
 
 def declaration_name(block: str) -> str:

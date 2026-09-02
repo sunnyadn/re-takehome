@@ -42,6 +42,7 @@ from submission.framework import (
     alternatives,
     hand_to_search,
     declaration_name,
+    graded_theorems,
     definition_slots,
     fill_definition,
     answer_slots,
@@ -431,6 +432,8 @@ class FrameworkAgent:
                     offer(candidate, True)
                     return result(candidate, "deterministic_sweep", True)
 
+            if graded_theorems(problem.challenge) > 1 and can_ask():
+                text = await self._share(problem, text, services, ledger, events)
             if definition_slots(text) and can_ask():
                 text = await self._define(problem, text, services, ledger, events)
             if names and can_ask():
@@ -882,10 +885,10 @@ class FrameworkAgent:
         # Measured on p09: the one fact its two theorems share was proved once
         # inside each of them, because a step was only ever tactic lines. The
         # hoist has always been here; nothing ever asked for it.
-        shared = declared_names(problem.challenge)
-        if len(shared) > 1:
+        shared = graded_theorems(problem.challenge)
+        if shared > 1:
             parts.append(
-                f"This problem is graded on {len(shared)} theorems and they share "
+                f"This problem is graded on {shared} theorems and they share "
                 "their mathematics. A fact more than one of them needs cannot live "
                 "inside either proof: state it as its own `theorem` above them, "
                 "with a `sorry` body if you cannot prove it yet, and it becomes a "
@@ -894,7 +897,7 @@ class FrameworkAgent:
         # contract is the last thing it reads.
         parts.append("Reply with one ```lean code block containing only tactic "
                      "lines, and nothing before or after it. No explanation."
-                     if len(shared) <= 1 else
+                     if shared <= 1 else
                      "Reply with one ```lean code block: either tactic lines for "
                      "the goal above, or one whole `theorem`. Nothing before or "
                      "after it. No explanation.")
@@ -909,6 +912,40 @@ class FrameworkAgent:
         here = enclosing_name(state.text, state.focus)
         taken = [n for n in root_names(state.text) if n != here]
         return drop_own(unwrap_own(screen_step(reply), (here,) if here else ()), taken)
+
+    async def _share(self, problem: Problem, text: str, services: Services,
+                     ledger: Ledger, events: list[dict[str, Any]]) -> str:
+        """The fact several theorems need, hoisted above them before any step.
+
+        Measured on p09: inviting this inside the step loop was read 52 times
+        and taken 0, because a step there is tactic lines and the models keep
+        the contract. Asked on its own it is a question they can answer."""
+
+        note = ""
+        for attempt in range(2):
+            ask = (f"Problem: {problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
+                   f"These {graded_theorems(problem.challenge)} theorems are "
+                   "graded together and share their mathematics. Name the one fact "
+                   "more than one of them needs, and state it as a standalone Lean 4 "
+                   "`theorem` above them. Reply with one ```lean block holding that "
+                   "declaration and nothing else. Leave its body `sorry`; proving it "
+                   "is a later turn." + note)
+            said, _ = await self._call(self.config.lines[attempt % len(self.config.lines)],
+                                       ask, STEP_TOKENS, services, ledger, think=True)
+            block = strip_fences(said).strip()
+            named = declaration_name(block)
+            if not named or named in declared_names(problem.challenge):
+                note = "\n\nYour last reply declared no new theorem."
+                continue
+            candidate = insert_preamble(text, as_goal(block) or block)
+            check = await services.lean.check_file(candidate)
+            kept = not classify(check.messages)[3]
+            events.append({"stage": "share", "name": named, "kept": kept})
+            if kept:
+                return candidate
+            note = ("\n\nThat statement did not elaborate. Lean said:\n"
+                    + format_messages(check.messages)[:FEEDBACK_CHARS])
+        return text
 
     async def _define(self, problem: Problem, text: str, services: Services,
                       ledger: Ledger, events: list[dict[str, Any]]) -> str:

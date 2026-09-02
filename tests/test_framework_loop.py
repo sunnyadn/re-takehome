@@ -882,16 +882,26 @@ TWO = ("import Mathlib\n\ntheorem demo : True := by\n  sorry\n\n"
 def asked_for(challenge):
     lean, llm = FakeLean(), FakeLLM(["have key : True := by trivial", "exact key"])
     agent = FrameworkAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
-    asyncio.run(agent.solve(
+    result = asyncio.run(agent.solve(
         Problem(id="demo", description="prove it", challenge=challenge),
         FakeServices(lean, llm)))
-    return wrote(llm)[0][1]
+    return [text for _, text in wrote(llm)], result.metadata["events"]
 
 
 def test_only_a_problem_with_two_theorems_is_offered_a_shared_lemma():
     # Measured on p09: the one fact its two theorems share was proved once
-    # inside each of them. Fifteen of the sixteen have a single theorem, and
-    # inviting a declaration there would trade a working contract for nothing.
-    one, two = asked_for(CHALLENGE), asked_for(TWO)
-    assert "only tactic lines" in one and "its own `theorem`" not in one
-    assert "its own `theorem`" in two and "only tactic lines" not in two
+    # inside each of them. An answer slot is a declaration but not a theorem,
+    # and counting it would have changed p06, p07 and p10, three that work.
+    one, one_events = asked_for(CHALLENGE)
+    two, two_events = asked_for(TWO)
+    assert all("only tactic lines" in t for t in one)
+    assert not any("theorem" in t and "standalone" in t for t in one)
+    assert not [e for e in one_events if e.get("stage") == "share"]
+    assert any("standalone Lean 4 `theorem`" in t for t in two)
+    assert any("its own `theorem`" in t for t in two)
+
+
+def test_an_answer_slot_is_a_declaration_but_not_a_second_theorem():
+    import submission.framework as fw
+    assert fw.graded_theorems(ANSWER_CHALLENGE) == 1
+    assert fw.graded_theorems(TWO) == 2
