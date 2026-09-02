@@ -39,6 +39,7 @@ from submission.framework import (
     classify,
     declaration_name,
     definition_slots,
+    fill_definition,
     drop_lines,
     goal_text,
     graded_theorems,
@@ -70,6 +71,8 @@ from submission.framework_agent import (
     BUDGET_RETRY,
     FILE_CHARS,
     NARRATES,
+    ANSWER_TOKENS,
+    strip_fences,
     GOAL_CHARS,
     LOOSE_DRAIN_S,
     MAX_PREFIXES,
@@ -396,6 +399,41 @@ def enclosing_have(lines: Sequence[str], goal: Goal) -> tuple[int | None, re.Mat
     return above, (HAVE_HEAD.match(lines[above]) if above is not None else None)
 
 
+SET_LITERAL = re.compile(r"^\(?\s*\{(.*)\}\s*(?::.*?)?\)?\s*$", re.S)
+TUPLE_IN = re.compile(r"[⟨(]\s*([A-Za-z_][\w']*(?:\s*,\s*[A-Za-z_][\w']*)+)\s*[⟩)]\s*∈")
+
+
+def set_elements(term: str) -> list[list[str]] | None:
+    """The tuples of an explicit finite set literal, or None for any other term."""
+    found = SET_LITERAL.match(term.strip())
+    if not found or "|" in found.group(1):
+        return None
+    items, depth, buf = [], 0, ""
+    for ch in found.group(1):
+        if ch == "," and depth == 0:
+            items.append(buf.strip()); buf = ""
+            continue
+        depth += (ch in OPENERS) - (ch in CLOSERS)
+        buf += ch
+    if buf.strip():
+        items.append(buf.strip())
+    out = []
+    for it in items:
+        inner = it.strip()
+        if inner[:1] in "(⟨" and inner[-1:] in ")⟩":
+            inner = inner[1:-1]
+        parts, depth, buf = [], 0, ""
+        for ch in inner:
+            if ch == "," and depth == 0:
+                parts.append(buf.strip()); buf = ""
+                continue
+            depth += (ch in OPENERS) - (ch in CLOSERS)
+            buf += ch
+        parts.append(buf.strip())
+        out.append(parts)
+    return out
+
+
 def is_stated(lines: Sequence[str], goal: Goal) -> bool:
     """Whether the goal is the body of a statement the model wrote."""
     i = goal.line - 1
@@ -564,6 +602,97 @@ def interpret(reply: str, board: Board, goal: Goal, graded: Sequence[str]) -> li
 
 class BoardAgent(FrameworkAgent):
     """The cursor loop's primitives, driven by a board instead of a cursor."""
+
+    async def _define(self, problem: Problem, text: str, services: Services,
+                      ledger: Ledger, events: list[dict[str, Any]]) -> str:
+        """The answer term is the first claim of the proof and the one no later
+        step can repair, so it is audited like a `have`: every model offers a
+        term, each is tried against the theorem's own statement, and a term a
+        witness breaks is not used. Measured on putnam_2018_a1 (v7.22): a
+        set-builder answer with integer division made the `↔` false at t=0."""
+
+        for name, kind in definition_slots(text):
+            offers: list[tuple[str, str]] = []
+            note = ""
+            for attempt in range(2 * len(self.config.lines)):
+                model = self.config.lines[attempt % len(self.config.lines)]
+                ask = (f"Give the value of `{name} : {kind}`.\n\nProblem: "
+                       f"{problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
+                       f"Reply with one Lean 4 term of type `{kind}` on a single line, "
+                       "and nothing else. It is the answer itself, not a proof of it, "
+                       "so no tactics and no `by`. A finite set is written as its "
+                       "elements, `({(1, 2), (3, 4)} : T)`, never as a set-builder." + note)
+                said, _ = await self._call(model, ask, ANSWER_TOKENS, services, ledger, think=True)
+                term = " ".join(strip_fences(said).split("\n"))[:FEEDBACK_CHARS].strip()
+                if not term or term.startswith("by "):
+                    note = "\n\nYour last reply was not a term."
+                    continue
+                candidate = fill_definition(text, name, term)
+                check = await services.lean.check_file(candidate)
+                if classify(check.messages)[3]:
+                    note = ("\n\nThat term did not elaborate. Lean said:\n"
+                            + format_messages(check.messages)[:FEEDBACK_CHARS])
+                    continue
+                note = ""
+                if term not in [t for t, _ in offers]:
+                    offers.append((term, candidate))
+                if len(offers) >= 2 or attempt >= len(self.config.lines) and offers:
+                    break
+            chosen = None
+            for term, candidate in offers:
+                verdict, values = await self._audit_answer(candidate, term, services, ledger)
+                events.append({"stage": "define", "name": name, "kept": verdict != "refuted",
+                               "term": term[:120], "verdict": verdict, "values": values})
+                if verdict != "refuted" and chosen is None:
+                    chosen = candidate
+            if chosen is None and offers:
+                chosen = offers[0][1]
+            if chosen is not None:
+                text = chosen
+        return text
+
+    async def _audit_answer(self, text: str, term: str, services: Services,
+                            ledger: Ledger) -> tuple[str, dict[str, str]]:
+        """A definition tried against the theorem that uses it: Lean states the
+        theorem's goal, each element of an explicit set answer and then the
+        auditor's values are tried as witnesses that the statement fails."""
+
+        roots = root_names(text)
+        holes = [(line_of(text, m.start()), m.group(1)) for m in placeholders(text)]
+        at = next(((l, ind) for l, ind in holes if owner(text, l)), None)
+        if not roots or at is None:
+            return "unstated", {}
+        goal = Goal(at[0], at[1], owner(text, at[0]), "")
+        check = await services.lean.check_file(extract_file(text, [goal]),
+                                               timeout_s=CHECK_TIMEOUT_FLOOR_S)
+        stmt = statements(check.messages).get(goal.line, "")
+        parsed = split_statement(stmt) if stmt else None
+        if not parsed:
+            return "unstated", {}
+        groups, target = parsed
+        first = proof_span(text, roots[0])
+        prefix = text[:first[0]] if first else ""
+        names = [n for g in groups for n in binder_names(g)]
+        tries: list[dict[str, str]] = []
+        tuple_names = TUPLE_IN.search(target)
+        elements = set_elements(term)
+        if tuple_names and elements:
+            keys = [k.strip() for k in tuple_names.group(1).split(",")]
+            tries += [dict(zip(keys, e)) for e in elements if len(e) == len(keys)]
+        async def breaks(values: dict[str, str]) -> bool:
+            probe = await services.lean.check_file(witness_file(prefix, groups, values, target),
+                                                   timeout_s=CHECK_TIMEOUT_FLOOR_S)
+            return probe.accepted
+        for values in tries:
+            if await breaks(values):
+                return "refuted", values
+        auditor = next((m for m in self.config.lines if not narrates(m)), self.config.lines[0])
+        reply, _ = await self._call(auditor, audit_prompt(stmt, prefix.replace("import Mathlib", "")),
+                                    AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM)
+        given = {n: v for n, v in (read_witness(reply) or {}).items() if n in names}
+        if (given or not names) and await breaks(given):
+            return "refuted", given
+        return ("holds" if tries or given or "holds" in reply else "unverified"), {}
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
         cfg = self.config

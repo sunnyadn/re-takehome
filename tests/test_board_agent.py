@@ -632,7 +632,8 @@ class WitnessLean(BoardLean):
                 above = next((l for l in reversed(lines[:i - 1])
                               if l.strip() and len(l) - len(l.lstrip()) < depth), "")
                 claim = (above.split(":", 1)[1].split(":=")[0].strip()
-                         if above.strip().startswith("have") else "True")
+                         if above.strip().startswith("have") else
+                         target if above.strip().startswith("theorem") else "True")
                 messages.append({"severity": "info", "pos": {"line": i - 1},
                                  "data": f"theorem extracted_1 {binders} : {claim} := sorry"})
         return LeanCheck(False, messages, True, False, 1)
@@ -747,4 +748,36 @@ def test_only_a_goal_the_model_stated_is_audited():
         FakeServices(lean, llm)))
     assert not any("You audit" in s for s in llm.systems)
     assert not any(e.get("kind") == "audit" for e in result.metadata["events"])
+
+
+class AnswerLean(WitnessLean):
+    """A witness file passes only at the one pair that breaks the theorem."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "(w_" in source:
+            self.sources.append(source)
+            return LeanCheck("(w_a : a = (0)) (w_b : b = (3))" in source, [], False, False, 1)
+        return await super().check_file(source, timeout_s)
+
+
+def test_an_answer_term_a_witness_breaks_is_not_used():
+    # Measured on putnam_2018_a1 (v7.22, one22b): the first elaborating answer
+    # was a set-builder with integer division, the `↔` was false from t=0 and
+    # 45 minutes went into an unprovable theorem. Each offer is tried against
+    # the theorem's own statement; an element that breaks it sinks the offer.
+    challenge = ("import Mathlib\n\nabbrev demo_solution : Set (ℕ × ℕ) := by\n  sorry\n\n"
+                 "theorem demo (a b : ℕ) : a + b = 2 ↔ (a, b) ∈ demo_solution := by\n  sorry\n")
+    lean, llm = AnswerLean(), ScriptLLM({
+        "model-a": ["({(1, 1), (0, 3)} : Set (ℕ × ℕ))", '{"holds": true}',
+                    "have key : True := by trivial\nexact key"] * 2,
+        "model-b": ["({(1, 1), (2, 0), (0, 2)} : Set (ℕ × ℕ))",
+                    "have key : True := by trivial\nexact key"] * 2})
+    agent = BoardAgent(Config(lines=("model-a", "model-b"), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    defines = [e for e in result.metadata["events"] if e.get("stage") == "define"]
+    assert [d["verdict"] for d in defines] == ["refuted", "holds"]
+    assert defines[0]["values"] == {"a": "0", "b": "3"}
+    assert "(2, 0)" in result.solution and "(0, 3)" not in result.solution
 
