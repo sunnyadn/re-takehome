@@ -140,9 +140,11 @@ def test_the_stop_margin_never_eats_a_quarter_of_a_short_run():
 
 def test_retries_are_capped_across_the_whole_problem(monkeypatch):
     # Each refusal keeps its reservation as permanent exposure, so an
-    # unbounded per-call retry closes the ledger on a long run.
+    # unbounded per-call retry closes the ledger on a long run. The pool scales
+    # with the clock, so it is the short run that has one small enough to spend.
+    from submission.agent import Config
     monkeypatch.setattr(agent_mod, "RETRY_BACKOFF_S", (0.0, 0.0, 0.0))
-    agent = SubmissionAgent()
+    agent = SubmissionAgent(Config(time_limit_s=1800.0))
     llm, ledger = _FlakyLLM(refusals=99), Ledger()
     calls = 0
     for _ in range(6):
