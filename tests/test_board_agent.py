@@ -1659,6 +1659,32 @@ def test_a_false_claim_is_refuted_by_evaluation_before_any_auditor_is_asked():
     assert "(x < 2)" in search and "¬ (x = 3)" in search
 
 
+def test_a_claim_the_walk_covers_is_settled_without_an_auditor_call():
+    # Measured over 7 runs: every refutation with ℕ binders came from the walk,
+    # the auditor's came from closed claims and ℤ, and audit calls were half of
+    # all calls (108 of 285 on putnam_2020_a2, one reply 482 s under the lock).
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+
+    class CleanSearchLean(WitnessLean):
+        async def check_file(self, source, timeout_s=None):
+            if "List.range" in source and "decide (" in source and "¬ (" in source:
+                self.sources.append(source)
+                return LeanCheck(True, [{"severity": "info", "data": "[]"}], False, False, 1)
+            return await super().check_file(source, timeout_s)
+
+    lean, llm = CleanSearchLean(), ScriptLLM({
+        "model-a": ["have fine : x < 3 := by\n  sorry\nhave key : True := by trivial\nexact key",
+                    "omega", "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    audits = [e for e in result.metadata["events"] if e.get("kind") == "audit" and "x < 3" in e.get("goal", "")]
+    assert audits and audits[0]["verdict"] == "holds" and audits[0]["by"] == "evaluation"
+    assert not any(p.startswith("A goal inside a Lean 4 proof, exactly as Lean states it") for _, p in llm.calls)
+    assert "have fine" in result.solution
+
+
 def test_the_technique_preamble_sits_after_the_header_and_the_models_are_told_about_it():
     # Techniques are Lean tactics defined once in the file, not prose recipes:
     # checked once in the image, callable by either model anywhere in the file.

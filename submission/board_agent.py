@@ -945,6 +945,12 @@ def read_witnesses(messages: Sequence[dict[str, Any]]) -> list[list[str]]:
     return []
 
 
+def searched_clean(messages: Sequence[dict[str, Any]]) -> bool:
+    """The walk ran to the end and printed no tuple: `[]`, as an info message."""
+    return any(m.get("severity") in INFO and str(m.get("data", "")).strip() == "[]"
+               for m in messages)
+
+
 PROP_SIGNS = re.compile(r"[=<≤>≥≠∣∧∨¬↔]|\bPrime\b|\bCoprime\b|\bEven\b|\bOdd\b")
 
 
@@ -1235,17 +1241,22 @@ class BoardAgent(FrameworkAgent):
         return text
 
     async def _enumerated(self, prefix: str, groups: Sequence[str], target: str,
-                          services: Services) -> dict[str, str] | None:
-        """Values from evaluation that satisfy every hypothesis and break the
-        claim, over 0..WITNESS_BOUND-1, before any model is asked. Measured on
-        rmo_2000_2: `(x+2)^3 < y^3 ↔ x ≥ 9` is false at x = 9, y = 11 and poisoned the board."""
+                          services: Services) -> tuple[bool, dict[str, str] | None]:
+        """(the walk ran, values that satisfy every hypothesis and break the
+        claim) over 0..WITNESS_BOUND-1. A claim the walk covers is settled here
+        and no model is asked about it: measured over 7 runs, every refutation
+        with ℕ binders came from the walk and the auditor's came from closed
+        claims and ℤ, while audit calls were half of all calls (108 of 285 on
+        putnam_2020_a2, 1990 s of latency, one reply 482 s under the board lock)."""
         search = counterexample_search(groups, target)
         if not search:
-            return None
+            return False, None
         names, body = search
         check = await services.lean.check_file(witness_search_file(prefix, names, body), timeout_s=60)
         rows = read_witnesses(check.messages)
-        return dict(zip(names, rows[0])) if rows and len(rows[0]) == len(names) else None
+        if rows and len(rows[0]) == len(names):
+            return True, dict(zip(names, rows[0]))
+        return searched_clean(check.messages), None
 
     async def _audit_root(self, text: str, decl: str, services: Services,
                           ledger: Ledger, term: str = "") -> tuple[str, dict[str, str]]:
@@ -1282,9 +1293,11 @@ class BoardAgent(FrameworkAgent):
         for values in tries:
             if await breaks(values):
                 return "refuted", values
-        found = await self._enumerated(prefix, groups, target, services)
+        searched, found = await self._enumerated(prefix, groups, target, services)
         if found and await breaks(found):
             return "refuted", found
+        if searched:
+            return "holds", {}
         auditor = next((m for m in self.config.lines if not narrates(m)), self.config.lines[0])
         reply, _ = await self._call(auditor, audit_prompt(stmt, prefix.replace("import Mathlib", "")),
                                     AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM)
@@ -1639,11 +1652,13 @@ class BoardAgent(FrameworkAgent):
                 sub["parsed"] = split_statement(sub["stmt"]) if sub.get("stmt") else None
             # Evaluation first: a claim it breaks needs no auditor.
             for sub in subjects:
-                sub["found"] = None
+                sub["searched"], sub["found"] = False, None
                 if sub["parsed"] and sub["parsed"][0]:
-                    sub["found"] = await self._enumerated(prefix, *sub["parsed"], services)
+                    sub["searched"], sub["found"] = await self._enumerated(prefix, *sub["parsed"], services)
             # No binders, no question: the witness file alone decides a closed claim.
-            asked = [sub for sub in subjects if sub["parsed"] and sub["parsed"][0] and not sub["found"]]
+            # A claim the walk covered is settled: the auditor is asked about the rest.
+            asked = [sub for sub in subjects
+                     if sub["parsed"] and sub["parsed"][0] and not sub["found"] and not sub["searched"]]
             replies = await asyncio.gather(*(self._call(
                 other, audit_prompt(sub["stmt"], prefix.replace("import Mathlib", "")),
                 AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM) for sub in asked))
@@ -1660,13 +1675,16 @@ class BoardAgent(FrameworkAgent):
                     verdict = "unverified"
                     if given is None and stopped != "length" and "holds" in reply:
                         verdict = "holds"
+                    if sub["searched"] and not sub["found"]:
+                        verdict = "holds"
                     if values or not names:
                         check = await services.lean.check_file(
                             witness_file(prefix, groups, values, target),
                             timeout_s=CHECK_TIMEOUT_FLOOR_S)
                         if check.accepted:
                             verdict = "refuted"
-                events.append({"kind": "audit", "by": "evaluation" if sub.get("found") else other,
+                events.append({"kind": "audit",
+                               "by": "evaluation" if sub.get("searched") else other,
                                "goal": target[:100], "verdict": verdict, "values": values})
                 if verdict == "refuted":
                     stmt = sub["what"] or f"⊢ {target}"
