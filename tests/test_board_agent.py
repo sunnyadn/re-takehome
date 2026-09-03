@@ -1161,19 +1161,19 @@ def test_after_a_restart_the_next_plan_is_asked_to_avoid_the_routes_already_trie
     assert "Routes already tried" in planners[-1] and "Take the obvious route (" in planners[-1]
 
 
-def test_a_branch_with_more_proved_facts_ranks_ahead_of_one_with_fewer_open_goals():
-    # Measured on rmo_2000_6 and putnam_2020_a2 with two routes open: the
-    # branch with fewer placeholders was the one that had posted nothing, and
-    # "fewest open goals first" kept choosing it. Progress Lean has certified
-    # (proved `have`s) ranks first; open goals break the tie.
+def test_a_filler_fact_does_not_rank_a_branch_ahead():
+    # v7.44 ranked branches by proved `have`s first; under the fake, the branch
+    # that collected `have junk : True := by trivial` on every idle turn outranked
+    # the one making progress, and models post fillers too (`h_a_ge_1`, `h_a_ge_2`
+    # both `a ≥ 1` on rmo_2000_6). Open goals, then age.
     from submission.board_agent import proved_count
-    rich = ("theorem t : True := by\n  have a : P := by\n    omega\n  have b : Q := by\n"
-            "    simp\n  have c : R := by\n    sorry\n  sorry\n")
-    poor = "theorem t : True := by\n  sorry\n"
-    assert proved_count(rich) == 2 and proved_count(poor) == 0
-    r = Board(rich, [Goal(7, "    ", "t", "⊢ R"), Goal(8, "  ", "t", "⊢ True")])
-    p = Board(poor, [Goal(2, "  ", "t", "⊢ True")])
-    assert sorted([p, r], key=lambda b: b.score)[0] is r
+    filler = ("theorem t : True := by\n  have junk : True := by trivial\n"
+              "  have junk2 : True := by trivial\n  sorry\n  sorry\n")
+    lean = "theorem t : True := by\n  sorry\n"
+    assert proved_count(filler) == 2 and proved_count(lean) == 0
+    f = Board(filler, [Goal(4, "  ", "t", "⊢ True"), Goal(5, "  ", "t", "⊢ True")])
+    l = Board(lean, [Goal(2, "  ", "t", "⊢ True")])
+    assert sorted([f, l], key=lambda b: b.score)[0] is l
 
 
 def test_a_fact_about_a_variable_bound_inside_the_have_stays_inside_it():
@@ -1209,3 +1209,23 @@ def test_a_claim_that_enters_through_a_prefix_cut_is_audited_too():
                for e in result.metadata["events"])
     assert "have bad" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
+
+
+def test_with_two_routes_open_the_second_worker_takes_the_other_one():
+    # Measured on rmo_2000_6 (one46a): both workers went to the better-ranked
+    # route and the other got 2 turns in 40. A branch the other model is on
+    # comes after the ones it is not, so two workers cover two routes.
+    # model-a: two rejections, then the crux; its two skeletons each leave one
+    # goal open. model-b arrives after the crux and can only close the fork's
+    # goal (k1); on the main branch its step does nothing.
+    result, lean, llm, _ = run(ONE, {
+        "model-a": ["no", "linarith [a]",
+                    "have k1 : P := by\n  sorry\nhave k2 : Q := by\n  sorry\n"
+                    "have k3 : R := by\n  sorry\nexact k1",                      # second route
+                    "have dead : P := by\n  sorry\nhave dead2 : Q := by\n  sorry\nexact dead"]
+                   + [f"linarith [x{i}]" for i in range(12)],
+        "model-b": ["exact k1"] * 3,
+    }, delay={"model-b": 0.6}, time_limit=60)
+    assert any(e.get("stage") == "route" for e in result.metadata["events"])
+    assert result.metadata["accepted_by_repl"] is True
+    assert "k1" in result.solution and "dead" not in result.solution

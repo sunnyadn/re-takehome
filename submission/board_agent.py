@@ -179,9 +179,10 @@ class Board:
     ms: int = 0
 
     @property
-    def score(self) -> tuple[int, int, int]:
-        """Most proved facts first, then fewer open goals, then the older branch."""
-        return -proved_count(self.text), len(self.goals), self.bid
+    def score(self) -> tuple[int, int]:
+        """Fewer open goals first; the tie goes to the older branch. (Proved
+        `have`s were tried as the first key: a filler `have : True` counts.)"""
+        return len(self.goals), self.bid
 
     def find(self, key: tuple[str, str]) -> Goal | None:
         return next((g for g in self.goals if g.key == key), None)
@@ -1606,17 +1607,23 @@ class BoardAgent(FrameworkAgent):
             anywhere, one the other model holds, so a 158s reply does not idle
             the fast model. Measured on p09: 4 minutes of 20 went that way."""
 
+            # A branch the other model is working on comes after the ones it is
+            # not: with two routes open both workers went to the better-ranked
+            # one and the other route got 2 turns in 40 (measured on rmo_2000_6).
+            busy = {b.bid for b in branches for g in b.goals
+                    if claimed.get(g.key) not in (None, model)}
             options = []
             for rank, b in enumerate(sorted(branches, key=lambda b: b.score)):
                 for g in b.goals:
                     if g.text and claimed.get(g.key) != model:
-                        options.append(((g.key, model) in repeated, g.key in claimed, rank,
+                        options.append(((g.key, model) in repeated, g.key in claimed,
+                                        b.bid in busy and len(branches) > 1, rank,
                                         tries.get(g.key, 0) >= LAST_IN_LINE,
                                         tries.get(g.key, 0), g.line, b, g))
             if not options:
                 return None
-            best = min(options, key=lambda o: o[:6])
-            return best[6], best[7]
+            best = min(options, key=lambda o: o[:7])
+            return best[7], best[8]
 
         def all_last_in_line() -> bool:
             return bool(board.goals) and not claimed and all(
