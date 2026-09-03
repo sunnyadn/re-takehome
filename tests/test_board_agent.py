@@ -1152,3 +1152,18 @@ def test_after_a_restart_the_next_plan_is_asked_to_avoid_the_routes_already_trie
     assert len(planners) >= 4
     assert "Routes already tried" not in planners[0]
     assert "Routes already tried" in planners[-1] and "Take the obvious route (" in planners[-1]
+
+
+def test_a_branch_with_more_proved_facts_ranks_ahead_of_one_with_fewer_open_goals():
+    # Measured on rmo_2000_6 and putnam_2020_a2 with two routes open: the
+    # branch with fewer placeholders was the one that had posted nothing, and
+    # "fewest open goals first" kept choosing it. Progress Lean has certified
+    # (proved `have`s) ranks first; open goals break the tie.
+    from submission.board_agent import proved_count
+    rich = ("theorem t : True := by\n  have a : P := by\n    omega\n  have b : Q := by\n"
+            "    simp\n  have c : R := by\n    sorry\n  sorry\n")
+    poor = "theorem t : True := by\n  sorry\n"
+    assert proved_count(rich) == 2 and proved_count(poor) == 0
+    r = Board(rich, [Goal(7, "    ", "t", "⊢ R"), Goal(8, "  ", "t", "⊢ True")])
+    p = Board(poor, [Goal(2, "  ", "t", "⊢ True")])
+    assert sorted([p, r], key=lambda b: b.score)[0] is r

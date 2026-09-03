@@ -179,9 +179,9 @@ class Board:
     ms: int = 0
 
     @property
-    def score(self) -> tuple[int, int]:
-        """Fewer open goals first; the tie goes to the less-tried branch."""
-        return len(self.goals), self.bid
+    def score(self) -> tuple[int, int, int]:
+        """Most proved facts first, then fewer open goals, then the older branch."""
+        return -proved_count(self.text), len(self.goals), self.bid
 
     def find(self, key: tuple[str, str]) -> Goal | None:
         return next((g for g in self.goals if g.key == key), None)
@@ -214,6 +214,22 @@ def owner(text: str, line: int) -> str:
         if span and line_of(text, span[0]) <= line <= line_of(text, max(span[1] - 1, span[0])):
             return name
     return ""
+
+
+def proved_count(text: str) -> int:
+    """`have`s whose block holds no placeholder: the facts Lean has certified."""
+    lines, count = text.split("\n"), 0
+    for i, line in enumerate(lines):
+        head = HAVE_HEAD.match(line)
+        if not head or ":=" not in line:
+            continue
+        depth, j = len(head.group(1)), i + 1
+        while j < len(lines) and (not lines[j].strip()
+                                  or len(lines[j]) - len(lines[j].lstrip()) > depth):
+            j += 1
+        if not any(l.strip() == "sorry" or l.strip() == "skip" for l in lines[i:j]):
+            count += 1
+    return count
 
 
 def read_board(text: str, messages: Sequence[dict[str, Any]], accepted: bool) -> Board:
@@ -1063,7 +1079,7 @@ class BoardAgent(FrameworkAgent):
 
         def prune() -> None:
             while len(branches) > BEAM:
-                worst = max(branches, key=lambda b: (len(b.goals), -b.bid))
+                worst = max(branches, key=lambda b: b.score)
                 branches.remove(worst)
                 events.append({"stage": "prune", "bid": worst.bid, "goals": len(worst.goals)})
 
