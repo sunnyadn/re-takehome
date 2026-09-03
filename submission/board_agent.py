@@ -1127,6 +1127,9 @@ class BoardAgent(FrameworkAgent):
 
         failed_at = 0
         known_names: dict[str, str] = {}
+        # Every plan asked for a declaration, kept across restarts: the next
+        # plan is asked to differ from them.
+        routes: dict[str, list[str]] = {}
 
         async def nearest_names(messages: Sequence[dict[str, Any]], goal: Goal) -> str:
             """Lean's own answer to a misspelt library name, once per name."""
@@ -1601,16 +1604,18 @@ class BoardAgent(FrameworkAgent):
                     del table[key]
             await commit(await look(fresh_text))
 
-        def prompt_for(goal: Goal, model: str, skeleton: bool = False) -> str:
+        def prompt_for(goal: Goal, model: str, skeleton: bool = False,
+                       plan: str | None = None) -> str:
             source, line = view(*render(board.text, board.index(goal))[:1], goal.decl)
+            plan = plans.get(goal.key) if plan is None else plan
             parts = [f"Problem: {problem.description}".strip(),
                      "File:\n" + source[-FILE_CHARS:],
                      "What Lean reports as open, with its hypotheses. The first goal "
                      f"is the active one, at `skip` on line {line}:\n"
                      f"{goal.text[:GOAL_CHARS]}"]
-            if plans.get(goal.key):
+            if plan:
                 parts.append("A mathematician was asked how to prove this goal and "
-                             f"answered:\n{plans[goal.key]}")
+                             f"answered:\n{plan}")
             if said.get(goal.key):
                 parts.append(f"{said[goal.key].lead(model)}:\n{said[goal.key].text}")
             if skeleton:
@@ -1655,7 +1660,7 @@ class BoardAgent(FrameworkAgent):
         async def turn(model: str) -> bool:
             """One turn for one worker: False when there was no goal to take."""
 
-            nonlocal finished
+            nonlocal finished, next_bid
             if True:
                 async with lock:
                     if any(b.accepted and is_done(b.text) for b in branches):
@@ -1678,13 +1683,22 @@ class BoardAgent(FrameworkAgent):
                                       and not plans.get(goal.key))
                         ask = prompt_for(goal, model)
                 if goal is not None and wants_plan:
+                    # The crux is where routes diverge, so it gets two: one plan
+                    # from each model, the second written as a skeleton onto a
+                    # sibling branch. Lean's progress on each decides between them.
                     other = next((m for m in models if m != model), model)
-                    plan = await self._ask_plan(
-                        problem, State(text=board.text, goal=goal.text),
-                        services, ledger, other)
+                    state = State(text=board.text, goal=goal.text)
+                    avoid = list(routes.get(goal.decl, []))
+                    plan, second = await asyncio.gather(
+                        self._ask_plan(problem, state, services, ledger, other, avoid=avoid),
+                        self._ask_plan(problem, state, services, ledger, model, avoid=avoid))
+                    ask_second, fork = "", None
                     async with lock:
                         plans[goal.key] = plan
+                        routes.setdefault(goal.decl, []).extend(
+                            p for p in (plan, second) if p.strip())
                         events.append({"kind": "plan", "by": other, "chars": len(plan)})
+                        events.append({"kind": "plan", "by": model, "chars": len(second)})
                         now = live(base.bid)
                         moved = now.find(goal.key) if now else None
                         if moved:
@@ -1693,6 +1707,36 @@ class BoardAgent(FrameworkAgent):
                         ask = prompt_for(goal, model, skeleton=True) if moved else ""
                         if ask:
                             events.append({"kind": "skeleton", "by": model})
+                        if moved and second.strip() and second.strip() != plan.strip() \
+                                and len(branches) < BEAM + 1:
+                            fork = Board(now.text, list(now.goals), list(now.messages),
+                                         now.accepted, next_bid)
+                            next_bid += 1
+                            sound[fork.bid] = sound.get(now.bid, now.text)
+                            branches.append(fork)
+                            focus(fork)
+                            ask_second = prompt_for(goal, model, skeleton=True, plan=second)
+                            focus(now)
+                    if ask_second and fork is not None:
+                        reply_b, _ = await self._call(model, ask_second, step_tokens(model),
+                                                      services, ledger, system=BOARD_SYSTEM)
+                        async with lock:
+                            side = live(fork.bid)
+                            there = side.find(goal.key) if side else None
+                            took = False
+                            if there is not None:
+                                focus(side)
+                                edits = interpret(reply_b, board, there, graded)
+                                took = await apply(model, there, edits) if edits else False
+                            if took and live(fork.bid):
+                                events.append({"stage": "route", "from": base.bid,
+                                               "to": fork.bid, "by": model})
+                                prune()
+                            elif live(fork.bid):
+                                branches.remove(live(fork.bid))
+                            main = live(base.bid)
+                            if main:
+                                focus(main)
                     if not ask:
                         async with lock:
                             claimed.pop(goal.key, None)
@@ -1726,7 +1770,6 @@ class BoardAgent(FrameworkAgent):
                         # The goal moved on under this reply. Judged against the
                         # file it was asked about, an accepted answer is a second
                         # way forward, and a second way is a branch, not waste.
-                        nonlocal next_bid
                         fork = Board(base.text, list(base.goals), list(base.messages),
                                      base.accepted, next_bid)
                         next_bid += 1

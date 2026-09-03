@@ -85,7 +85,8 @@ class ScriptLLM:
         if self.delay.get(model):
             await asyncio.sleep(self.delay[model])
         if "competition mathematician" in messages[0]["content"]:
-            return said("Take the obvious route.", 0.001)
+            self.plans = getattr(self, "plans", 0) + 1
+            return said(f"Take the obvious route ({self.plans}).", 0.001)
         queue = self.scripts.get(model, [])
         reply = queue.pop(0) if queue else "have junk : True := by trivial"
         if isinstance(reply, tuple):
@@ -200,9 +201,9 @@ def test_restating_a_closed_declaration_pushes_feedback_and_counts():
     challenge = ("import Mathlib\n\ntheorem demo : True := by\n  sorry\n\n"
                  "theorem demo_b : True := by\n  trivial\n")
     result, lean, llm, _ = run(challenge, {
-        "model-a": ["no", "no", "theorem demo_b : True := by trivial",
+        "model-a": ["no", "no", "no", "no", "theorem demo_b : True := by trivial",
                     "have key : True := by trivial", "exact key"],
-    }, lines=("model-a",))
+    }, lines=("model-a",))  # the fourth "no" is the second route's skeleton at the crux
     assert [e for e in result.metadata["events"] if e.get("kind") == "drop"]
     assert any("already declared" in p for _, p in llm.calls)
 
@@ -433,10 +434,11 @@ def test_after_the_plan_the_next_step_is_asked_as_a_skeleton_of_sorries():
     # goes on the board as goals and both workers take them.
     skeleton = "have key : P := by\n  sorry\nhave more : P := by\n  sorry\nexact key"
     result, lean, llm, _ = run(ONE, {
-        "model-a": ["linarith", "exact?", skeleton, "exact key", "exact key", "exact key"],
+        "model-a": ["linarith", "exact?", "linarith", skeleton, "exact key", "exact key", "exact key"],
     }, lines=("model-a",))
+    # two routes at the crux: the second route's skeleton (rejected here) and the main one
     asked = [p for m, p in llm.calls if "Write the plan as a skeleton" in p]
-    assert len(asked) == 1 and "mathematician was asked" in asked[0]
+    assert len(asked) == 2 and all("mathematician was asked" in a for a in asked)
     assert {"kind": "skeleton", "by": "model-a"} in result.metadata["events"]
     # Both sorries were posted: a later check rendered two placeholders.
     assert any(src.count("skip") >= 2 for src in lean.sources)
@@ -1116,3 +1118,37 @@ def test_a_misspelt_library_name_comes_back_with_the_nearest_real_ones():
     from submission.board_agent import library_names
     assert library_names([{"data": "Unknown identifier `x`"}, {"data": "Unknown identifier `h_k`"},
                           {"data": "Unknown identifier `k.succ`"}], "k x : ℕ\n⊢ True") == []
+
+
+def test_the_crux_opens_two_routes_and_the_second_can_be_the_one_that_closes():
+    # Measured on rmo_2000_6, putnam_2018_a1 and rmo_2001_2: one plan per crux,
+    # and every run deepened the first route it was given. Two plans, one per
+    # model, the second written onto a sibling branch; Lean decides between them.
+    # Queue: two rejected steps, then at the crux the second route's skeleton
+    # (closes), then the main route's skeleton (a dead end).
+    result, lean, llm, _ = run(ONE, {
+        "model-a": ["no", "linarith [a]",
+                    "have key : True := by trivial\nexact key",
+                    "have dead : P := by\n  sorry\nexact dead"],
+    }, lines=("model-a",))
+    planners = [p for m, p in llm.calls if p.startswith("Problem: prove it\n\nThe goal")]
+    assert len(planners) == 2
+    assert any(e.get("stage") == "route" for e in result.metadata["events"])
+    assert result.metadata["accepted_by_repl"] is True
+    assert "dead" not in result.solution
+
+
+def test_after_a_restart_the_next_plan_is_asked_to_avoid_the_routes_already_tried():
+    # Measured on rmo_2001_2: after the board was cut back the models proposed
+    # the same decomposition again. Plans are remembered per declaration across
+    # restarts and the planner is told which ones to avoid.
+    challenge = "import Mathlib\n\ntheorem demo (n : ℕ) : True := by\n  sorry\n"
+    result, lean, llm, _ = run(challenge, {
+        "model-b": ["no", "linarith [h1]", "linarith [h2]"]
+                   + ["linarith [h%d]" % i for i in range(3, 22)]
+                   + ["have key : True := by trivial\nexact key"] * 3},
+        lines=("model-b",), time_limit=60)
+    planners = [p for m, p in llm.calls if p.startswith("Problem: prove it\n\nThe goal")]
+    assert len(planners) >= 4
+    assert "Routes already tried" not in planners[0]
+    assert "Routes already tried" in planners[-1] and "Take the obvious route (" in planners[-1]

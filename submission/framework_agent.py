@@ -942,11 +942,16 @@ class FrameworkAgent:
         return "\n".join(printed)[:FEEDBACK_CHARS] or "nothing"
 
     async def _ask_plan(self, problem: Problem, state: State, services: Services,
-                        ledger: Ledger, model: str = "") -> str:
-        """The mathematics, from the model that answers in mathematics."""
+                        ledger: Ledger, model: str = "", avoid: Sequence[str] = ()) -> str:
+        """The mathematics, from the model that answers in mathematics. Routes
+        already tried on this declaration are named so the next one differs."""
 
         ask = (f"Problem: {problem.description}\n\nThe goal, as Lean reports it:\n"
                f"{state.goal[:GOAL_CHARS]}\n\nHow do you prove this?")
+        if avoid:
+            tried = "\n".join(f"- {a[:300]}" for a in list(avoid)[-3:])
+            ask += ("\n\nRoutes already tried on this goal that did not work out. "
+                    f"Give a different one:\n{tried}")
         # Measured on p10: with reasoning on, the plan came back as "The user is
         # asking me to prove a theorem in Lean 4", which costs a call and enters
         # every later prompt. Reasoning stays on only where it is the answer.
