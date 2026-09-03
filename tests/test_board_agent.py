@@ -1443,3 +1443,26 @@ def test_a_stuck_leaf_inside_a_mostly_proved_have_is_restarted_before_the_have_i
     kinds = [e.get("kind") for e in result.metadata["events"]]
     assert "leaf_restart" in kinds
     assert kinds.index("leaf_restart") < (kinds.index("withdraw") if "withdraw" in kinds else 10 ** 6)
+
+
+def test_a_declaration_with_proved_facts_does_not_restart_while_its_last_goal_can_retry():
+    # Measured on rmo_2000_6 (one55a): at 08:46 one goal was left under
+    # `case inr.inr` inside `have h_min` (h2, h5, h2a, h5a proved above it);
+    # it reached 6 tries and the whole declaration went back to its statement.
+    from submission.board_agent import settled_inside, Goal
+    text = ("import Mathlib\n\ntheorem demo : True := by\n"
+            "  have big : Q := by\n"
+            "    have p1 : P := by\n      trivial\n"
+            "    have p2 : P := by\n      trivial\n"
+            "    rcases h with h | h\n"
+            "    case inl =>\n      trivial\n"
+            "    case inr =>\n      skip\n"
+            "  trivial\n")
+    assert settled_inside(text, Goal(13, "      ", "demo", "case inr\n⊢ Q")) == 2
+    script = ["have big : Q := by\n  have p1 : P := by\n    trivial\n  have p2 : P := by\n    trivial\n  sorry\nexact big"]
+    script += [f"linarith [x{i}]" for i in range(14)] + ["exact big"] * 4
+    result, lean, llm, _ = run(ONE, {"model-a": script}, lines=("model-a",), time_limit=60)
+    kinds = [e.get("kind") or e.get("stage") for e in result.metadata["events"]]
+    assert "leaf_restart" in kinds
+    first_restate = kinds.index("restate") if "restate" in kinds else 10 ** 6
+    assert kinds.index("leaf_restart") < first_restate

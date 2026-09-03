@@ -686,29 +686,44 @@ def withdraw_only(text: str, goal: Goal) -> tuple[str, str]:
 
 
 def settled_inside(text: str, goal: Goal) -> int:
-    """Proved facts in the `have` enclosing the goal: sub-`have`s of that block
-    whose bodies hold no placeholder. What withdrawal would throw away."""
+    """Proved facts around the goal: `have`s with no placeholder left inside the
+    nearest enclosing `have` (walking out through `case` and bullet lines), or
+    inside the declaration when no `have` encloses it. What a withdrawal or a
+    restart would throw away."""
     lines = text.split("\n")
-    above, head = enclosing_have(lines, goal)
-    if not head:
+    i, depth = goal.line - 1, len(goal.indent)
+    start, top = None, 0
+    while i > 0:
+        i -= 1
+        line = lines[i]
+        if not line.strip():
+            continue
+        d = len(line) - len(line.lstrip())
+        if d >= depth:
+            continue
+        depth = d
+        if HAVE_HEAD.match(line) or DECL_HEAD.match(line) or d == 0:
+            start, top = i, d
+            break
+    if start is None:
         return 0
-    depth = len(head.group(1))
-    end = above + 1
+    end = start + 1
     while end < len(lines) and (not lines[end].strip()
-                                or len(lines[end]) - len(lines[end].lstrip()) > depth):
+                                or len(lines[end]) - len(lines[end].lstrip()) > top):
         end += 1
     count = 0
-    for i in range(above + 1, end):
-        m = HAVE_HEAD.match(lines[i])
-        if not m or i + 1 == goal.line:
+    for k in range(start + 1, end):
+        m = HAVE_HEAD.match(lines[k])
+        if not m or k + 1 == goal.line:
             continue
-        j, d = i + 1, len(m.group(1))
+        j, d = k + 1, len(m.group(1))
         body = []
         while j < end and (not lines[j].strip() or len(lines[j]) - len(lines[j].lstrip()) > d):
             body.append(lines[j]); j += 1
         if body and not any(l.strip() in ("sorry", "skip") for l in body):
             count += 1
     return count
+
 
 INFLATION = 3.0
 
@@ -1844,6 +1859,18 @@ class BoardAgent(FrameworkAgent):
 
             worst = max(board.goals, key=lambda g: tries.get(g.key, 0), default=None)
             if worst is None or not worst.decl:
+                return
+            # Measured on rmo_2000_6 (one55a 08:46→08:51): one goal left, 6 tries,
+            # and the declaration went back to its statement. Goals sitting among
+            # proved facts restart themselves once before the declaration does.
+            leaves = [g for g in board.goals if g.key not in leaf_restarts
+                      and settled_inside(board.text, g) >= 2]
+            if leaves:
+                for g in leaves:
+                    leaf_restarts.add(g.key)
+                    tries.pop(g.key, None); said.pop(g.key, None); plans.pop(g.key, None)
+                events.append({"kind": "leaf_restart", "by": "harness", "goals": len(leaves),
+                               "settled": settled_inside(board.text, leaves[0])})
                 return
             restated[worst.decl] = restated.get(worst.decl, 0) + 1
             fresh_text, _ = restate(board.text, worst.decl)
