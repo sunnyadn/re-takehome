@@ -1683,6 +1683,37 @@ def test_a_fact_posted_under_an_intro_stays_where_its_hypotheses_are():
     assert not any(e.get("kind") == "lifted" for e in result.metadata["events"])
 
 
+def test_an_auditor_that_does_not_answer_in_time_lets_the_step_through_unverified():
+    # Measured on putnam_2020_a2 (v7.63): one audit reply took 482 s under the
+    # board lock, the run's only gap over 90 s. The call is not cancelled (an
+    # open reservation fails the problem); it is drained before the agent returns.
+    import submission.board_agent as ba
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = WitnessLean(), ScriptLLM({
+        "model-a": ["have fine : x < 3 := by\n  sorry\nhave key : True := by trivial\nexact key",
+                    "omega", "have key : True := by trivial\nexact key"],
+        "model-b": ['{"holds": true}'] * 4}, delay={"model-b": 0.8})
+    was = ba.AUDIT_WAIT_S
+    ba.AUDIT_WAIT_S = 0.1
+    try:
+        agent = BoardAgent(Config(lines=("model-a", "model-b"), budget_usd=1.0, time_limit_s=600.0))
+        started = time.monotonic()
+        result = asyncio.run(agent.solve(
+            Problem(id="demo", description="prove it", challenge=challenge),
+            FakeServices(lean, llm)))
+        wall = time.monotonic() - started
+    finally:
+        ba.AUDIT_WAIT_S = was
+    events = result.metadata["events"]
+    slow = [e for e in events if e.get("kind") == "slow_call"]
+    assert slow and slow[0]["by"] == "model-b" and slow[0]["audits"] == 1
+    audit = next(e for e in events if e.get("kind") == "audit" and "x < 3" in e.get("goal", ""))
+    assert audit["verdict"] == "unverified"
+    assert "have fine" in result.solution and result.metadata["accepted_by_repl"] is True
+    # The late reply was still awaited: the run took at least the auditor's delay.
+    assert wall >= 0.8, wall
+
+
 def test_a_claim_the_walk_covers_is_settled_without_an_auditor_call():
     # Measured over 7 runs: every refutation with ℕ binders came from the walk,
     # the auditor's came from closed claims and ℤ, and audit calls were half of

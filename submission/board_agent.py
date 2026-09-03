@@ -260,6 +260,10 @@ WITNESS_CLOSERS = ("norm_num", "decide", "simp",
                    "norm_num [Finset.mem_insert, Finset.mem_singleton]",
                    "simp; norm_num", "norm_num; decide")
 AUDIT_TOKENS = 2500
+# An auditor that has not answered by then lets the step through as unverified;
+# the call runs on and is drained before the agent returns (a reservation left
+# open fails the problem). Measured: one 482 s audit reply under the board lock.
+AUDIT_WAIT_S = 120.0
 AUDIT_SYSTEM = ("You audit one goal inside a Lean 4 proof. You answer with one "
                 "JSON object and nothing else.")
 # Lean states the goal itself: every hypothesis in scope as a binder, numerals
@@ -1683,9 +1687,18 @@ class BoardAgent(FrameworkAgent):
             # A claim the walk covered is settled: the auditor is asked about the rest.
             asked = [sub for sub in subjects
                      if sub["parsed"] and sub["parsed"][0] and not sub["found"] and not sub["searched"]]
-            replies = await asyncio.gather(*(self._call(
+            pending_calls = [asyncio.ensure_future(self._call(
                 other, audit_prompt(sub["stmt"], prefix.replace("import Mathlib", "")),
-                AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM) for sub in asked))
+                AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM)) for sub in asked]
+            for t in pending_calls:
+                loose.append(t)
+                t.add_done_callback(lambda t: loose.remove(t) if t in loose else None)
+            if pending_calls:
+                done_calls, late = await asyncio.wait(pending_calls, timeout=AUDIT_WAIT_S)
+                if late:
+                    events.append({"kind": "slow_call", "by": other, "audits": len(late),
+                                   "waited_s": AUDIT_WAIT_S})
+            replies = [t.result() if t.done() else ("", "") for t in pending_calls]
             for sub in subjects:
                 audited[sub["key"]] = ""
                 verdict, values = "unstated", {}
@@ -2423,8 +2436,10 @@ class BoardAgent(FrameworkAgent):
             events.append({"stage": "abort", "error": type(exc).__name__})
             return result(best, "aborted", False)
         finally:
+            # Every call the agent started must settle before it returns: the
+            # harness fails a problem whose ledger still holds a reservation.
             if loose:
-                await asyncio.wait(list(loose), timeout=LOOSE_DRAIN_S)
+                await asyncio.wait(list(loose))
 
 
 def create_agent() -> BoardAgent:
