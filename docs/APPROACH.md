@@ -52,7 +52,7 @@ Some routes the models reach and cannot finish are a fixed tactic sequence. Thos
 
 `qwen` narrates its reasoning into the reply when reasoning is on, so it is asked every question with reasoning off. With it on, its shared-lemma proposal was prose in 6 of 6 p09 runs, its answer-term reply was a page of derivation, and its audit replies never reached the JSON.
 
-`gpt-oss` step replies are capped at 4000 tokens. Measured over 808 replies at 6000, the 95th percentile latency was 146 to 182 s and 65 replies passed 120 s. The harness reads a response with a 180 s timeout and treats any transport failure as spend of unknown size, which closes the problem's ledger and fails the problem whatever the proof says. 3 such failures occurred in 7213 requests. At the slow rate seen, 6000 tokens cannot finish inside 180 s and 4000 can.
+`gpt-oss` step replies are capped at 4000 tokens, and every call is further capped at what the slowest of the model's last 6 replies of 400+ tokens would produce in 120 s (floor 1200). Measured on p10: a 4000-token step at 19 tokens/s ran 206 s, past the read timeout, and scored 0 a proof the board had accepted 38 s earlier; the previous replies in that run had run 10 to 58 s. Measured over 808 replies at 6000, the 95th percentile latency was 146 to 182 s and 65 replies passed 120 s. The harness reads a response with a 180 s timeout and treats any transport failure as spend of unknown size, which closes the problem's ledger and fails the problem whatever the proof says. 3 such failures occurred in 7213 requests. At the slow rate seen, 6000 tokens cannot finish inside 180 s and 4000 can.
 
 ## The rest
 

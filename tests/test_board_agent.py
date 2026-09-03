@@ -1946,3 +1946,31 @@ def test_a_finished_proof_that_calls_no_technique_ships_without_the_block():
                            lines=("model-a",), time_limit=20)
     assert result2.metadata["accepted_by_repl"] is True
     assert "techniques defined for this file" in result2.solution
+
+
+def test_a_slow_model_is_asked_for_fewer_tokens_than_it_could_not_deliver_in_time():
+    # Measured on p10 (v7.79): a 4000-token gpt-oss step at 19 tokens/s ran
+    # 206 s, past the harness's 180 s read timeout, and the ledger going
+    # unknown scored 0 a proof accepted 38 s earlier. After two replies at
+    # that rate the next call asks for what 120 s can carry.
+    from submission.framework_agent import LATENCY_BUDGET_S, PACE_FLOOR
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=3.0))
+    assert agent._paced("m", 4000) == 4000
+    agent._pace["m"] = [(4000, 206.0)]
+    assert agent._paced("m", 4000) == 4000                    # one reply is no rate
+    agent._pace["m"].append((3000, 100.0))
+    assert agent._paced("m", 4000) == int(4000 / 206.0 * LATENCY_BUDGET_S)
+    agent._pace["m"].append((50, 60.0))                       # a short reply says nothing
+    assert agent._paced("m", 4000) == int(4000 / 206.0 * LATENCY_BUDGET_S)
+    agent._pace["m"] = [(2000, 400.0), (2000, 400.0)]
+    assert agent._paced("m", 4000) == PACE_FLOOR
+    # _call records every reply's tokens and seconds under the model's name.
+    class CountedLLM(ScriptLLM):
+        async def complete(self, *, model, messages, **kwargs):
+            r = await super().complete(model=model, messages=messages, **kwargs)
+            r.usage = {"cost": 0.01, "completion_tokens": 700}
+            return r
+    lean, llm = BoardLean(), CountedLLM({"model-a": ["have key : True := by trivial\nexact key"]})
+    asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                            FakeServices(lean, llm)))
+    assert agent._pace["model-a"] and agent._pace["model-a"][0][0] == 700

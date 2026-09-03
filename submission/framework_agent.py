@@ -93,6 +93,15 @@ ANSWER_TOKENS = 4000
 # the ledger marks accounting incomplete and never clears it, so the next call
 # aborts the problem. The setting is therefore decided by name, never probed.
 REASONING = {"effort": "low"}
+# The harness reads a reply for at most 180 s and a ReadTimeout leaves the
+# ledger unknown, which scores the problem 0 whatever the file says. Measured
+# on p10 (v7.79): a 4000-token step call at 19 tokens/s ran 206 s and zeroed a
+# proof that had been accepted 38 s earlier. So a call may ask for no more
+# tokens than the slowest recent reply rate produces in LATENCY_BUDGET_S.
+LATENCY_BUDGET_S = 120.0
+PACE_WINDOW = 6
+PACE_MIN_TOKENS = 400
+PACE_FLOOR = 1200
 NO_REASONING = {"enabled": False}
 NARRATES = ("qwen",)
 GOAL_CHARS = 4000
@@ -425,6 +434,8 @@ class Turn:
 class FrameworkAgent:
     def __init__(self, config: Config | None = None):
         self.config = config or Config.from_env()
+        # Per model: (completion tokens, seconds) of each reply, for _paced.
+        self._pace: dict[str, list[tuple[int, float]]] = {}
 
     def _reasoning(self, model: str) -> dict[str, Any]:
         """Reasoning a model narrates in its content crowds out the step."""
@@ -1226,9 +1237,11 @@ class FrameworkAgent:
         It stays on where thinking is the answer: the plan, and the arithmetic
         behind a numeric slot."""
 
+        max_tokens = self._paced(model, max_tokens)
         for wait in (0.0,) + RETRY_BACKOFF_S:
             if wait:
                 await asyncio.sleep(wait)
+            started = time.monotonic()
             try:
                 reply = await services.llm.complete(
                     model=model,
@@ -1246,9 +1259,21 @@ class FrameworkAgent:
                     continue
                 raise
             ledger.record(reply.usage)
+            self._pace.setdefault(model, []).append(
+                (int((reply.usage or {}).get("completion_tokens") or 0), time.monotonic() - started))
             said = tool_lines(reply.tool_calls) or spoken(reply.content or "")
             return said, reply.finish_reason or ""
         return "", ""
+
+    def _paced(self, model: str, want: int) -> int:
+        """`want` tokens, or what the slowest of the model's recent replies
+        would produce inside LATENCY_BUDGET_S, whichever is less."""
+
+        rates = [t / s for t, s in self._pace.get(model, [])[-PACE_WINDOW:]
+                 if t >= PACE_MIN_TOKENS and s > 0]
+        if len(rates) < 2:
+            return want
+        return max(PACE_FLOOR, min(want, int(min(rates) * LATENCY_BUDGET_S)))
 
 
 # Measured on p10: a model that reasons returns its draft inside `<think>`
