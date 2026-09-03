@@ -36,13 +36,13 @@ Score is the kit comparator's verdict, 1 or 0. Wall time is seconds.
 | p10_factorial_pow | 0 (235) | t/o | 1 (155) | 0.0046 |
 | putnam_2018_a1 | t/o | 1* | 0 (2726) | 0.073 |
 | putnam_2020_a2 | 0 (614) | 1* | 0 (1296) | 0.054 |
-| rmo_2000_2 | 0 (835) | t/o | 0, run in progress at submission, 0 on every earlier version | |
+| rmo_2000_2 | 0 (835) | t/o | 0 (2705) | 0.078 |
 | rmo_2000_3 | t/o | t/o | 0 (see note) | |
 | rmo_2000_6 | 0 (904) | t/o | 1 (378) | 0.021 |
 | rmo_2001_2 | t/o | t/o | 0 (2655) | 0.111 |
 | **Total of 16** | **7** | **8 (6 without \*)** | **11** | |
 
-Wall time is the agent's own `wall_s` in `result.json`, comparator time excluded. `t/o` is `agent exceeded 1080.0s` in the kit's `summary.json` (3 of qwen's 9 zeros, 7 of gpt-oss's 8). The board runs for `putnam_2018_a1` and `rmo_2001_2` are from the commit two before the final one (v7.59), which differs from it only in how Lean positions are mapped when a challenge has more than one import line, and both challenges have one. The `rmo_2000_6` artifact is a run of an identical copy of the problem under the id `rmo6y`, made so that several copies could run at once.
+Wall time is the agent's own `wall_s` in `result.json`, comparator time excluded. `t/o` is `agent exceeded 1080.0s` in the kit's `summary.json` (3 of qwen's 9 zeros, 7 of gpt-oss's 8). The board runs for `putnam_2018_a1`, `rmo_2000_2` and `rmo_2001_2` are from the commit two before the final one (v7.59), which differs from it only in how Lean positions are mapped when a challenge has more than one import line, and all three challenges have one. The `rmo_2000_6` artifact is a run of an identical copy of the problem under the id `rmo6y`, made so that several copies could run at once.
 
 \* These two passes predate the kit's PR #9 ("Inline the Putnam answers so circular solutions stop scoring"). They used the answer to prove the answer and would not score now.
 
