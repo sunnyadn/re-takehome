@@ -12,7 +12,9 @@ VAR = re.compile(r"^[A-Za-z_][\w']*$")
 # Every alternative must close the goal: `simp_all` alone can rewrite a
 # hypothesis, count as success, and leave the goal open (measured on the
 # rmo_2001_2 case leaves).
-FINISH = "first | omega | (norm_num at *; done) | nlinarith | (simp_all; done)"
+FINISH = ("first | omega | (norm_num at *; done) | nlinarith | (simp_all; done)"
+          " | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, "
+          "Finset.mem_insert, Finset.mem_singleton] at *; omega)")
 LEAF_CAP = 6
 CASES_MAX = 40
 # One check's elaboration is bounded: a candidate that does not finish fast is not one.
