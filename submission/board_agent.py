@@ -700,10 +700,24 @@ def fold_heads(block: str) -> str:
 BIG_OPERATOR_IN = re.compile(r"([∑∏]\s*(?:\([^()]*\)|[^\s,()]+))\s+in\s+")
 
 
+OPENERS, CLOSERS = "([{⟨", ")]}⟩"
+
+
 def dialect(block: str) -> str:
-    """Spellings the models learned that this Mathlib renamed, written the way
-    it reads them now: `∑ x in s` is `∑ x ∈ s`. Lexical only, same term."""
-    return BIG_OPERATOR_IN.sub(r"\1 ∈ ", block)
+    """Spellings the models learned that Lean 4 Mathlib does not read: `∑ x in
+    s` is `∑ x ∈ s`, and a tactic line does not end in a comma. Lexical only;
+    a comma inside an open bracket or continuing a list on the next line stays."""
+    lines = BIG_OPERATOR_IN.sub(r"\1 ∈ ", block).split("\n")
+    for i, line in enumerate(lines):
+        body = line.rstrip()
+        if not body.endswith(",") or "--" in body:
+            continue
+        balanced = sum(body.count(c) for c in OPENERS) == sum(body.count(c) for c in CLOSERS)
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        continues = nxt.strip() and len(nxt) - len(nxt.lstrip()) > len(line) - len(line.lstrip())
+        if balanced and not continues:
+            lines[i] = body[:-1]
+    return "\n".join(lines)
 
 
 def put(text: str, goal: Goal, block: str, trailing: bool = True) -> tuple[str, tuple[int, int]]:

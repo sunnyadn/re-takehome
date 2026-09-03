@@ -1072,3 +1072,18 @@ def test_a_board_with_every_goal_last_in_line_starts_the_declaration_over():
     assert any(e.get("stage") == "restate" for e in result.metadata["events"])
     assert result.metadata["accepted_by_repl"] is True
     assert "induction" not in result.solution
+
+
+def test_a_lean_3_comma_at_the_end_of_a_tactic_line_is_dropped():
+    # Measured on r3's archive: 38 of 868 step replies had a tactic line ending
+    # in a comma, every one rejected with "expected command", and qwen wrote
+    # the next one the same way after being told (rmo_2000_6 one40a, twice).
+    from submission.board_agent import dialect
+    assert dialect("intro n hn,\nsimp [p10_answer] at hn ⊢,\nexact h") == \
+        "intro n hn\nsimp [p10_answer] at hn ⊢\nexact h"
+    # a comma that continues a list on the next line, or sits inside an open
+    # bracket, is not a Lean 3 comma
+    assert dialect("use 1,\n  2") == "use 1,\n  2"
+    assert dialect("refine ⟨a,\n  b⟩") == "refine ⟨a,\n  b⟩"
+    assert dialect("simp only [foo,\n  bar] at h") == "simp only [foo,\n  bar] at h"
+    assert dialect("· norm_num [Nat.factorial],") == "· norm_num [Nat.factorial]"
