@@ -202,3 +202,11 @@ See `RULES.md` for the complete assignment rules.
 | `docker/` | Source for the Lean runtime image |
 | `docs/` | Agent API, setup, artifacts, and security model |
 | `scripts/` | Setup, smoke test, rescore, and judging checks |
+
+## This submission
+
+The agent is in `submission/`, entry point `submission.agent:create_agent` (the harness default). How it works, what it measures and what it does not do is in [docs/APPROACH.md](docs/APPROACH.md).
+
+The harness (`src/re_harness`, `run.py`, the Docker image and the scripts) is the take-home kit as provided. The changes outside `submission/` are `scripts/judge_check.sh`, which takes the problem from `JUDGE_CHECK_PROBLEM` (default `p06_pow_mod`, a problem the agent cannot close without a model call), and a `notes/` line in `.gitignore`. The two-model coordination layer, the tests under `tests/test_board_agent.py`, `tests/test_framework*.py`, `tests/test_submission_agent.py`, and `tools/replay.py` are my own work.
+
+Run the suite with `.venv/bin/python -m pytest tests/ -q`, the contract check with `bash scripts/judge_check.sh`.
