@@ -679,18 +679,42 @@ def enclosing_chain(lines: Sequence[str], goal: Goal) -> list[tuple[int, re.Matc
         probe = Goal(above + 1, head.group(1), goal.decl, goal.text)
 
 
+INTRO_LIKE = re.compile(r"^\s*(intro|intros|rintro|obtain|rcases|cases'?|induction'?|by_contra'?|"
+                        r"by_cases|interval_cases|fin_cases|match|choose|generalize|set)\b")
+
+
+def context_grows(lines: Sequence[str], chain: Sequence[tuple[int, re.Match]], depth: int,
+                  goal: Goal) -> bool:
+    """Whether a line in the bodies the goal sits in, above it and inside the
+    `have` at `chain[depth - 1]`, adds hypotheses. A fact posted below such a
+    line may be true only under them, and Lean cannot say so once it is moved
+    above the `have`: measured on rmo_2000_2, `y^3 < (x+2)^3` was posted under
+    `intro hxle : x ≤ 8`, lifted above `h1`, then refuted at (9, 11) and the
+    right route withdrawn with it."""
+    for i in range(depth - 1, -1, -1):
+        outer, _ = chain[i]
+        inner_line, inner_indent = ((chain[i - 1][0], len(chain[i - 1][1].group(1))) if i > 0
+                                    else (goal.line - 1, len(goal.indent)))
+        for l in lines[outer + 1:inner_line]:
+            if l.strip() and len(l) - len(l.lstrip()) == inner_indent and INTRO_LIKE.match(l):
+                return True
+    return False
+
+
 def split_facts(block: str) -> tuple[list[str], str]:
     """The `have ... := by sorry` statements at the top level of a block, and
-    the block without them."""
+    the block without them. A statement below an `intro`-like line of the
+    block stays in the block: it may hold only under what that line named."""
     lines = normalise_steps(block).split("\n")
     body = [l for l in lines if l.strip()]
     base = min((len(l) - len(l.lstrip()) for l in body), default=0)
-    facts, rest, i = [], [], 0
+    facts, rest, i, grown = [], [], 0, False
     while i < len(lines):
         line = lines[i]
         head = HAVE_HEAD.match(line)
         nxt = lines[i + 1] if i + 1 < len(lines) else ""
-        if head and len(head.group(1)) == base and nxt.strip() == "sorry" \
+        grown = grown or (len(line) - len(line.lstrip()) == base and bool(INTRO_LIKE.match(line)))
+        if head and not grown and len(head.group(1)) == base and nxt.strip() == "sorry" \
                 and len(nxt) - len(nxt.lstrip()) > base:
             facts.append(f"{line.strip()}\n  sorry")
             i += 2
@@ -1906,6 +1930,8 @@ class BoardAgent(FrameworkAgent):
             nxt, why, depth, head = None, "", 0, None
             for depth in range(len(chain), 0, -1):
                 outer, head = chain[depth - 1]
+                if context_grows(lines, chain, depth, goal):
+                    continue
                 lifted = [reindent(f, head.group(1)) for f, _ in fresh]
                 text = "\n".join(lines[:outer] + lifted + lines[outer:])
                 shift = sum(f.count("\n") + 1 for f in lifted)

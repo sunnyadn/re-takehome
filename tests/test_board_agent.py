@@ -1659,6 +1659,30 @@ def test_a_false_claim_is_refuted_by_evaluation_before_any_auditor_is_asked():
     assert "(x < 2)" in search and "¬ (x = 3)" in search
 
 
+def test_a_fact_posted_under_an_intro_stays_where_its_hypotheses_are():
+    # Measured on rmo_2000_2 (v7.66): `y^3 < (x+2)^3`, true under `intro hxle`
+    # (x ≤ 8), was lifted above `h1`, refuted at (9, 11) as a global claim, and
+    # the correct route was withdrawn with it. A lift may not drop context.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    result, lean, llm, _ = run(challenge, {
+        "model-a": ["have outer : True := by\n  sorry\nexact outer",
+                    "intro loc\nhave inner : 1 = 1 := by\n  sorry\nhave key : True := by trivial\nexact key",
+                    "have key2 : True := by trivial\nexact key2"]}, lines=("model-a",))
+    text = result.solution
+    assert "have inner" in text and text.index("intro loc") < text.index("have inner")
+    assert text.index("have outer") < text.index("have inner")
+    assert not any(e.get("kind") == "lifted" for e in result.metadata["events"])
+    assert result.metadata["accepted_by_repl"] is True
+    # The same when the `intro` was written a step earlier and is on the board.
+    result, lean, llm, _ = run(challenge, {
+        "model-a": ["have outer : True := by\n  sorry\nexact outer", "intro loc",
+                    "have inner : 1 = 1 := by\n  sorry\nhave key : True := by trivial\nexact key",
+                    "have key2 : True := by trivial\nexact key2"]}, lines=("model-a",))
+    text = result.solution
+    assert text.index("have outer") < text.index("intro loc") < text.index("have inner")
+    assert not any(e.get("kind") == "lifted" for e in result.metadata["events"])
+
+
 def test_a_claim_the_walk_covers_is_settled_without_an_auditor_call():
     # Measured over 7 runs: every refutation with ℕ binders came from the walk,
     # the auditor's came from closed claims and ℤ, and audit calls were half of
