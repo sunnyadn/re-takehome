@@ -217,22 +217,6 @@ def owner(text: str, line: int) -> str:
     return ""
 
 
-def proved_count(text: str) -> int:
-    """`have`s whose block holds no placeholder: the facts Lean has certified."""
-    lines, count = text.split("\n"), 0
-    for i, line in enumerate(lines):
-        head = HAVE_HEAD.match(line)
-        if not head or ":=" not in line:
-            continue
-        depth, j = len(head.group(1)), i + 1
-        while j < len(lines) and (not lines[j].strip()
-                                  or len(lines[j]) - len(lines[j].lstrip()) > depth):
-            j += 1
-        if not any(l.strip() == "sorry" or l.strip() == "skip" for l in lines[i:j]):
-            count += 1
-    return count
-
-
 def read_board(text: str, messages: Sequence[dict[str, Any]], accepted: bool) -> Board:
     """Each placeholder takes the tightest `unsolved goals` span holding it."""
 

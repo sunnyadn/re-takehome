@@ -1166,12 +1166,10 @@ def test_a_filler_fact_does_not_rank_a_branch_ahead():
     # that collected `have junk : True := by trivial` on every idle turn outranked
     # the one making progress, and models post fillers too (`h_a_ge_1`, `h_a_ge_2`
     # both `a ≥ 1` on rmo_2000_6). Open goals, then age.
-    from submission.board_agent import proved_count
-    filler = ("theorem t : True := by\n  have junk : True := by trivial\n"
-              "  have junk2 : True := by trivial\n  sorry\n  sorry\n")
+    filler = ("theorem t : True := by\n  have junk : True := by\n    trivial\n"
+              "  have junk2 : True := by\n    trivial\n  sorry\n  sorry\n")
     lean = "theorem t : True := by\n  sorry\n"
-    assert proved_count(filler) == 2 and proved_count(lean) == 0
-    f = Board(filler, [Goal(4, "  ", "t", "⊢ True"), Goal(5, "  ", "t", "⊢ True")])
+    f = Board(filler, [Goal(6, "  ", "t", "⊢ True"), Goal(7, "  ", "t", "⊢ True")])
     l = Board(lean, [Goal(2, "  ", "t", "⊢ True")])
     assert sorted([f, l], key=lambda b: b.score)[0] is l
 
