@@ -1020,3 +1020,24 @@ def test_a_rewrite_that_unfolds_a_variable_everywhere_is_measured_as_inflation()
                            "(1009, 2018), (2018, 1009), (340033, 674), (1358114, 673)}")
     assert inflated(mem, unfolded) == 1.0
 
+
+
+def test_a_big_operator_written_with_in_is_spelled_the_way_this_mathlib_reads_it():
+    # Measured on rmo_2000_3 (65 rejections, 208 occurrences) and putnam_2020_a2
+    # (14 rejections): both models write `∑ j in Finset.Icc 0 k`, the spelling
+    # Mathlib replaced by `∑ j ∈ s`, and Lean's "unexpected token 'in'" never
+    # tells them so. The rename is lexical; the term means the same.
+    from submission.board_agent import dialect
+    assert dialect("have h : ∑ j in Finset.Icc 0 k, f j = ∏ (i : ℕ) in s, g i := by\n"
+                   "  simp") == ("have h : ∑ j ∈ Finset.Icc 0 k, f j = ∏ (i : ℕ) ∈ s, g i := by\n"
+                                 "  simp")
+    # `in` anywhere else is left alone
+    kept = "set_option maxHeartbeats 400000 in\nsimp only [Finset.sum_range_succ] at h ⊢"
+    assert dialect(kept) == kept
+    assert dialect("∑ x ∈ s, x") == "∑ x ∈ s, x"
+    # and put() applies it, so the file never carries the old spelling
+    from submission.board_agent import put
+    text = "theorem t : True := by\n  sorry"
+    goal = Goal(2, "  ", "t", "⊢ True")
+    new, _ = put(text, goal, "have h : ∑ j in Finset.range 3, j = 3 := by sorry")
+    assert "∑ j ∈ Finset.range 3" in new and " in " not in new

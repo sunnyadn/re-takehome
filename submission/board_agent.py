@@ -692,11 +692,20 @@ def fold_heads(block: str) -> str:
     return "\n".join(out)
 
 
+BIG_OPERATOR_IN = re.compile(r"([∑∏]\s*(?:\([^()]*\)|[^\s,()]+))\s+in\s+")
+
+
+def dialect(block: str) -> str:
+    """Spellings the models learned that this Mathlib renamed, written the way
+    it reads them now: `∑ x in s` is `∑ x ∈ s`. Lexical only, same term."""
+    return BIG_OPERATOR_IN.sub(r"\1 ∈ ", block)
+
+
 def put(text: str, goal: Goal, block: str, trailing: bool = True) -> tuple[str, tuple[int, int]]:
     """The block where the goal's placeholder is, and the lines it now covers."""
 
     lines = text.split("\n")
-    body = reindent(normalise_steps(fold_heads(block)), goal.indent)
+    body = reindent(normalise_steps(fold_heads(dialect(block))), goal.indent)
     if trailing:
         body = f"{body}\n{goal.indent}sorry"
     lines[goal.line - 1] = body
@@ -791,7 +800,7 @@ class BoardAgent(FrameworkAgent):
                 # question with a page of derivation twice; gpt-oss alone offered.
                 said, _ = await self._call(model, ask, ANSWER_TOKENS, services, ledger,
                                            think=not narrates(model))
-                term = " ".join(strip_fences(said).split("\n"))[:FEEDBACK_CHARS].strip()
+                term = dialect(" ".join(strip_fences(said).split("\n")))[:FEEDBACK_CHARS].strip()
                 if not term or term.startswith("by "):
                     note = "\n\nYour last reply was not a term."
                     continue
