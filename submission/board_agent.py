@@ -1963,8 +1963,11 @@ class BoardAgent(FrameworkAgent):
                 time.monotonic() - progress_at > STALL_SHARE * cfg.time_limit_s)
 
         async def unstick() -> None:
-            """Every goal last in line: the worst one's declaration starts over,
-            and what was said and planned for its goals goes with it."""
+            """Every goal last in line, or nothing accepted for a while: the
+            innermost open have comes off on a fork, else the worst goal's
+            declaration starts over and what was said and planned for it goes."""
+
+            nonlocal next_bid
 
             worst = max(board.goals, key=lambda g: tries.get(g.key, 0), default=None)
             if worst is None or not worst.decl:
@@ -1987,8 +1990,21 @@ class BoardAgent(FrameworkAgent):
             inside = [g for g in board.goals if withdraw_only(board.text, g)[0]]
             if inside:
                 deepest = max(inside, key=lambda g: (len(g.indent), tries.get(g.key, 0)))
+                # The stuck subtree is not thrown away: the board with it stays
+                # as a sibling branch and the take-back happens on a fork, so
+                # the two ways forward race, as two plans do.
+                if len(branches) < BEAM + 1:
+                    fork = Board(board.text, list(board.goals), list(board.messages),
+                                 board.accepted, next_bid)
+                    next_bid += 1
+                    sound[fork.bid] = sound.get(board.bid, board.text)
+                    branches.append(fork)
+                    focus(fork)
+                    events.append({"stage": "fork", "from": branches[0].bid if branches else 0,
+                                   "to": fork.bid, "why": "stall"})
                 if await take_back("harness", deepest,
                                    "after the board made no progress for a while"):
+                    prune()
                     return
             restated[worst.decl] = restated.get(worst.decl, 0) + 1
             fresh_text, _ = restate(board.text, worst.decl)

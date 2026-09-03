@@ -1590,3 +1590,25 @@ def test_a_stalled_board_takes_back_the_innermost_open_have_before_it_restarts_t
     first_withdraw = next((i for i, k in enumerate(kinds) if k == ("withdraw", "harness")), None)
     first_restate = next((i for i, k in enumerate(kinds) if k[0] == "restate"), len(kinds))
     assert first_withdraw is not None and first_withdraw < first_restate
+
+
+def test_the_stall_take_back_happens_on_a_fork_so_the_stuck_subtree_stays_a_branch(monkeypatch):
+    # OR below the root: the board with the stuck have and the board without it
+    # race as two branches, the way two plans do.
+    import submission.board_agent as ba
+    clock = {"now": 0.0}
+
+    def ticking():
+        clock["now"] += 12.0
+        return clock["now"]
+
+    monkeypatch.setattr(ba.time, "monotonic", ticking)
+    challenge = "import Mathlib\n\ntheorem demo (n : ℕ) : True := by\n  sorry\n"
+    result, _, _, _ = run(challenge, {"model-b": ["have inner : True := by\n  sorry\nexact inner"]
+                                      + ["linarith [h%d]" % i for i in range(40)]
+                                      + ["have key : True := by trivial\nexact key"] * 3},
+                          lines=("model-b",), time_limit=900.0)
+    events = result.metadata["events"]
+    fork = next((i for i, e in enumerate(events) if e.get("stage") == "fork" and e.get("why") == "stall"), None)
+    withdraw = next((i for i, e in enumerate(events) if e.get("kind") == "withdraw" and e.get("by") == "harness"), None)
+    assert fork is not None and withdraw is not None and fork < withdraw
