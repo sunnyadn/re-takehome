@@ -1974,3 +1974,17 @@ def test_a_slow_model_is_asked_for_fewer_tokens_than_it_could_not_deliver_in_tim
     asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
                             FakeServices(lean, llm)))
     assert agent._pace["model-a"] and agent._pace["model-a"][0][0] == 700
+
+
+def test_powers_bounded_in_the_context_give_a_pow_bounds_leaf():
+    # Measured on rmo_2000_2 (v7.79): the route left the bounds on `P` with
+    # `h : y ^ 3 = P` and a disjunction goal; the squeeze leaf expects `y = E`.
+    from submission.leaves import leaf_candidates
+    goal = ("x y : ℕ\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n"
+            "h_up : x ^ 3 + 8 * x ^ 2 - 6 * x + 8 ≤ (x + 3) ^ 3\n"
+            "h_low : (x + 2) ^ 3 ≤ x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ y = x + 2 ∨ y = x + 3")
+    blocks = [c.split("\n")[-1] for c in leaf_candidates(goal)]
+    assert blocks == ["pow_bounds y 3"]           # x ^ 3 inside P is not a bound on x
+    direct = "a b : ℕ\nh1 : (b + 1) ^ 2 ≤ a ^ 2\nh2 : a ^ 2 < (b + 3) ^ 2\n⊢ b + 1 ≤ a ∧ a ≤ b + 2"
+    assert [c.split("\n")[-1] for c in leaf_candidates(direct)] == ["pow_bounds a 2"]
+    assert not any("pow_bounds" in c for c in leaf_candidates("n : ℕ\n⊢ 7 ∣ 2 ^ n - 1 ↔ 3 ∣ n"))

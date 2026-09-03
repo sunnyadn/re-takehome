@@ -138,6 +138,22 @@ macro_rules
       have h2 := (Nat.pow_lt_pow_iff_left (by norm_num : ($n : ℕ) ≠ 0)).1 hhi
       omega))
 
+-- `pow_bounds y n`: bounds on y ^ n in the context (on y ^ n itself, or on the right side of
+-- a hypothesis `y ^ n = P`) become bounds on y, then omega.
+syntax "pow_bounds" term:max term:max : tactic
+macro_rules
+  | `(tactic| pow_bounds $y $n) => `(tactic| (
+      have hn : ($n : ℕ) ≠ 0 := by norm_num
+      try have hb₁ := (Nat.pow_le_pow_iff_left hn).1 ‹(_ : ℕ) ^ $n ≤ $y ^ $n›
+      try have hb₂ := (Nat.pow_le_pow_iff_left hn).1 ‹$y ^ $n ≤ (_ : ℕ) ^ $n›
+      try have hb₃ := (Nat.pow_lt_pow_iff_left hn).1 ‹(_ : ℕ) ^ $n < $y ^ $n›
+      try have hb₄ := (Nat.pow_lt_pow_iff_left hn).1 ‹$y ^ $n < (_ : ℕ) ^ $n›
+      try have hc₁ := (Nat.pow_le_pow_iff_left hn).1 (le_of_le_of_eq ‹(_ : ℕ) ^ $n ≤ _› ‹$y ^ $n = _›.symm)
+      try have hc₂ := (Nat.pow_le_pow_iff_left hn).1 (le_of_eq_of_le ‹$y ^ $n = _› ‹_ ≤ (_ : ℕ) ^ $n›)
+      try have hc₃ := (Nat.pow_lt_pow_iff_left hn).1 (lt_of_lt_of_eq ‹(_ : ℕ) ^ $n < _› ‹$y ^ $n = _›.symm)
+      try have hc₄ := (Nat.pow_lt_pow_iff_left hn).1 (lt_of_eq_of_lt ‹$y ^ $n = _› ‹_ < (_ : ℕ) ^ $n›)
+      omega))
+
 -- `bounded_cases x N`: x ≤ N (omega, nlinarith, or from x ^ 2 / x ^ 3 = numeral), then every value.
 syntax "bounded_cases" ident term:max : tactic
 macro_rules
@@ -152,6 +168,8 @@ macro_rules
                 "`pow_squeeze y n E` (goal `y = E`, a hypothesis `y ^ n = ...`, n = 2 or 3): proves "
                 "E ^ n ≤ y ^ n < (E + 1) ^ n by omega/nlinarith and concludes; `pow_squeeze y n E with h` "
                 "first replaces the variable of `h : c ≤ x` by c + k inside those proofs. "
+                "`pow_bounds y n`: when the context bounds y ^ n by powers (`(x+2)^3 ≤ y^3`, or "
+                "`(x+2)^3 ≤ P` with `h : y^3 = P`), turns them into bounds on y and finishes by omega. "
                 "`bounded_cases x N`: proves x ≤ N (omega, nlinarith, or from x ^ 2 or x ^ 3 equal to a "
                 "numeral) and finishes every value.")
 

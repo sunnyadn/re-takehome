@@ -60,6 +60,21 @@ def _powers(hyps) -> list[tuple[str, str, str, str]]:
     return out
 
 
+def _powered(hyps) -> list[tuple[str, str, str, str]]:
+    """(name, variable, exponent, rest) for every hypothesis with `v ^ n` on one
+    side of =, ≤ or <, n = 2 or 3."""
+    out = []
+    for n, t in hyps:
+        m = re.match(r"^(.+?) (=|≤|<|≥|>) (.+)$", t)
+        if not m:
+            continue
+        for side in (m.group(1), m.group(3)):
+            p = re.match(r"^([A-Za-z_][\w']*) \^ ([23])$", side.strip())
+            if p:
+                out.append((n, p.group(1), p.group(2), t))
+    return out
+
+
 def leaf_candidates(goal_text: str) -> list[str]:
     hyps = _hyps(goal_text)
     target = _target(goal_text)
@@ -70,9 +85,18 @@ def leaf_candidates(goal_text: str) -> list[str]:
                     key=lambda b: -b[2])
     out: list[str] = []
 
+    # v ^ n bounded by powers in the context (on v ^ n itself, or through
+    # `v ^ n = P`), the goal about v: the bounds move to v, then omega. Measured
+    # on rmo_2000_2 (v7.79): the route left `h_low : (x+2)^3 ≤ P`, `h_up : P ≤
+    # (x+3)^3`, `h : y^3 = P ⊢ y = x + 2 ∨ y = x + 3`, and no model closed it.
+    for _, v, n, _ in _powered(hyps):
+        if re.search(rf"\b{re.escape(v)}\b", target) and any(
+                re.search(r"(≤|<)", t) and re.search(r"\^ " + n + r"\b", t) for _, t in hyps):
+            out.append(f"pow_bounds {v} {n}")
+
     # y = E with y ^ n known: squeeze between consecutive powers.
     m = re.match(r"^([A-Za-z_][\w']*) = (.+)$", target)
-    if m and not NUM.match(m.group(2).strip()):
+    if m and not NUM.match(m.group(2).strip()) and not re.search(r"[∨∧↔→]", m.group(2)):
         y, rhs = m.group(1), m.group(2).strip()
         for _, v, n, _ in powers:
             if v == y:
