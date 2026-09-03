@@ -621,7 +621,8 @@ def test_a_step_is_checked_under_a_timeout_scaled_to_the_base_file():
     result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
                                      FakeServices(lean, llm)))
     assert result.metadata["accepted_by_repl"] is True
-    steps = [t for s, t in lean.timeouts if "have key" in s and "#print axioms" not in s]
+    steps = [t for s, t in lean.timeouts if "have key" in s and "#print axioms" not in s
+             and "apply?" not in s]
     assert steps and all(t is not None and t <= 30 for t in steps), steps
 
 
@@ -1674,3 +1675,32 @@ def test_the_technique_preamble_sits_after_the_header_and_the_models_are_told_ab
     assert all("dvd_cases" in src for src in lean.sources if "have key" in src)
     assert "dvd_cases" in result.solution
     assert any("dvd_cases" in s for s in llm.systems)
+
+
+def test_apply_suggestions_close_a_goal_without_a_model_or_reach_the_prompt():
+    # Measured in the image: `apply?` closed 4 of 4 leaf goals by `exact`
+    # (Nat.le_of_dvd, Nat.Prime.dvd_of_dvd_pow, Nat.sum_range_choose,
+    # lt_of_pow_lt_pow_left'), names the models write wrong or never reach.
+    class ApplyLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            if "apply?" in source:
+                rows = source.split("\n")
+                # The REPL numbers lines in the import-stripped body.
+                line = next(i for i, l in enumerate(rows, start=1) if "apply?" in l) - sum(
+                    1 for l in rows if l.startswith("import "))
+                return LeanCheck(False, [{"severity": "info", "pos": {"line": line}, "endPos": {"line": line},
+                                          "data": "Try this:\n  [apply] exact le_of_dvd hb h"}],
+                                 False, False, 1)
+            if "exact le_of_dvd hb h" in source:
+                # Real Lean: the exact closes the goal; `skip` on no goals is silent.
+                return LeanCheck(True, [], "sorry" in source, False, 1)
+            return await super().check_file(source, timeout_s)
+
+    lean, llm = ApplyLean(), ScriptLLM({"model-a": ["have junk : True := by trivial"] * 2})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert "exact le_of_dvd hb h" in result.solution
+    lib = [e for e in result.metadata["events"] if e.get("kind") == "library"]
+    assert lib and lib[0]["accepted"] and lib[0]["found"] == 1
+    assert not llm.calls
