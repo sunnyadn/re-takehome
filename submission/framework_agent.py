@@ -18,7 +18,7 @@ from re_harness import AgentResult, LLMCallError, Problem, Services
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
-from submission.techniques import PREAMBLE_END
+from submission.techniques import PREAMBLE_END, without_techniques
 from submission.agent import (
     in_file_coordinates,
     BUDGET_HEADROOM,
@@ -1060,6 +1060,8 @@ class FrameworkAgent:
                         feedback: Feedback | None, model: str, services: Services,
                         ledger: Ledger, plan: str = "") -> str:
         source, line = render(state.text, state.focus)
+        source, gone = without_techniques(source)
+        line = line - gone + 1 if gone and line else line
         parts = [f"Problem: {problem.description}".strip(),
                  "File:\n" + source[-FILE_CHARS:],
                  "What Lean reports as open, with its hypotheses. The first goal "

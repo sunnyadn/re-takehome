@@ -125,3 +125,20 @@ def technique_card() -> str:
     """What the models are told about the tactics this file defines."""
     return "Tactics defined in this file, usable anywhere in it:\n" + "\n".join(
         f"- {note}" for _, note in TECHNIQUES)
+
+
+ELIDED = "-- tactics defined for this file (see the system prompt): " + ", ".join(
+    n.split("`")[1].split()[0] for _, n in TECHNIQUES)
+
+
+def without_techniques(text: str) -> tuple[str, int]:
+    """The file with the technique block replaced by one comment line, and how
+    many lines went: what a model reads is the proof, not Lean metaprogramming
+    (measured: 4.6 KB of elab code was in every step and audit prompt)."""
+    a, b = text.find(PREAMBLE_MARK), text.find(PREAMBLE_END)
+    if a < 0 or b < 0:
+        return text, 0
+    b += len(PREAMBLE_END)
+    removed = text[a:b].count("\n")
+    return text[:a] + ELIDED + text[b:], removed
+

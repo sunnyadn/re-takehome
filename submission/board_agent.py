@@ -16,6 +16,7 @@ from re_harness import AgentResult, LLMCallError, Problem, Services
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
+from submission.techniques import without_techniques
 from submission.agent import (
     BUDGET_HEADROOM,
     technique_card,
@@ -1143,6 +1144,7 @@ def view(source: str, decl: str) -> tuple[str, int]:
         out.append((span, f"{head.group(1)}\n  -- proved, {lines} lines elided\n\n"))
     for (start, end), replacement in sorted(out, reverse=True):
         source = source[:start] + replacement + source[end:]
+    source, _ = without_techniques(source)
     at = next((i for i, l in enumerate(source.split("\n"), start=1) if l.strip() == "skip"), 0)
     return source, at
 
@@ -1327,7 +1329,7 @@ class BoardAgent(FrameworkAgent):
         if searched:
             return "holds", {}
         auditor = next((m for m in self.config.lines if not narrates(m)), self.config.lines[0])
-        reply, _ = await self._call(auditor, audit_prompt(stmt, prefix.replace("import Mathlib", "")),
+        reply, _ = await self._call(auditor, audit_prompt(stmt, without_techniques(prefix)[0].replace("import Mathlib", "")),
                                     AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM)
         given = {n: v for n, v in (read_witness(reply) or {}).items() if n in names}
         if (given or not names) and await breaks(given):
@@ -1676,6 +1678,7 @@ class BoardAgent(FrameworkAgent):
             roots = root_names(nxt.text)
             first = proof_span(nxt.text, roots[0]) if roots else None
             prefix = nxt.text[:first[0]] if first else ""
+            shown_prefix = without_techniques(prefix)[0].replace("import Mathlib", "")
             for sub in subjects:
                 sub["parsed"] = split_statement(sub["stmt"]) if sub.get("stmt") else None
             # Evaluation first: a claim it breaks needs no auditor.
@@ -1688,7 +1691,7 @@ class BoardAgent(FrameworkAgent):
             asked = [sub for sub in subjects
                      if sub["parsed"] and sub["parsed"][0] and not sub["found"] and not sub["searched"]]
             pending_calls = [asyncio.ensure_future(self._call(
-                other, audit_prompt(sub["stmt"], prefix.replace("import Mathlib", "")),
+                other, audit_prompt(sub["stmt"], shown_prefix),
                 AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM)) for sub in asked]
             for t in pending_calls:
                 loose.append(t)

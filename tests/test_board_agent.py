@@ -1767,6 +1767,10 @@ def test_the_technique_preamble_sits_after_the_header_and_the_models_are_told_ab
     assert all("divisor_cases" in src for src in lean.sources if "have key" in src)
     assert "divisor_cases" in result.solution
     assert any("`divisor_cases h`" in s for s in llm.systems)
+    # Lean sees the block; a model sees one comment line in its place. Measured:
+    # 4.6 KB of elab code sat in every step and audit prompt of three runs.
+    assert not any("elab_rules" in p or "macro_rules" in p for _, p in llm.calls)
+    assert any("tactics defined for this file" in p for _, p in llm.calls)
 
 
 def test_apply_suggestions_close_a_goal_without_a_model_or_reach_the_prompt():
