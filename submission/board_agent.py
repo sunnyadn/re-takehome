@@ -1499,6 +1499,9 @@ class BoardAgent(FrameworkAgent):
             states it, the auditor names values, Lean checks that they satisfy
             every hypothesis and break it. The refutation, or "" to let it in."""
 
+            if not cfg.audit:
+                return ""
+
             # Measured over 12 audits: a narrating model names values that violate
             # a hypothesis every time, at ~9 s; the other answers in ~1.4 s.
             other = next((m for m in models if m != author and not narrates(m)),

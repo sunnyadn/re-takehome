@@ -1612,3 +1612,17 @@ def test_the_stall_take_back_happens_on_a_fork_so_the_stuck_subtree_stays_a_bran
     fork = next((i for i, e in enumerate(events) if e.get("stage") == "fork" and e.get("why") == "stall"), None)
     withdraw = next((i for i, e in enumerate(events) if e.get("kind") == "withdraw" and e.get("by") == "harness"), None)
     assert fork is not None and withdraw is not None and fork < withdraw
+
+
+def test_the_audit_switch_lets_a_false_claim_in_when_off():
+    # The ablation arm: VM_AUDIT=off. The same false `have` the audit refutes
+    # in test_a_claim_that_enters_through_a_prefix_cut_is_audited_too goes in.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = WitnessLean(), ScriptLLM({
+        "model-a": ["have bad : x = 3 := by\n  sorry\nlinarith",
+                    "have key : True := by trivial\nexact key"] * 2})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0, audit=False))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    assert not any(e.get("kind") == "audit" for e in result.metadata["events"])

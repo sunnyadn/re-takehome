@@ -65,6 +65,9 @@ class Config:
     stall_before_handoff: int = 1
     budget_usd: float = 1.00
     time_limit_s: float = 28800.0
+    # Research switch: VM_AUDIT=off lets every statement in unaudited (the
+    # ablation arm of the writeup). The judged configuration is the default.
+    audit: bool = True
     # The worker hands the agent time_limit minus this, then hard-cancels.
     verify_reserve_s: float = 120.0
     # A cancelled call closes the ledger and scores the problem zero, so no
@@ -77,6 +80,7 @@ class Config:
         settings = HarnessSettings.from_env(n_workers=1)
         return cls(
             lines=_env_models("VM_LINES", (MODEL_A, MODEL_B)),
+            audit=os.environ.get("VM_AUDIT", "on").strip().lower() not in ("off", "0", "false"),
             budget_usd=settings.budget_usd,
             time_limit_s=settings.time_limit_s,
             verify_reserve_s=float(settings.verify_reserve_s),
