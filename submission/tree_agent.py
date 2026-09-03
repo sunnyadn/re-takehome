@@ -58,3 +58,60 @@ def observe(forest: Forest, messages, accepted: bool) -> None:
         raise ValueError(f"{len(texts)} placeholders read for {len(leaves)} leaves")
     for leaf, text in zip(leaves, texts):
         leaf.text = text
+
+
+def split_goals(text: str) -> list[str]:
+    """One printed goal per entry: Lean separates the goals of one message
+    with a blank line, each starting with `case` or a hypothesis or `⊢`."""
+
+    parts = [p.strip() for p in re.split(r"\n\s*\n", text.strip()) if p.strip()]
+    return parts or [""]
+
+
+def leaf_index(forest: Forest, leaf: GoalNode) -> int:
+    return forest.leaves().index(leaf)
+
+
+async def attempt(forest: Forest, tree: ProofTree, leaf: GoalNode, block: str, lean,
+                  timeout_s: float | None = None) -> tuple[bool, list]:
+    """Try a block at a leaf: expand with one subgoal per `sorry` line plus one
+    for whatever the block leaves open, check the rendering with every
+    placeholder as `skip`, and settle: a placeholder with no goal goes, a
+    placeholder holding several goals becomes several leaves. On a real
+    failure the expansion is dropped and the messages come back as feedback."""
+
+    from submission.board_agent import render_all
+    from submission.framework import classify
+
+    sorries = sum(1 for l in block.split("\n") if l.strip() == "sorry")
+    tree.expand(leaf, block, [""] * (sorries + 1))
+    for _ in range(4):
+        text = forest.render()
+        check = await lean.check_file(render_all(text), timeout_s=timeout_s)
+        progress, spare, expensive, failures = classify(check.messages)
+        if failures or expensive or check.timed_out:
+            tree.drop(leaf)
+            return False, list(check.messages)
+        observe(forest, check.messages, check.accepted)
+        node = leaf.tactic
+        changed = False
+        for sub in list(node.subgoals):
+            if sub.tactic is not None:
+                continue
+            goals = split_goals(sub.text) if sub.text else []
+            if not goals:
+                node.subgoals.remove(sub)
+                changed = True
+            elif len(goals) > 1:
+                # several goals behind one placeholder: a scaffold node, one
+                # case per goal, so each leaf has a placeholder of its own
+                tags = [m.group(1) for m in (re.match(r"case (\S+)", g) for g in goals) if m]
+                if len(tags) == len(goals):
+                    scaffold = "\n".join(f"case {t} =>\n  sorry" for t in tags)
+                else:
+                    scaffold = "\n".join("· sorry" for _ in goals)
+                tree.expand(sub, scaffold, goals)
+                changed = True
+        if not changed:
+            return True, list(check.messages)
+    return True, list(check.messages)
