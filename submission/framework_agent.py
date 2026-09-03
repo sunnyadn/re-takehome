@@ -1028,6 +1028,12 @@ class FrameworkAgent:
 
         ask = (f"Problem: {problem.description}\n\nThe goal, as Lean reports it:\n"
                f"{state.goal[:GOAL_CHARS]}\n\nHow do you prove this?")
+        sheet = sheet_for(state.goal)
+        if sheet:
+            # The route hints on the sheets (squeeze between powers, prime
+            # dividing a factor, block the sum) are for the planner as much as
+            # for the writer; the names tell it what Mathlib can do in one step.
+            ask += f"\n\nWhat the loaded Mathlib has for this goal's vocabulary:\n{sheet}"
         if avoid:
             tried = "\n".join(f"- {a[:300]}" for a in list(avoid)[-3:])
             ask += ("\n\nRoutes already tried on this goal that did not work out. "

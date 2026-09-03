@@ -1375,6 +1375,17 @@ def test_a_goal_about_divisibility_carries_the_current_mathlib_names_before_any_
     assert "Nat.prime_dvd_prime_iff_eq" in sheet_for("p q m : ℕ\nhp : Nat.Prime p\n⊢ p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2 → p = q")
     from submission.agent import COCKTAIL
     assert "assumption" in COCKTAIL
+    # the planner sees the sheet too
+    import asyncio
+    from submission.framework_agent import FrameworkAgent, State
+    from submission.agent import Config
+    from re_harness import Problem
+    fa = FrameworkAgent(Config(lines=("m",), budget_usd=1.0, time_limit_s=60.0))
+    llm = ScriptLLM({"m": ["plan"]})
+    asyncio.run(fa._ask_plan(Problem(id="d", description="p", challenge=""),
+                             State(text="", goal="a b : ℕ\n⊢ 10 ∣ a * b"), FakeServices(BoardLean(), llm),
+                             __import__("submission.agent", fromlist=["Ledger"]).Ledger(), "m"))
+    assert any("Nat.Prime.dvd_mul" in p for _, p in llm.calls)
     # the fake Lean prints a goal as its declaration name, so the wiring is
     # checked with a sheet that answers every goal
     import submission.board_agent as ba
