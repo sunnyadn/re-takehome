@@ -1,0 +1,52 @@
+{
+  "metadata": {
+    "strategy": "board",
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.000597,
+    "wall_s": 14.2,
+    "turns": 7,
+    "events": [
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(a + b + c) ^ (2 : ℕ) = (9 : ℝ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a * b + b * c + c * a ≤ (3 : ℝ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "stale",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 189,
+        "slow": false
+      }
+    ]
+  }
+}

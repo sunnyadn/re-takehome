@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "problem_id": "p02_frac_cancel",
+  "description": "# p02_frac_cancel\n\nWhat is the value of $x$ if $x = \\dfrac{2009^2 - 2009}{2009}$? Show that it is $2008$.\n",
+  "challenge": "import Mathlib\n\n/-- What is the value of `x` if `x = (2009 ^ 2 - 2009) / 2009`? Show that it is `2008`. -/\ntheorem p02_frac_cancel (x : ℝ) (h : x = (2009 ^ 2 - 2009) / 2009) : x = 2008 := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "p02_frac_cancel"
+  ],
+  "definition_names": [],
+  "numeric_answer_names": [],
+  "out_dir": "/home/sunny/frame/out/p02_frac_cancel/board_agent/20260903T100324Z/p02_frac_cancel",
+  "budget_usd": 1.0,
+  "time_limit_s": 1800.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.board_agent:create_agent",
+  "session_id": "9b4a085924ec406aa786913e13536a6c"
+}

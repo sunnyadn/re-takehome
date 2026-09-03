@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "problem_id": "p06_pow_mod",
+  "description": "# p06_pow_mod\n\nFind the last two digits of $7^{2026}$; that is, compute $7^{2026} \\bmod 100$.\n\nFill in `p06_answer` with a numeric literal and prove the theorem.\n",
+  "challenge": "import Mathlib\n\n/-- The last two digits of `7 ^ 2026`. Must be a numeric literal. -/\nabbrev p06_answer : ℕ := sorry\n\n/-- Compute `7 ^ 2026 % 100`. -/\ntheorem p06_pow_mod : 7 ^ 2026 % 100 = p06_answer := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "p06_pow_mod"
+  ],
+  "definition_names": [
+    "p06_answer"
+  ],
+  "numeric_answer_names": [
+    "p06_answer"
+  ],
+  "out_dir": "/home/sunny/frame/out/p06_pow_mod/board_agent/20260903T100500Z/p06_pow_mod",
+  "budget_usd": 1.0,
+  "time_limit_s": 1800.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.board_agent:create_agent",
+  "session_id": "c74d81dc83744ace89025cdf5e7dbe6f"
+}

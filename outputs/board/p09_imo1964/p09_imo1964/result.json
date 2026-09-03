@@ -1,0 +1,394 @@
+{
+  "schema_version": 1,
+  "problem_id": "p09_imo1964",
+  "status": "passed",
+  "passed": true,
+  "points": 1,
+  "comparator": {
+    "passed": true,
+    "exit_code": 0,
+    "timed_out": false,
+    "duration_ms": 22821,
+    "output": {
+      "passed": true,
+      "exit_code": 0,
+      "stdout": "Building Challenge\n⚠ [8655/8656] Built Challenge (5.6s)\nwarning: Challenge.lean:4:8: declaration uses `sorry`\nwarning: Challenge.lean:8:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[p09_a, p09_b, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge\nBuilding Solution\n⚠ [8655/8656] Built Solution (2.7s)\nwarning: Solution.lean:4:47: This simp argument is unused:\n  pow_add\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_a̵d̵d̵,̵ ̵p̵o̵w̵_̵mul, Nat.pow_mod, Nat.mul_mod, Nat.add_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:4:56: This simp argument is unused:\n  pow_mul\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_add, p̵o̵w̵_̵m̵u̵l̵,̵ ̵Nat.pow_mod, Nat.mul_mod, Nat.add_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:4:78: This simp argument is unused:\n  Nat.mul_mod\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_add, pow_mul, Nat.pow_mod, N̵a̵t̵.̵m̵u̵l̵_̵m̵o̵d̵,̵ ̵Nat.add_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:4:91: This simp argument is unused:\n  Nat.add_mod\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_add, pow_mul, Nat.pow_mod, Nat.mul_mod,̵ ̵N̵a̵t̵.̵a̵d̵d̵_̵m̵o̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:9:15: This simp argument is unused:\n  pow_add\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_a̵d̵d̵,̵ ̵p̵o̵w̵_̵mul, Nat.pow_mod, Nat.mul_mod, Nat.add_mod, h2]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:9:46: This simp argument is unused:\n  Nat.mul_mod\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_add, pow_mul, Nat.pow_mod, N̵a̵t̵.̵m̵u̵l̵_̵m̵o̵d̵,̵ ̵Nat.add_mod, h2]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:9:59: This simp argument is unused:\n  Nat.add_mod\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_add, pow_mul, Nat.pow_mod, Nat.mul_mod, N̵a̵t̵.̵a̵d̵d̵_̵m̵o̵d̵,̵ ̵h2]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:9:72: This simp argument is unused:\n  h2\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_add, pow_mul, Nat.pow_mod, Nat.mul_mod, Nat.add_mod,̵ ̵h̵2̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:16:59: This simp argument is unused:\n  Nat.add_mod\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_add, pow_mul, Nat.pow_mod, Nat.mul_mod,̵ ̵N̵a̵t̵.̵a̵d̵d̵_̵m̵o̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:23:59: This simp argument is unused:\n  Nat.add_mod\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_add, pow_mul, Nat.pow_mod, Nat.mul_mod,̵ ̵N̵a̵t̵.̵a̵d̵d̵_̵m̵o̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:10:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:11:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:17:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:18:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:24:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:25:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:10:10: 'norm_num' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:11:10: 'omega' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:17:10: 'norm_num' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:18:10: 'omega' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:24:10: 'norm_num' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:25:10: 'omega' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:29:23: Variable name `hn` is not explicitly referenced.\n\nThe binding can be removed (if unused) or named `_` (if used implicitly).\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`\nwarning: Solution.lean:55:23: This simp argument is unused:\n  Nat.mul_mod\n\nHint: Omit it from the simp argument list.\n  simp [Nat.pow_mod, N̵a̵t̵.̵m̵u̵l̵_̵m̵o̵d̵,̵ ̵Nat.mod_mod_of_dvd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:55:36: This simp argument is unused:\n  Nat.mod_mod_of_dvd\n\nHint: Omit it from the simp argument list.\n  simp [Nat.pow_mod, Nat.mul_mod,̵ ̵N̵a̵t̵.̵m̵o̵d̵_̵m̵o̵d̵_̵o̵f̵_̵d̵v̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:61:54: This simp argument is unused:\n  Nat.mul_mod\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_succ, Nat.m̵u̵l̵_̵m̵o̵d̵,̵ ̵N̵a̵t̵.̵pow_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:61:67: This simp argument is unused:\n  Nat.pow_mod\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_succ, Nat.mul_mod,̵ ̵N̵a̵t̵.̵p̵o̵w̵_̵m̵o̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:65:31: This simp argument is unused:\n  h_mod\n\nHint: Omit it from the simp argument list.\n  simp_all [h_m̵o̵d̵,̵ ̵h̵_̵pow_mod, h_cases, h_dvd_iff_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:65:38: This simp argument is unused:\n  h_pow_mod\n\nHint: Omit it from the simp argument list.\n  simp_all [h_mod, h_p̵o̵w̵_̵m̵o̵d̵,̵ ̵h̵_̵cases, h_dvd_iff_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:65:49: This simp argument is unused:\n  h_cases\n\nHint: Omit it from the simp argument list.\n  simp_all [h_mod, h_pow_mod, h_c̵a̵s̵e̵s̵,̵ ̵h̵_̵dvd_iff_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:65:58: This simp argument is unused:\n  h_dvd_iff_mod\n\nHint: Omit it from the simp argument list.\n  simp_all [h_mod, h_pow_mod, h_cases,̵ ̵h̵_̵d̵v̵d̵_̵i̵f̵f̵_̵m̵o̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:65:96: This simp argument is unused:\n  h_mod\n\nHint: Omit it from the simp argument list.\n  simp_all [̵h̵_̵m̵o̵d̵,̵ ̵h̵_̵p̵o̵w̵_̵m̵o̵d̵,̵[̲h̲_̲p̲o̲w̲_̲m̲o̲d̲,̲\n  ̲  ̲ ̲ ̲h_cases, h_dvd_iff_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:65:103: This simp argument is unused:\n  h_pow_mod\n\nHint: Omit it from the simp argument list.\n  simp_all [h_mod,\n  ̲  ̲ ̲ ̲h̵_̵p̵o̵w̵_̵m̵o̵d̵,̵ ̵h_cases, h_dvd_iff_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:65:114: This simp argument is unused:\n  h_cases\n\nHint: Omit it from the simp argument list.\n  simp_all [h_mod,\n  ̲  ̲ ̲ ̲h_pow_mod, h̵_̵c̵a̵s̵e̵s̵,̵ ̵h_dvd_iff_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:65:123: This simp argument is unused:\n  h_dvd_iff_mod\n\nHint: Omit it from the simp argument list.\n  simp_all [h_mod,\n  ̲  ̲ ̲ ̲h_pow_mod, h̵_̵c̵a̵s̵e̵s̵,̵ ̵h̵_̵d̵v̵d̵_̵i̵f̵f̵_̵m̵o̵d̵]̵h̲_̲c̲a̲s̲e̲s̲]̲\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:62:8: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:62:21: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:48:4: 'skip' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:50:4: 'skip' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:53:4: 'skip' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:57:4: 'skip' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:62:8: 'norm_num' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:62:21: 'omega' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:68:23: Variable name `hn` is not explicitly referenced.\n\nThe binding can be removed (if unused) or named `_` (if used implicitly).\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`\nwarning: Solution.lean:77:15: This simp argument is unused:\n  pow_add\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_a̵d̵d̵,̵ ̵p̵o̵w̵_̵mul, Nat.pow_mod, Nat.mul_mod, Nat.add_mod] at h3 h1 ⊢\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:77:24: This simp argument is unused:\n  pow_mul\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_add, p̵o̵w̵_̵m̵u̵l̵,̵ ̵Nat.pow_mod, Nat.mul_mod, Nat.add_mod] at h3 h1 ⊢\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:77:46: This simp argument is unused:\n  Nat.mul_mod\n\nHint: Omit it from the simp argument list.\n  simp [h, pow_add, pow_mul, Nat.pow_mod, N̵a̵t̵.̵m̵u̵l̵_̵m̵o̵d̵,̵ ̵Nat.add_mod] at h3 h1 ⊢\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nBuild completed successfully (8656 jobs).\nExporting #[p09_a, p09_b, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution\nRunning Lean default kernel on solution.\nLean default kernel accepts the solution\nYour solution is okay!\n",
+      "stderr": "WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Challenge\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Challenge -- p09_a p09_b propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Solution\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Solution -- p09_a p09_b propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\n"
+    }
+  },
+  "answer_shape": {
+    "passed": true,
+    "errors": []
+  },
+  "budget": {
+    "limit_usd": 1.0,
+    "spent_usd": 0.012798754999999997,
+    "reserved_usd": 0,
+    "accounting_complete": true
+  },
+  "within_time": true,
+  "wall_s": 368.273,
+  "models_used": [
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.5-flash-02-23"
+  ],
+  "both_required_models_used": true,
+  "agent_error": null,
+  "agent_metadata": {
+    "strategy": "board",
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.012799,
+    "wall_s": 343.1,
+    "turns": 123,
+    "events": [
+      {
+        "stage": "share",
+        "name": "pow_two_mod_seven",
+        "kept": true
+      },
+      {
+        "stage": "share",
+        "name": "two_pow_mod_seven",
+        "kept": true
+      },
+      {
+        "stage": "share-audit",
+        "name": "two_pow_mod_seven",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "stage": "share-audit",
+        "name": "pow_two_mod_seven",
+        "verdict": "duplicate"
+      },
+      {
+        "stage": "split",
+        "goals": 3
+      },
+      {
+        "stage": "route",
+        "from": 0,
+        "to": 1,
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "fork",
+        "from": 0,
+        "to": 2,
+        "goal": "n : ℕ\nhn : 0 < n\n⊢ (2 ^ n - 1) % 7 = 0 ↔ 3 ∣ n"
+      },
+      {
+        "stage": "prune",
+        "bid": 1,
+        "goals": 4
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "((2 : ℕ) % (7 : ℕ) % (7 : ℕ) % (7 : ℕ) % (7 : ℕ) % (7 : ℕ)) ^ n % (7 : ℕ) = (2 : ℕ) ^ (n % (3 : ℕ)) ",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "((2 : ℕ) % (7 : ℕ)) ^ n % (7 : ℕ) = ((2 : ℕ) % (7 : ℕ)) ^ (n % (3 : ℕ)) % (7 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "((2 : ℕ) % (7 : ℕ) % (7 : ℕ)) ^ n % (7 : ℕ) = ((2 : ℕ) % (7 : ℕ)) ^ (n % (3 : ℕ)) % (7 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 2
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "pow_mod"
+        ],
+        "ms": 2444,
+        "found": true
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 795
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 539
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "n % (3 : ℕ) = (0 : ℕ) → (3 : ℕ) ∣ n",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "n % (3 : ℕ) = (1 : ℕ) → ¬(7 : ℕ) ∣ (2 : ℕ) ^ n - (1 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "n % (3 : ℕ) = (2 : ℕ) → ¬(7 : ℕ) ∣ (2 : ℕ) ^ n - (1 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true
+      },
+      {
+        "kind": "collapse",
+        "tactic": "omega",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true
+      },
+      {
+        "kind": "collapse",
+        "tactic": "omega",
+        "accepted": true
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 4
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 770,
+        "slow": false
+      }
+    ]
+  }
+}

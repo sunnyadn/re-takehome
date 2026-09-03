@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "run_id": "85b08c64495f49e29b325c08f611cfdd",
+  "set": "sample",
+  "started_at": "2026-09-03T10:08:34.888198+00:00",
+  "agent": "submission.board_agent:create_agent",
+  "agent_name": "board_agent",
+  "timestamp": "20260903T100834Z",
+  "n_workers": 1,
+  "budget_usd_per_problem": 1.0,
+  "time_limit_s_per_problem": 1800.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "api_key_configured": true,
+  "python": "3.12.9",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "finished_at": "2026-09-03T10:11:31.366870+00:00",
+  "wall_s": 171.198,
+  "resumed": false,
+  "resumed_skipped_problems": 0,
+  "executed_problems": 1
+}

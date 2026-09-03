@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "problem_id": "p01_linear",
+  "description": "# p01_linear\n\nLet $x$ be a real number with $3x + 7 = 22$. Show that $x = 5$.\n",
+  "challenge": "import Mathlib\n\n/-- If `3 * x + 7 = 22` for a real number `x`, then `x = 5`. -/\ntheorem p01_linear (x : ℝ) (h : 3 * x + 7 = 22) : x = 5 := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "p01_linear"
+  ],
+  "definition_names": [],
+  "numeric_answer_names": [],
+  "out_dir": "/home/sunny/frame/out/p01_linear/board_agent/20260903T100302Z/p01_linear",
+  "budget_usd": 1.0,
+  "time_limit_s": 1800.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.board_agent:create_agent",
+  "session_id": "24db7400f63f40afba38433c11759dd0"
+}
