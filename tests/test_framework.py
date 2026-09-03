@@ -245,13 +245,15 @@ def test_several_goals_behind_one_placeholder_each_get_their_own():
 # Both messages came off the graded image, checking the file below. Lean counts
 # lines from zero, so the bullet is its line 4 and the theorem its line 2.
 STRANDED = "import Mathlib\n\ntheorem t : True ∧ True := by\n  constructor\n  · trivial\n  skip\n"
-BULLET = {"severity": "error", "pos": {"line": 4, "column": 2},
-          "endPos": {"line": 4, "column": 11}, "data": "unsolved goals\ncase mp\n⊢ 3 ∣ n"}
-WHOLE = {"severity": "error", "pos": {"line": 2, "column": 62},
-         "endPos": {"line": 5, "column": 6}, "data": "unsolved goals\ncase mpr\n⊢ True"}
+# Messages as the readers see them: FileCoordinates has already moved Lean's
+# lines (numbered from 1 in the import-stripped body) down by the import lines.
+BULLET = {"severity": "error", "pos": {"line": 5, "column": 2},
+          "endPos": {"line": 5, "column": 11}, "data": "unsolved goals\ncase mp\n⊢ 3 ∣ n"}
+WHOLE = {"severity": "error", "pos": {"line": 3, "column": 62},
+         "endPos": {"line": 6, "column": 6}, "data": "unsolved goals\ncase mpr\n⊢ True"}
 
 
-def test_lean_counts_lines_from_zero_and_this_file_counts_from_one():
+def test_positions_are_read_as_file_coordinates():
     assert fw.message_line(BULLET) == 5 and fw.message_end_line(BULLET) == 5
     assert fw.message_span(WHOLE) == (3, 6)
     assert fw.message_column(BULLET) == 2

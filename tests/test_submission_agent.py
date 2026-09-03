@@ -163,14 +163,13 @@ def test_surplus_lines_offsets_by_import_count():
     source = "\n".join(lines) + "\n"
     surplus = lines.index("  norm_num") + 1
     # Lean sees the file without its 2 import lines and reports line 4;
-    # ImportAwareLean hands it on as 5 (calibrated for one import line), and
-    # surplus_lines maps that back to file line 6.
-    messages = [{"severity": "error", "pos": {"line": 5},
+    # FileCoordinates hands it on as file line 6, which is what readers get.
+    messages = [{"severity": "error", "pos": {"line": 6},
                  "data": "No goals to be solved"}]
     assert agent_mod.surplus_lines(messages, source) == [surplus]
 
 
-def test_import_aware_lean_shifts_positions_by_the_extra_import_lines():
+def test_file_coordinates_moves_lean_positions_down_by_the_import_lines():
     # Measured on rmo_2000_6 (h59a, 2026-09-03 09:50Z): with the challenge's
     # two imports kept plus import Mathlib, every goal read as empty and the
     # run stopped after 25 s with "no goal left to work on": the REPL client
@@ -182,12 +181,16 @@ def test_import_aware_lean_shifts_positions_by_the_extra_import_lines():
         async def check_file(self, source, timeout_s=None):
             return LeanCheck(False, [{"severity": "error", "pos": {"line": 4}, "endPos": {"line": 5},
                                       "data": "unsolved goals\n⊢ True"}], True, False, 1)
-    lean = agent_mod.ImportAwareLean(Raw())
+    lean = agent_mod.FileCoordinates(Raw())
     three = "import A\nimport B\nimport Mathlib\n\ntheorem t : True := by\n  sorry\n"
     one = "import Mathlib\n\ntheorem t : True := by\n  sorry\n"
-    assert asyncio.run(lean.check_file(three)).messages[0]["pos"]["line"] == 6
-    assert asyncio.run(lean.check_file(three)).messages[0]["endPos"]["line"] == 7
-    assert asyncio.run(lean.check_file(one)).messages[0]["pos"]["line"] == 4
+    assert asyncio.run(lean.check_file(three)).messages[0]["pos"]["line"] == 7
+    assert asyncio.run(lean.check_file(three)).messages[0]["endPos"]["line"] == 8
+    assert asyncio.run(lean.check_file(one)).messages[0]["pos"]["line"] == 5
+    # idempotent wrapping
+    services = type("S", (), {})(); services.lean = Raw()
+    agent_mod.in_file_coordinates(services); inner = services.lean
+    assert agent_mod.in_file_coordinates(services).lean is inner
 
 
 def test_surplus_lines_ignores_other_errors():
@@ -422,9 +425,9 @@ def test_search_file_never_drops_a_graded_declaration():
     assert checked > 50, f"only {checked} splices exercised, the walk is not covering"
 
 
-_MIXED_ERRORS = [
-    {"severity": "error", "pos": {"line": 3}, "data": "linarith failed to find a contradiction"},
-    {"severity": "error", "pos": {"line": 7}, "data": "Unknown constant `Nat.made_up`"},
+_MIXED_ERRORS = [   # file coordinates, as FileCoordinates hands them on
+    {"severity": "error", "pos": {"line": 4}, "data": "linarith failed to find a contradiction"},
+    {"severity": "error", "pos": {"line": 8}, "data": "Unknown constant `Nat.made_up`"},
 ]
 
 
@@ -564,7 +567,7 @@ def _advance_result(lean, challenge=_TWO_DECLS):
     line = Line(index=0, owner="qwen/qwen3.5-flash-02-23")
     line.candidate = challenge
     services = _Services(_StuckLLM())
-    services.lean = lean
+    services.lean = agent_mod.FileCoordinates(lean)   # _advance sits below the solve boundary
     services.checkpoint = lambda *a, **k: None
     problem = SimpleNamespace(challenge=challenge, description="s", id="t")
     ledger = Ledger()

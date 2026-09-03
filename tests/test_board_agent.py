@@ -126,7 +126,8 @@ def test_every_placeholder_is_rendered_as_skip_at_once():
 def test_the_board_reads_one_goal_per_placeholder_with_its_own_context():
     text = ("import Mathlib\n\ntheorem demo : True := by\n  have k : True := by\n"
             "    sorry\n  sorry\n\ntheorem demo_b : True := by\n  sorry\n")
-    check = asyncio.run(BoardLean().check_file(render_all(text)))
+    from submission.agent import FileCoordinates
+    check = asyncio.run(FileCoordinates(BoardLean()).check_file(render_all(text)))
     board = read_board(text, check.messages, check.accepted)
     assert [g.decl for g in board.goals] == ["demo", "demo", "demo_b"]
     assert [g.line for g in board.goals] == [5, 6, 9]

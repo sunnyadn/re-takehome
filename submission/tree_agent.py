@@ -137,7 +137,7 @@ from typing import Any
 
 from re_harness import AgentResult, Problem, Services
 
-from submission.agent import Ledger, declared_names, format_messages, normalise_imports, strip_fences
+from submission.agent import Ledger, declared_names, format_messages, in_file_coordinates, normalise_imports, strip_fences
 from submission.board_agent import (BoardAgent, dialect, existential, read_witnesses,
                                     witness_search_file)
 from submission.framework_agent import STEP_TOKENS, notes_for, screen_step, sheet_for
@@ -151,6 +151,7 @@ class TreeAgent(BoardAgent):
     """The board agent's judge, prompts and probes on a proof tree."""
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
+        services = in_file_coordinates(services)
         cfg, started = self.config, time.monotonic()
         deadline = started + cfg.last_turn_start_s
         ledger, events = Ledger(), []

@@ -25,8 +25,8 @@ def test_lean_messages_flow_back_to_the_leaves_in_file_order():
     msgs = []
     for i, l in enumerate(line):
         if l.strip() == "sorry":
-            msgs.append({"severity": "error", "pos": {"line": i}, "endPos": {"line": i},
-                         "data": f"unsolved goals\n⊢ G{len(msgs)}"})
+            msgs.append({"severity": "error", "pos": {"line": i + 1}, "endPos": {"line": i + 1},
+                         "data": f"unsolved goals\n⊢ G{len(msgs)}"})   # file coordinates
     observe(forest, msgs, False)
     assert [g.text for g in forest.leaves()] == ["⊢ G0", "⊢ G1", "⊢ G2"]
 
@@ -73,7 +73,8 @@ def test_an_attempt_settles_its_leaves_from_what_lean_prints():
     from submission.tree_agent import attempt
     forest = forest_from_challenge("import Mathlib\n\ntheorem demo : A ∧ B := by\n  sorry\n")
     [tree] = forest.trees
-    lean = TreeLean()
+    from submission.agent import FileCoordinates
+    lean = FileCoordinates(TreeLean())
     ok, _ = asyncio.run(attempt(forest, tree, tree.root, "constructor", lean))
     assert ok and [g.text for g in tree.leaves()] == ["case left\n⊢ A", "case right\n⊢ B"]
     assert tree.render().endswith("  constructor\n  case left =>\n    sorry\n  case right =>\n    sorry\n")

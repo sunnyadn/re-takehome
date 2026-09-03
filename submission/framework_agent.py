@@ -19,6 +19,7 @@ from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
 from submission.agent import (
+    in_file_coordinates,
     BUDGET_HEADROOM,
     declared_names,
     FEEDBACK_CHARS,
@@ -422,6 +423,7 @@ class FrameworkAgent:
         return NO_REASONING if any(n in model for n in NARRATES) else REASONING
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
+        services = in_file_coordinates(services)
         cfg = self.config
         started = time.monotonic()
         deadline = started + cfg.last_turn_start_s

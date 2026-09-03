@@ -181,13 +181,13 @@ def classify(messages: Sequence[Any]) -> tuple[list[Any], list[Any], list[Any], 
 
 
 def _at(message: Any, key: str, field: str) -> int | None:
-    """Measured on the graded image: Lean's positions are 0-based."""
+    """Positions are file coordinates: FileCoordinates (agent.py) maps what
+    Lean reports for the import-stripped body onto the file once, at the
+    boundary, so no reader carries an offset of its own."""
 
     pos = message.get(key) if isinstance(message, dict) else None
     found = pos.get(field) if isinstance(pos, dict) else None
-    if not isinstance(found, int):
-        return None
-    return found + 1 if field == "line" else found
+    return found if isinstance(found, int) else None
 
 
 def message_line(message: Any) -> int | None:

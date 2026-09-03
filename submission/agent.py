@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import copy
 import dataclasses
 import re
 import time
@@ -427,10 +428,11 @@ def import_lines(source: str) -> int:
     return sum(1 for l in source.splitlines() if IMPORT_LINE.match(l))
 
 
-class ImportAwareLean:
-    """The REPL client strips every import line before Lean sees the file, so
-    Lean's positions are short by that many lines; everything here was
-    calibrated for one. Positions come back shifted for the others."""
+class FileCoordinates:
+    """The one place Lean's positions meet the file. The REPL client strips
+    every import line before Lean sees the source, and Lean numbers the body
+    it received from 1; each reported line moves down by the number of import
+    lines so every reader works in file coordinates."""
 
     def __init__(self, inner: Any) -> None:
         self._inner = inner
@@ -440,35 +442,41 @@ class ImportAwareLean:
 
     async def check_file(self, source: str, timeout_s: Any = None) -> Any:
         check = await self._inner.check_file(source, timeout_s=timeout_s)
-        extra = import_lines(source) - 1
-        if extra <= 0 or not check.messages:
+        shift = import_lines(source)
+        if not shift or not check.messages:
             return check
-        shifted = []
+        moved = []
         for m in check.messages:
             m = dict(m)
             for key in ("pos", "endPos"):
                 at = m.get(key)
                 if isinstance(at, dict) and isinstance(at.get("line"), int):
-                    m[key] = dict(at, line=at["line"] + extra)
-            shifted.append(m)
-        return dataclasses.replace(check, messages=shifted)
+                    m[key] = dict(at, line=at["line"] + shift)
+            moved.append(m)
+        if dataclasses.is_dataclass(check):
+            return dataclasses.replace(check, messages=moved)
+        check = copy.copy(check)
+        check.messages = moved
+        return check
+
+
+def in_file_coordinates(services: Any) -> Any:
+    if not isinstance(services.lean, FileCoordinates):
+        services.lean = FileCoordinates(services.lean)
+    return services
 
 
 def surplus_lines(messages: Sequence[dict[str, Any]], source: str) -> list[int]:
-    """Source lines holding a tactic that ran after its goal was closed.
+    """Source lines holding a tactic that ran after its goal was closed."""
 
-    Lean strips imports first, so a position is offset by the imports above."""
-
-    kept = [i for i, l in enumerate(source.splitlines(), start=1) if not IMPORT_LINE.match(l)]
+    total = len(source.splitlines())
     out = set()
     for m in messages:
         if m.get("severity") != "error" or NO_GOALS not in str(m.get("data", "")).lower():
             continue
         reported = (m.get("pos") or {}).get("line")
-        if reported:
-            reported = int(reported) - (import_lines(source) - 1)   # ImportAwareLean shifted it
-        if reported and 1 <= reported <= len(kept):
-            out.add(kept[reported - 1])
+        if reported and 1 <= int(reported) <= total:
+            out.add(int(reported))
     return sorted(out)
 
 
@@ -492,7 +500,7 @@ def source_lines(
 
     With a pattern, only the errors whose text matches it."""
 
-    kept = [i for i, l in enumerate(source.splitlines(), start=1) if not IMPORT_LINE.match(l)]
+    total = len(source.splitlines())
     out = []
     for m in messages:
         if m.get("severity") != "error":
@@ -500,10 +508,8 @@ def source_lines(
         if pattern is not None and not pattern.search(str(m.get("data", ""))):
             continue
         reported = (m.get("pos") or {}).get("line")
-        if reported:
-            reported = int(reported) - (import_lines(source) - 1)   # ImportAwareLean shifted it
-        if reported and 1 <= reported <= len(kept):
-            out.append(kept[reported - 1])
+        if reported and 1 <= int(reported) <= total:
+            out.append(int(reported))
     return sorted(set(out))
 
 
@@ -691,6 +697,7 @@ class SubmissionAgent:
         self._retries_left = self.config.max_retries
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
+        services = in_file_coordinates(services)
         cfg = self.config
         started = time.monotonic()
         deadline = started + cfg.last_turn_start_s
