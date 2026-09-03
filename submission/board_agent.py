@@ -85,6 +85,7 @@ from submission.framework_agent import (
     State,
     is_probe,
     notes_for,
+    sheet_for,
     screen_step,
 )
 
@@ -1747,6 +1748,10 @@ class BoardAgent(FrameworkAgent):
                      "What Lean reports as open, with its hypotheses. The first goal "
                      f"is the active one, at `skip` on line {line}:\n"
                      f"{goal.text[:GOAL_CHARS]}"]
+            sheet = sheet_for(goal.text)
+            if sheet:
+                parts.append("Names the loaded Mathlib has for this goal's vocabulary, "
+                             f"as #check prints them:\n{sheet}")
             if plan:
                 parts.append("A mathematician was asked how to prove this goal and "
                              f"answered:\n{plan}")

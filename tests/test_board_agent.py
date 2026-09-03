@@ -1351,3 +1351,28 @@ def test_a_goal_keeps_its_history_when_a_fact_is_added_above_it():
     tries2 = {old[1].key: 1}
     inherit(old, twin, (tries2,))
     assert new[2].key not in tries2
+
+
+def test_a_goal_about_divisibility_carries_the_current_mathlib_names_before_any_error():
+    # Measured on rmo_2000_6 (one52b, 1 h): the models reached the right lemmas
+    # (Nat.Prime.dvd_of_dvd_pow, pow_dvd_iff_le_factorization) after rounds of
+    # unknown-name rejections and a detour through factorization arithmetic;
+    # the right half of the theorem was never reached. The names are known
+    # before the first step; the name probe only ever answered a rejection.
+    from submission.framework_agent import sheet_for
+    sheet = sheet_for("a b : ℕ\nha : 0 < a\n⊢ 10 ∣ a * b")
+    assert "Nat.Prime.dvd_mul" in sheet and "Nat.le_of_dvd" in sheet
+    assert sheet_for("x : ℕ\n⊢ x + 1 = 1 + x") == ""
+    assert len(sheet.splitlines()) <= 16
+    # the fake Lean prints a goal as its declaration name, so the wiring is
+    # checked with a sheet that answers every goal
+    import submission.board_agent as ba
+    real = ba.sheet_for
+    ba.sheet_for = lambda goal: "SHEET-MARK " + goal.split("⊢", 1)[-1].strip()
+    try:
+        challenge = "import Mathlib\n\ntheorem demo (a b : ℕ) : 2 ∣ a * b := by\n  sorry\n"
+        _, _, llm, _ = run(challenge, {"model-b": ["have key : True := by trivial\nexact key"]},
+                           lines=("model-b",))
+    finally:
+        ba.sheet_for = real
+    assert any("as #check prints them:\nSHEET-MARK demo" in p for m, p in llm.calls)

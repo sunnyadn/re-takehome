@@ -255,6 +255,64 @@ NOTES: tuple[tuple[re.Pattern[str], str], ...] = (
 )
 
 
+# Section 4 of the framework: the names the loaded Mathlib has, given before
+# the first step to any goal whose vocabulary they fit. Every name and signature
+# below was printed by `#check` in the harness image; nothing is from memory.
+SHEETS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"∣"),
+     "Nat.Prime.dvd_mul (hp : p.Prime) : p ∣ m * n ↔ p ∣ m ∨ p ∣ n\n"
+     "Nat.Prime.dvd_of_dvd_pow (hp : p.Prime) : p ∣ m ^ n → p ∣ m ; Nat.dvd_of_pow_dvd : 1 ≤ k → p ^ k ∣ m → p ∣ m\n"
+     "Nat.Coprime.mul_dvd_of_dvd_of_dvd : m.Coprime n → m ∣ a → n ∣ a → m * n ∣ a (omega also gets 10 ∣ x from 2 ∣ x and 5 ∣ x)\n"
+     "Nat.le_of_dvd : 0 < n → m ∣ n → m ≤ n ; Nat.dvd_antisymm ; Nat.Prime.eq_one_or_self_of_dvd (hp) (m) : m ∣ p → m = 1 ∨ m = p\n"
+     "Nat.dvd_sub : k ∣ m → k ∣ n → k ∣ m - n ; Nat.dvd_add_right (h : a ∣ b) : a ∣ b + c ↔ a ∣ c ; Nat.pow_dvd_pow_iff_le_right : 1 < x → (x ^ k ∣ x ^ l ↔ k ≤ l)\n"
+     "Nat.Prime.pow_dvd_iff_le_factorization (hp) (hn : n ≠ 0) : p ^ k ∣ n ↔ k ≤ n.factorization p. Prefer the route through a prime dividing a factor; factorization arithmetic needs nonzero side goals at every step.\n"
+     "A closed fact such as 2000 ∣ 5 ^ 3 * 2 ^ 4 is `by decide` or `by norm_num`."),
+    (re.compile(r"divisors"),
+     "Nat.mem_divisors : n ∈ m.divisors ↔ n ∣ m ∧ m ≠ 0 ; Nat.Prime.divisors (hp) : p.divisors = {1, p}\n"
+     "Nat.divisors_mul (m n) : (m * n).divisors = m.divisors * n.divisors (pointwise product, no coprimality needed; Finset.mem_mul)\n"
+     "Nat.divisors_prime_pow (hp) (k) : (p ^ k).divisors = (Finset.range (k + 1)).map ⟨(p ^ ·), _⟩ ; Nat.dvd_prime_pow (hp) : i ∣ p ^ m ↔ ∃ k ≤ m, i = p ^ k\n"
+     "Nat.dvd_mul : k ∣ m * n ↔ ∃ k₁ k₂, k₁ ∣ m ∧ k₂ ∣ n ∧ k₁ * k₂ = k. For a 7-digit n, `decide` on n.divisors does not finish; go through its prime factorisation."),
+    (re.compile(r"%|≡|ModEq"),
+     "Nat.pow_mod (a b n) : a ^ b % n = (a % n) ^ b % n ; Nat.mul_mod ; Nat.add_mod ; Nat.mod_mod_of_dvd (a) : c ∣ b → a % b % c = a % c\n"
+     "Nat.mod_lt (x) : 0 < y → x % y < y ; Nat.div_add_mod (m n) : n * (m / n) + m % n = m ; Nat.mod_two_eq_zero_or_one (n)\n"
+     "Nat.even_iff : Even n ↔ n % 2 = 0 ; Nat.odd_iff ; Nat.ModEq.pow (m) : a ≡ b [MOD n] → a ^ m ≡ b ^ m [MOD n]\n"
+     "omega decides linear facts with % and / by constants. A residue split: `have h := Nat.mod_lt n (by norm_num : 0 < 9)`, `generalize n % 9 = r at *`, `interval_cases r`."),
+    (re.compile(r"∑|∏|Finset\.sum|Finset\.prod"),
+     "Finset.sum_range_succ (f n) : ∑ x ∈ range (n + 1), f x = ∑ x ∈ range n, f x + f n ; Finset.prod_range_succ ; Finset.sum_range_zero\n"
+     "Finset.sum_range_id (n) : ∑ i ∈ range n, i = n * (n - 1) / 2 ; Finset.sum_range_id_mul_two (n) : (∑ i ∈ range n, i) * 2 = n * (n - 1)\n"
+     "Finset.mul_sum (s f a) : a * ∑ i ∈ s, f i = ∑ i ∈ s, a * f i ; Finset.sum_mul ; Finset.sum_add_distrib ; Finset.sum_const (b) : ∑ _x ∈ s, b = s.card • b ; Finset.card_range\n"
+     "Finset.sum_le_sum : (∀ i ∈ s, f i ≤ g i) → ∑ i ∈ s, f i ≤ ∑ i ∈ s, g i ; Finset.sum_congr rfl (fun i hi => _)\n"
+     "A closed form: `induction n with | zero => simp | succ n ih => rw [Finset.sum_range_succ, ih]; ring` (over ℕ prove the form without division first). Spell it ∑ x ∈ s, not ∑ x in s."),
+    (re.compile(r"factorial|!"),
+     "Nat.factorial_succ (n) : (n + 1).factorial = (n + 1) * n.factorial ; Nat.factorial_pos ; Nat.factorial_le : m ≤ n → m.factorial ≤ n.factorial\n"
+     "Nat.dvd_factorial : 0 < m → m ≤ n → m ∣ n.factorial ; Nat.Prime.dvd_factorial (hp) : p ∣ n.factorial ↔ p ≤ n\n"
+     "Write Nat.factorial n or n.factorial (the ! notation needs `open Nat`); small values evaluate with `decide` or `norm_num [Nat.factorial]`."),
+    (re.compile(r"\^.*[<≤]|[<≤].*\^"),
+     "Nat.pow_lt_pow_left : a < b → n ≠ 0 → a ^ n < b ^ n ; Nat.pow_le_pow_left : a ≤ b → ∀ i, a ^ i ≤ b ^ i\n"
+     "Nat.pow_lt_pow_right : 1 < a → m < n → a ^ m < a ^ n ; Nat.pow_le_pow_right : a > 0 → i ≤ j → a ^ i ≤ a ^ j ; Nat.lt_pow_self : 1 < a → n < a ^ n\n"
+     "Nat.pow_lt_pow_iff_left : n ≠ 0 → (a ^ n < b ^ n ↔ a < b) ; Nat.pow_le_pow_iff_left ; Nat.pow_left_injective : n ≠ 0 → Function.Injective (· ^ n) ; Nat.mul_self_le_mul_self_iff : m * m ≤ n * n ↔ m ≤ n\n"
+     "Over ℤ or ℝ: pow_le_pow_left₀ : 0 ≤ a → a ≤ b → ∀ n, a ^ n ≤ b ^ n ; lt_of_pow_lt_pow_left₀ (n) : 0 ≤ b → a ^ n < b ^ n → a < b ; sq_nonneg a\n"
+     "To pin an unknown: squeeze it between consecutive powers with nlinarith (`(x + 2) ^ 3 < y ^ 3`, `y ^ 3 < (x + 3) ^ 3`), convert with Nat.pow_lt_pow_iff_left, then omega or interval_cases."),
+    (re.compile(r"factorization"),
+     "Nat.factorization_mul : a ≠ 0 → b ≠ 0 → (a * b).factorization = a.factorization + b.factorization ; Nat.factorization_pow (n k) : (n ^ k).factorization = k • n.factorization\n"
+     "Nat.Prime.factorization_self (hp) : p.factorization p = 1 ; Nat.factorization_eq_zero_of_not_dvd : ¬p ∣ n → n.factorization p = 0 ; Nat.eq_of_factorization_eq"),
+    (re.compile(r"Coprime|gcd"),
+     "Nat.coprime_primes (hp hq) : p.Coprime q ↔ p ≠ q ; Nat.Prime.coprime_iff_not_dvd (hp) : p.Coprime n ↔ ¬p ∣ n ; Nat.Coprime.pow (m n) : k.Coprime l → (k ^ m).Coprime (l ^ n)\n"
+     "Nat.Coprime.dvd_of_dvd_mul_left : k.Coprime m → k ∣ m * n → k ∣ n ; Nat.Coprime.gcd_eq_one ; Nat.gcd_comm ; a closed Coprime such as Nat.Coprime 16 125 is `by norm_num`."),
+    (re.compile(r"IsLeast|IsGreatest|lowerBounds|upperBounds"),
+     "IsLeast S a is a ∈ S ∧ a ∈ lowerBounds S: `refine ⟨?_, ?_⟩`. Membership in a set-builder is its existential: `exact ⟨w₁, w₂, by norm_num, by norm_num, by decide, rfl⟩`.\n"
+     "The bound: `intro n hn` then `obtain ⟨a, b, ha, hb, h, rfl⟩ := hn` (Set.mem_setOf_eq). IsGreatest is the mirror with upperBounds."),
+)
+
+
+def sheet_for(goal_text: str) -> str:
+    """The sheets this goal's vocabulary triggers, first 3, at most 16 lines."""
+
+    target = goal_text.split("⊢", 1)[1] if "⊢" in goal_text else goal_text
+    hits = [sheet for pattern, sheet in SHEETS if pattern.search(target) or pattern.search(goal_text)]
+    return "\n".join("\n".join(hits[:3]).splitlines()[:16])
+
+
 def notes_for(text: str) -> str:
     """The framework entries this message triggers, and only those."""
 
