@@ -110,7 +110,52 @@ end DivisorCases""",
                  "divisor with d replaced by it (over ℤ, `hx : d = m` or `hx : d = -m` in each case). "
                  "For `h : a * b = N` first `have hd : a ∣ N := Dvd.intro _ h`. Never `decide` a divisor set.")
 
-TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES,)
+# Measured on rmo_2000_2: the route reached `hxge : x ≥ 9 ⊢ y = x + 2` with
+# `h : y ^ 3 = ...` by 306 s and no model closed it in three runs.
+LEAF_TACTICS = ("""-- `pow_squeeze y n E` (goal y = E, a hypothesis y ^ n = ...): E ^ n ≤ y ^ n < (E + 1) ^ n
+-- by omega/nlinarith, then Nat.pow_le/lt_pow_iff_left; `with h` first replaces
+-- the variable of `h : c ≤ x` by c + k inside those two proofs.
+syntax "pow_squeeze" term:max term:max term:max (" with " ident)? : tactic
+macro_rules
+  | `(tactic| pow_squeeze $y $n $lo) => `(tactic| (
+      have hlo : ($lo : ℕ) ^ $n ≤ $y ^ $n := by
+        first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
+      have hhi : $y ^ $n < ($lo + 1) ^ $n := by
+        first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
+      have h1 := (Nat.pow_le_pow_iff_left (by norm_num : ($n : ℕ) ≠ 0)).1 hlo
+      have h2 := (Nat.pow_lt_pow_iff_left (by norm_num : ($n : ℕ) ≠ 0)).1 hhi
+      omega))
+  | `(tactic| pow_squeeze $y $n $lo with $h) => `(tactic| (
+      have hlo : ($lo : ℕ) ^ $n ≤ $y ^ $n := by
+        obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le $h
+        subst hk
+        first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
+      have hhi : $y ^ $n < ($lo + 1) ^ $n := by
+        obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le $h
+        subst hk
+        first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
+      have h1 := (Nat.pow_le_pow_iff_left (by norm_num : ($n : ℕ) ≠ 0)).1 hlo
+      have h2 := (Nat.pow_lt_pow_iff_left (by norm_num : ($n : ℕ) ≠ 0)).1 hhi
+      omega))
+
+-- `bounded_cases x N`: x ≤ N (omega, nlinarith, or from x ^ 2 / x ^ 3 = numeral), then every value.
+syntax "bounded_cases" ident term:max : tactic
+macro_rules
+  | `(tactic| bounded_cases $x $n) => `(tactic| (
+      have hb : $x ≤ $n := by first
+        | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
+        | (apply Nat.lt_succ_iff.mp; apply (Nat.pow_lt_pow_iff_left (by norm_num : (2 : ℕ) ≠ 0)).1
+           first | omega | (norm_num at *; omega) | (norm_num at *; done))
+        | (apply Nat.lt_succ_iff.mp; apply (Nat.pow_lt_pow_iff_left (by norm_num : (3 : ℕ) ≠ 0)).1
+           first | omega | (norm_num at *; omega) | (norm_num at *; done))
+      interval_cases $x <;> first | omega | (norm_num at *; done) | nlinarith | simp_all))""",
+                "`pow_squeeze y n E` (goal `y = E`, a hypothesis `y ^ n = ...`, n = 2 or 3): proves "
+                "E ^ n ≤ y ^ n < (E + 1) ^ n by omega/nlinarith and concludes; `pow_squeeze y n E with h` "
+                "first replaces the variable of `h : c ≤ x` by c + k inside those proofs. "
+                "`bounded_cases x N`: proves x ≤ N (omega, nlinarith, or from x ^ 2 or x ^ 3 equal to a "
+                "numeral) and finishes every value.")
+
+TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES, LEAF_TACTICS)
 
 PREAMBLE_MARK = "-- techniques defined for this file"
 PREAMBLE_END = "-- end of techniques"

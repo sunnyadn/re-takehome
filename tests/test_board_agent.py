@@ -1749,6 +1749,44 @@ def test_a_rejected_reply_is_read_for_the_statements_it_makes():
                for p in proofs)
 
 
+def test_leaf_candidates_are_built_from_the_goal_s_shape_and_tried_before_any_model():
+    # Measured on 3 September: rmo_2000_2, rmo_2001_2 and putnam_2018_a1 had the
+    # route on the board within minutes and were lost on leaves of these shapes.
+    from submission.leaves import leaf_candidates
+    crux = ("x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n"
+            "hxge : x ≥ 9\n⊢ y = x + 2")
+    got = leaf_candidates(crux)
+    assert got[0].endswith("pow_squeeze y 3 (x + 2) with hxge") and any("Nat.exists_eq_add_of_le hxge" in c for c in got)
+    assert not any(c.endswith("with hx") or c.endswith("with hy") for c in got)
+    dvd = "m p q : ℕ\nhp : Nat.Prime p\nhA_dvd : m - (p + q) ∣ 5 * p * q\n⊢ m - (p + q) = 1 ∨ m - (p + q) = 5"
+    assert any(c.endswith("divisor_cases hA_dvd <;> first | omega | (norm_num at *; done) | nlinarith | simp_all")
+               for c in leaf_candidates(dvd))
+    assert leaf_candidates("⊢ True") == []
+    small = "x : ℕ\nhb : x ≤ 3\nh : x ^ 2 = 4\n⊢ x = 2"
+    assert any("interval_cases x <;>" in c for c in leaf_candidates(small))
+    assert any("bounded_cases x 3" in c for c in leaf_candidates(small))
+
+    class LeafLean(BoardLean):
+        """The theorem's own goal carries `hb : x ≤ 3`; `interval_cases x` closes it."""
+        async def check_file(self, source, timeout_s=None):
+            check = await super().check_file(source)
+            if "interval_cases x" in source and "theorem demo" in source:
+                return LeanCheck(True, [], False, False, 1)
+            msgs = [dict(m, data=m["data"].replace("⊢ demo", "hb : x ≤ 3\n⊢ x = 2"))
+                    if "⊢ demo" in str(m.get("data")) else m for m in check.messages]
+            return LeanCheck(check.accepted, msgs, check.has_sorry, False, 1)
+
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hb : x ≤ 3) : x = 2 := by\n  sorry\n"
+    lean, llm = LeafLean(), ScriptLLM({"model-a": ["omega"] * 3})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=challenge),
+                                     FakeServices(lean, llm)))
+    leaf = [e for e in result.metadata["events"] if e.get("kind") == "leaf"]
+    assert leaf and leaf[0]["accepted"] and "interval_cases x" in leaf[0]["block"]
+    assert not any(p.startswith("A goal inside a Lean 4 proof, exactly as Lean states it") for _, p in llm.calls)
+    assert "interval_cases x" in result.solution
+
+
 def test_a_claim_the_walk_covers_is_settled_without_an_auditor_call():
     # Measured over 7 runs: every refutation with ℕ binders came from the walk,
     # the auditor's came from closed claims and ℤ, and audit calls were half of

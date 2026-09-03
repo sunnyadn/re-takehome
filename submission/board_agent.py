@@ -16,6 +16,7 @@ from re_harness import AgentResult, LLMCallError, Problem, Services
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
+from submission.leaves import leaf_candidates
 from submission.techniques import without_techniques
 from submission.agent import (
     BUDGET_HEADROOM,
@@ -1910,6 +1911,29 @@ class BoardAgent(FrameworkAgent):
                            "accepted": accepted, "ms": check.duration_ms})
             return accepted
 
+        async def leaf_sweep(goal: Goal) -> bool:
+            """Tactic blocks built from the goal's shape (leaves.py), each one
+            check, no model asked. Measured on 3 September: three of the four
+            unsolved problems were lost on leaves of these shapes after the
+            models had found the route."""
+
+            base = board
+            candidates = leaf_candidates(goal.text)
+            if not candidates:
+                return False
+            for block in candidates:
+                nxt, why = await judge(base, goal, block)
+                if nxt is not None:
+                    events.append({"kind": "leaf", "goal": goal.text[-120:],
+                                   "block": block.split("\n")[-1][:80], "accepted": True})
+                    await commit(nxt)
+                    return True
+                if why == TIMED_OUT:
+                    break
+            events.append({"kind": "leaf", "goal": goal.text[-120:], "accepted": False,
+                           "tried": len(candidates)})
+            return False
+
         async def library_sweep(goal: Goal) -> bool:
             """Mathlib asked what unifies with the goal (`apply?`), after the
             closers failed. An `exact` answer is written, no model asked; the
@@ -2324,7 +2348,8 @@ class BoardAgent(FrameworkAgent):
                     base = board
                     if goal is not None and goal.key not in swept:
                         swept.add(goal.key)
-                        if await sweep(goal) or await witness_sweep(goal) or await library_sweep(goal):
+                        if await sweep(goal) or await leaf_sweep(goal) or await witness_sweep(goal) \
+                                or await library_sweep(goal):
                             return True
                         await consult(goal)
                     if goal is not None:
