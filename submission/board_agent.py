@@ -1272,8 +1272,9 @@ class BoardAgent(FrameworkAgent):
                 services.checkpoint(best, {"accepted": accepted})
 
         def result(source: str, how: str, accepted: bool) -> AgentResult:
-            tail = events[-60:]
-            kept = [e for e in events[:-60] if "stage" in e] + tail
+            # Every event, so a run's accounting (who wrote, who audited, what
+            # closed without a model) can be read off result.json. A 500-turn
+            # run is about 150 KB; the earlier last-60 cut made counts tails.
             return AgentResult(source, {
                 "strategy": "board",
                 "solved_by": how,
@@ -1281,7 +1282,7 @@ class BoardAgent(FrameworkAgent):
                 "spend_usd": round(ledger.spent_usd, 6),
                 "wall_s": round(time.monotonic() - started, 1),
                 "turns": len(events),
-                "events": kept,
+                "events": list(events),
             })
 
         async def deliver(text: str, how: str) -> AgentResult | None:
