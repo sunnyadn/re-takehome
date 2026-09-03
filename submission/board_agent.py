@@ -666,6 +666,24 @@ def withdraw(text: str, goal: Goal) -> tuple[str, str]:
     return "\n".join(lines[:above] + [indent + "sorry"] + lines[end:]), head.group(2).strip()
 
 
+def withdraw_only(text: str, goal: Goal) -> tuple[str, str]:
+    """Like `withdraw`, but only the `have` and its own body go; what follows
+    in the block stays. The block keeps a `sorry` if nothing else is left."""
+    lines = text.split("\n")
+    above, head = enclosing_have(lines, goal)
+    if not head:
+        return "", ""
+    indent = head.group(1)
+    end = above + 1
+    while end < len(lines) and (not lines[end].strip()
+                                or len(lines[end]) - len(lines[end].lstrip()) > len(indent)):
+        end += 1
+    rest = lines[end:]
+    keeps = rest and rest[0].strip() and len(rest[0]) - len(rest[0].lstrip()) == len(indent)
+    middle = [] if keeps else [indent + "sorry"]
+    return "\n".join(lines[:above] + middle + rest), head.group(2).strip()
+
+
 INFLATION = 3.0
 
 
@@ -1404,13 +1422,21 @@ class BoardAgent(FrameworkAgent):
             """The `have` this goal is the body of comes off the board, with the
             rest of its block; the goal it was posted on is told why."""
 
-            fresh, statement = withdraw(board.text, goal)
+            fresh, statement = withdraw_only(board.text, goal)
             if not fresh:
                 return
+            # Only the have goes; if Lean then finds the rest of the block broken
+            # (it used the name), the rest goes too. Measured on rmo_2000_6:
+            # withdrawing h_witness took h_min, the whole crux, which never used it.
+            trimmed = await look(fresh)
+            whole = False
+            if classify(trimmed.messages)[3]:
+                fresh, statement = withdraw(board.text, goal)
+                trimmed, whole = await look(fresh), True
             events.append({"kind": "withdraw", "by": author, "have": statement[:120],
-                           "tries": tries.get(goal.key, 0)})
+                           "tries": tries.get(goal.key, 0), "whole_block": whole})
             withdrawn.setdefault(goal.decl, []).append(statement)
-            await commit(await look(fresh))
+            await commit(trimmed)
             back = next((g for g in reversed(board.goals) if g.decl == goal.decl
                          and g.line <= goal.line), None)
             if back is not None:

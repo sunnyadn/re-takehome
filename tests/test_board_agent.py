@@ -49,6 +49,10 @@ class BoardLean:
                 messages.append({"severity": "error", "pos": {"line": i - 1},
                                  "endPos": {"line": i - 1},
                                  "data": "Unknown identifier `loc`"})
+            if re.match(r"exact gone\w*$", body) and body.split()[1] not in haves:
+                messages.append({"severity": "error", "pos": {"line": i - 1},
+                                 "endPos": {"line": i - 1},
+                                 "data": f"Unknown identifier `{body.split()[1]}`"})
             if body.startswith("exact Nat."):
                 messages.append({"severity": "error", "pos": {"line": i - 1},
                                  "endPos": {"line": i - 1},
@@ -503,15 +507,18 @@ def test_a_have_whose_goal_keeps_failing_is_withdrawn_with_everything_after_it()
     # false fact at t=64; every goal after it lived in a contradiction and the
     # lemma goal itself could never close. The board has to be able to take a
     # decomposition back.
+    # `exact gone` after the have uses its name (the fake reports it unknown once
+    # the have is gone), so the whole block goes, as before v7.49.
     result, lean, llm, _ = run(ONE, {
-        "model-a": ["have key : P := by\n  sorry\nexact key",
+        "model-a": ["have gone : P := by\n  sorry\nexact gone",
                     "linarith", "linarith", "linarith", "linarith",
                     "have other : True := by trivial", "exact other"],
     }, lines=("model-a",))
     events = result.metadata["events"]
-    assert any(e.get("kind") == "withdraw" and "key : P" in e.get("have", "") for e in events)
+    assert any(e.get("kind") == "withdraw" and "gone : P" in e.get("have", "")
+               and e.get("whole_block") for e in events)
     assert any("withdrawn" in p for _, p in llm.calls)
-    assert "have key : P" not in result.solution
+    assert "have gone : P" not in result.solution and "exact gone" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
 
 
@@ -1226,13 +1233,13 @@ def test_with_two_routes_open_the_second_worker_takes_the_other_one():
         "model-a": ["no", "linarith [a]",
                     "have k1 : P := by\n  sorry\nhave k2 : Q := by\n  sorry\n"
                     "have k3 : R := by\n  sorry\nexact k1",                      # second route
-                    "have dead : P := by\n  sorry\nhave dead2 : Q := by\n  sorry\nexact dead"]
+                    "have gone : P := by\n  sorry\nhave gone2 : Q := by\n  sorry\nexact gone"]
                    + [f"linarith [x{i}]" for i in range(12)],
         "model-b": ["exact k1"] * 3,
     }, delay={"model-b": 0.6}, time_limit=60)
     assert any(e.get("stage") == "route" for e in result.metadata["events"])
     assert result.metadata["accepted_by_repl"] is True
-    assert "k1" in result.solution and "dead" not in result.solution
+    assert "k1" in result.solution and "gone" not in result.solution
 
 
 class ClosedLean(WitnessLean):
@@ -1261,4 +1268,19 @@ def test_a_step_that_leaves_a_closed_false_goal_is_refused_without_a_model_call(
     assert any(e.get("verdict") == "refuted" and e.get("goal") == "P 10" for e in audits)
     assert not any("Is the target a consequence" in p for _, p in llm.calls)
     assert "use 10" not in result.solution and "use 5" in result.solution
+    assert result.metadata["accepted_by_repl"] is True
+
+
+def test_withdrawing_a_fact_keeps_the_independent_facts_after_it():
+    # Measured on rmo_2000_6 (one48a 06:37): `h_witness` was withdrawn after 4
+    # failed attempts and took `h_min`, the whole crux, down with it, though
+    # h_min never used it. Only the have goes; Lean says whether anything after
+    # it depended on it, and only then does the rest of the block go too.
+    result, lean, llm, _ = run(ONE, {
+        "model-a": ["have bad : P := by\n  sorry\nhave good : Q := by\n  sorry\nexact good"]
+                   + [f"linarith [x{i}]" for i in range(7)] + ["exact good", "exact good"],
+    }, lines=("model-a",))
+    assert any(e.get("kind") == "withdraw" and "bad" in e.get("have", "")
+               for e in result.metadata["events"])
+    assert "have good" in result.solution and "have bad" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
