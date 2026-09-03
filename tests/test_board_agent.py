@@ -1751,7 +1751,7 @@ def test_the_technique_preamble_sits_after_the_header_and_the_models_are_told_ab
     assert lines[0] == "import Mathlib.Data.Nat.Basic" and lines[1] == "import Mathlib"
     assert lines.index("attribute [instance 2000] instPowNat") < lines.index(PREAMBLE_MARK) < lines.index(
         "theorem demo (d : ℕ) (h : d ∣ 2000) : 5 ≤ d := by")
-    assert 'syntax "divisor_cases" ident " for " term' in text and with_preamble(text) == text
+    assert 'syntax "divisor_cases" ident : tactic' in text and "elab_rules" in text and with_preamble(text) == text
     # A hoisted lemma, a probe or a set_option lands below the technique block,
     # else a lemma that calls a technique is written above its definition.
     from submission.framework import insert_preamble
@@ -1766,7 +1766,7 @@ def test_the_technique_preamble_sits_after_the_header_and_the_models_are_told_ab
                                lines=("model-a",))
     assert all("divisor_cases" in src for src in lean.sources if "have key" in src)
     assert "divisor_cases" in result.solution
-    assert any("divisor_cases h : e" in s for s in llm.systems)
+    assert any("`divisor_cases h`" in s for s in llm.systems)
 
 
 def test_apply_suggestions_close_a_goal_without_a_model_or_reach_the_prompt():

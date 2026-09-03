@@ -279,7 +279,7 @@ SHEETS: tuple[tuple[re.Pattern[str], str], ...] = (
      "Nat.dvd_sub : k ∣ m → k ∣ n → k ∣ m - n ; Nat.dvd_add_right (h : a ∣ b) : a ∣ b + c ↔ a ∣ c ; Nat.pow_dvd_pow_iff_le_right : 1 < x → (x ^ k ∣ x ^ l ↔ k ≤ l)\n"
      "Nat.Prime.pow_dvd_iff_le_factorization (hp) (hn : n ≠ 0) : p ^ k ∣ n ↔ k ≤ n.factorization p. Prefer the route through a prime dividing a factor; factorization arithmetic needs nonzero side goals at every step.\n"
      "A closed fact such as 2000 ∣ 5 ^ 3 * 2 ^ 4 is `by decide` or `by norm_num`.\n"
-     "d ∣ e with e a product of primes (variables with Nat.Prime, numerals, prime powers): `divisor_cases h : e`, or `divisor_cases h : N = e` for a numeral N (a tactic defined in this file); never decide the divisor set of a large numeral (measured at 4072324: recursion depth and heartbeats blow up)."),
+     "d ∣ N with N a numeral or a product of primes (ℕ or ℤ): `divisor_cases h` (a tactic defined in this file) gives one goal per divisor; never decide the divisor set of a large numeral (measured at 4072324: recursion depth and heartbeats blow up)."),
     (re.compile(r"divisors"),
      "Nat.mem_divisors : n ∈ m.divisors ↔ n ∣ m ∧ m ≠ 0 ; Nat.Prime.divisors (hp) : p.divisors = {1, p}\n"
      "Nat.divisors_mul (m n) : (m * n).divisors = m.divisors * n.divisors (pointwise product, no coprimality needed; Finset.mem_mul)\n"
