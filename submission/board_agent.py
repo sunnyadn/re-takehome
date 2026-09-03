@@ -705,7 +705,7 @@ def put(text: str, goal: Goal, block: str, trailing: bool = True) -> tuple[str, 
     """The block where the goal's placeholder is, and the lines it now covers."""
 
     lines = text.split("\n")
-    body = reindent(normalise_steps(fold_heads(dialect(block))), goal.indent)
+    body = reindent(normalise_steps(fold_heads(block)), goal.indent)
     if trailing:
         body = f"{body}\n{goal.indent}sorry"
     lines[goal.line - 1] = body
@@ -749,7 +749,7 @@ class Edit:
 def interpret(reply: str, board: Board, goal: Goal, graded: Sequence[str]) -> list[Edit]:
     """Read a reply once, as proofs of whatever it names."""
 
-    block = screen_step(reply, allow_sorry=True)
+    block = dialect(screen_step(reply, allow_sorry=True))
     if not block:
         return []
     if is_probe(block):

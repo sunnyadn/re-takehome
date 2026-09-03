@@ -1035,9 +1035,12 @@ def test_a_big_operator_written_with_in_is_spelled_the_way_this_mathlib_reads_it
     kept = "set_option maxHeartbeats 400000 in\nsimp only [Finset.sum_range_succ] at h ⊢"
     assert dialect(kept) == kept
     assert dialect("∑ x ∈ s, x") == "∑ x ∈ s, x"
-    # and put() applies it, so the file never carries the old spelling
-    from submission.board_agent import put
-    text = "theorem t : True := by\n  sorry"
+    # and interpret() applies it once, so every edit (step or hoisted lemma)
+    # carries the new spelling. Measured one37a: a hoisted lemma kept `in`.
     goal = Goal(2, "  ", "t", "⊢ True")
-    new, _ = put(text, goal, "have h : ∑ j in Finset.range 3, j = 3 := by sorry")
-    assert "∑ j ∈ Finset.range 3" in new and " in " not in new
+    board = Board("theorem t : True := by\n  sorry", [goal])
+    edits = interpret("```lean\nhave h : ∑ j in Finset.range 3, j = 3 := by sorry\n"
+                      "lemma l (k : ℕ) : ∑ j in Finset.range k, j = k := by\n  sorry\n```",
+                      board, goal, ["t"])
+    assert [e.kind for e in edits] == ["step", "hoist"]
+    assert all(" in " not in e.block + e.body and "∈" in e.block + e.body for e in edits)
