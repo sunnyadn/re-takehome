@@ -1318,3 +1318,15 @@ def test_a_hoisted_lemma_whose_goal_keeps_failing_is_dropped_like_a_have():
     assert any(e.get("kind") == "withdraw" and e.get("decl") == "part1" for e in events)
     assert "lemma part1" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
+
+
+def test_a_closed_goal_is_one_whose_target_names_no_hypothesis():
+    # Measured on rmo_2000_6 (one51a 07:13): `use 2; use 5` left `⊢ 0 < 5 ∧ 2000 ∣
+    # 8 * 5 ^ 4 ∧ 10 = 2 * 5` (false) under `h_a : 0 < 5`, `h_div : ...`; with
+    # "no hypotheses" as the test it was not audited and the branch died.
+    from submission.board_agent import is_closed
+    assert is_closed("h_a : 0 < 5\nh_div : 2000 ∣ 5 ^ 3 * 2 ^ 4\n⊢ 0 < 5 ∧ 2000 ∣ 8 * 5 ^ 4 ∧ 10 = 2 * 5")
+    assert is_closed("⊢ 2000 ∣ 4 ^ 2 * 1 ^ 5")
+    assert not is_closed("a b : ℕ\nha : 0 < a\n⊢ 10 ≤ a * b")
+    assert not is_closed("⊢ ∃ a b, 0 < a ∧ 10 = a * b")
+    assert not is_closed("⊢ True") and not is_closed("⊢ demo")  # nothing to evaluate

@@ -728,6 +728,18 @@ def inflated(before: str, after: str) -> float:
     return len(now_text) / was
 
 
+def is_closed(goal_text: str) -> bool:
+    """A goal whose target names none of its hypotheses and binds nothing: a
+    closed proposition, decided by evaluation alone. Measured on rmo_2000_6:
+    `use 2; use 5` left `⊢ 0 < 5 ∧ 2000 ∣ 8 * 5 ^ 4 ∧ 10 = 2 * 5` under proved
+    facts about numerals, and "no hypotheses at all" missed it."""
+    target = target_of(goal_text)
+    if not target or re.search(r"[∀∃λ]|\bfun\b", target) or not re.search(r"\d", target):
+        return False
+    return not any(re.search(rf"(?<![\w'.]){re.escape(n)}(?![\w'])", target)
+                   for n in hypotheses(goal_text))
+
+
 def target_of(goal_text: str) -> str:
     return goal_text.rsplit("⊢", 1)[-1].strip() if "⊢" in goal_text else ""
 
@@ -1304,7 +1316,7 @@ class BoardAgent(FrameworkAgent):
                 # decides it in one check. Measured on rmo_2000_6: `use 10; use 1`
                 # left `⊢ 0 < 1 ∧ 2000 ∣ 10 ^ 3 * 1 ^ 4 ∧ ...` and the branch died.
                 dead_end = target_of(g.text) == "False"
-                closed = not hypotheses(g.text) and not re.search(r"[∀∃λ]|fun\b", target_of(g.text))
+                closed = is_closed(g.text)
                 if (g.key in had or not g.text or META.search(target_of(g.text))
                         or not (dead_end or closed or is_stated(lines, g))
                         or enclosing_have(lines, g)[0] in covered):
