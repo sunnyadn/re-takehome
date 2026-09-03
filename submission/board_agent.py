@@ -1891,8 +1891,10 @@ class BoardAgent(FrameworkAgent):
 
             base = board
             block = tagged_closers(cocktail)
+            t0 = time.monotonic()
             nxt, _ = await judge(base, goal, block)
-            events.append({"kind": "closers", "by": "harness", "accepted": nxt is not None})
+            events.append({"kind": "closers", "by": "harness", "accepted": nxt is not None,
+                           "ms": int((time.monotonic() - t0) * 1000)})
             if nxt is None:
                 return False
             tactic = fired_closer(nxt.messages, put(base.text, goal, block)[1], cocktail)
@@ -1949,17 +1951,19 @@ class BoardAgent(FrameworkAgent):
             candidates = leaf_candidates(goal.text)
             if not candidates:
                 return False
+            t0 = time.monotonic()
             for block in candidates:
                 nxt, why = await judge(base, goal, block)
                 if nxt is not None:
                     events.append({"kind": "leaf", "goal": goal.text[-120:],
-                                   "block": block.split("\n")[-1][:80], "accepted": True})
+                                   "block": block.split("\n")[-1][:80], "accepted": True,
+                                   "ms": int((time.monotonic() - t0) * 1000)})
                     await commit(nxt)
                     return True
                 if why == TIMED_OUT:
                     break
             events.append({"kind": "leaf", "goal": goal.text[-120:], "accepted": False,
-                           "tried": len(candidates)})
+                           "tried": len(candidates), "ms": int((time.monotonic() - t0) * 1000)})
             return False
 
         async def library_sweep(goal: Goal) -> bool:
