@@ -145,17 +145,46 @@ class Ledger:
         return cost
 
 
+NAT_POW_LINE = "attribute [instance 2000] instPowNat"
+NUMERAL_EXPONENT = re.compile(r"\^ (\d+)(?![\d.])")
+STATEMENT = re.compile(r"((?:theorem|lemma)\s+[\w'.]+)(.*?)(:=[ \t]*by\b)", re.S)
+
+
+def type_exponents(text: str) -> str:
+    """`x ^ 2` becomes `x ^ (2 : ℕ)` in every theorem statement. Under the
+    challenge's own imports the numeral exponent elaborates through core's
+    `instPowNat`; under `import Mathlib` a default instance routes it through
+    `Monoid.npow`, and the comparator then sees two different statements."""
+
+    return STATEMENT.sub(lambda m: m.group(1) + NUMERAL_EXPONENT.sub(r"^ (\1 : ℕ)", m.group(2))
+                         + m.group(3), text)
+
+
 def normalise_imports(source: str, fallback: str) -> str:
-    """Force a single `import Mathlib` header.
+    """The challenge's own imports, kept, plus `import Mathlib` for the tactics.
 
-    The REPL checks against a full Mathlib; the Comparator compiles the file."""
+    Measured on rmo_2000_6 (2026-09-03): a proof the REPL and `lake build`
+    both accepted scored 0, "Challenge and solution theorem statement do not
+    match", because `import Mathlib` alone made `a ^ 2` elaborate through
+    `Monoid.npow` where the challenge's `import Mathlib.Data.Nat.Basic` used
+    `instPowNat`. With the original imports kept, `instPowNat` raised above
+    the default instance and numeral exponents typed, the comparator passes."""
 
-    body = "\n".join(
-        line for line in source.splitlines() if not line.lstrip().startswith("import ")
-    ).strip()
+    lines = source.splitlines()
+    imports: list[str] = []
+    for line in lines:
+        if line.lstrip().startswith("import ") and line.strip() not in imports:
+            imports.append(line.strip())
+    body = "\n".join(line for line in lines if not line.lstrip().startswith("import ")).strip()
     if not body:
         return fallback
-    return "import Mathlib\n\n" + body + "\n"
+    if "import Mathlib" not in imports:
+        imports.append("import Mathlib")
+    if any(i != "import Mathlib" for i in imports):
+        if NAT_POW_LINE not in body:
+            body = NAT_POW_LINE + "\n\n" + body
+        body = type_exponents(body)
+    return "\n".join(imports) + "\n\n" + body + "\n"
 
 
 FENCE_LINE = re.compile(r"^\s*```.*$", re.MULTILINE)
@@ -227,7 +256,9 @@ def statement_headers(source: str) -> dict[str, str]:
 def statement_drift(challenge: str, candidate: str) -> list[str]:
     """Names the candidate dropped or reworded."""
 
-    original = statement_headers(challenge)
+    # the header the agent writes is the challenge's after normalise_imports
+    # (typed numeral exponents under narrow imports), so compare against that
+    original = statement_headers(normalise_imports(challenge, challenge))
     now = statement_headers(candidate)
     faults = []
     for name, header in original.items():

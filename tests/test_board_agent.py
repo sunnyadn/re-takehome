@@ -1484,3 +1484,27 @@ def test_a_declaration_with_proved_facts_does_not_restart_while_its_last_goal_ca
     assert "leaf_restart" in kinds
     first_restate = kinds.index("restate") if "restate" in kinds else 10 ** 6
     assert kinds.index("leaf_restart") < first_restate
+
+
+def test_the_challenge_imports_are_kept_and_numeral_exponents_typed_when_they_are_narrow():
+    # Measured on rmo_2000_6 (one56a, 2026-09-03): the REPL and lake build
+    # accepted the proof; the comparator scored 0 because under `import Mathlib`
+    # `a ^ 2` elaborates through Monoid.npow, under the challenge's own imports
+    # through instPowNat. Verified with the real comparator: original imports +
+    # import Mathlib + `attribute [instance 2000] instPowNat` + `^ (2 : ℕ)` passes.
+    from submission.agent import normalise_imports, type_exponents
+    narrow = ("import Mathlib.Data.Nat.Basic\nimport Mathlib.Order.Bounds.Basic\n\n"
+              "theorem t (a b : ℕ) : 2000 ∣ a ^ 2 * b ^ 5 → 10 ≤ a * b := by\n  sorry\n")
+    out = normalise_imports(narrow, narrow)
+    assert out.startswith("import Mathlib.Data.Nat.Basic\nimport Mathlib.Order.Bounds.Basic\nimport Mathlib\n\n"
+                          "attribute [instance 2000] instPowNat\n\n")
+    assert "2000 ∣ a ^ (2 : ℕ) * b ^ (5 : ℕ) → 10 ≤ a * b := by" in out
+    assert normalise_imports(out, out) == out  # idempotent
+    from submission.agent import statement_drift
+    assert statement_drift(narrow, out) == []   # the agent's own grader accepts its header
+    assert statement_drift(narrow, out.replace("10 ≤ a * b", "9 ≤ a * b"))
+    full = "import Mathlib\n\ntheorem t (a : ℕ) : a ^ 2 = a * a := by\n  sorry\n"
+    assert normalise_imports(full, full) == full  # a full-Mathlib challenge is untouched
+    # exponents that are not numerals, and proof bodies, are left alone
+    assert type_exponents("theorem t : 2 ^ n = 2 ^ n := by\n  have : 3 ^ 2 = 9 := by norm_num\n  rfl\n") \
+        == "theorem t : 2 ^ n = 2 ^ n := by\n  have : 3 ^ 2 = 9 := by norm_num\n  rfl\n"
