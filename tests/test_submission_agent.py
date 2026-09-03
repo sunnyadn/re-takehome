@@ -162,9 +162,32 @@ def test_surplus_lines_offsets_by_import_count():
              "  trivial", "  norm_num"]
     source = "\n".join(lines) + "\n"
     surplus = lines.index("  norm_num") + 1
-    messages = [{"severity": "error", "pos": {"line": 4},
+    # Lean sees the file without its 2 import lines and reports line 4;
+    # ImportAwareLean hands it on as 5 (calibrated for one import line), and
+    # surplus_lines maps that back to file line 6.
+    messages = [{"severity": "error", "pos": {"line": 5},
                  "data": "No goals to be solved"}]
     assert agent_mod.surplus_lines(messages, source) == [surplus]
+
+
+def test_import_aware_lean_shifts_positions_by_the_extra_import_lines():
+    # Measured on rmo_2000_6 (h59a, 2026-09-03 09:50Z): with the challenge's
+    # two imports kept plus import Mathlib, every goal read as empty and the
+    # run stopped after 25 s with "no goal left to work on": the REPL client
+    # strips import lines and the board was calibrated for exactly one.
+    import asyncio
+    from re_harness.lean import LeanCheck
+
+    class Raw:
+        async def check_file(self, source, timeout_s=None):
+            return LeanCheck(False, [{"severity": "error", "pos": {"line": 4}, "endPos": {"line": 5},
+                                      "data": "unsolved goals\n⊢ True"}], True, False, 1)
+    lean = agent_mod.ImportAwareLean(Raw())
+    three = "import A\nimport B\nimport Mathlib\n\ntheorem t : True := by\n  sorry\n"
+    one = "import Mathlib\n\ntheorem t : True := by\n  sorry\n"
+    assert asyncio.run(lean.check_file(three)).messages[0]["pos"]["line"] == 6
+    assert asyncio.run(lean.check_file(three)).messages[0]["endPos"]["line"] == 7
+    assert asyncio.run(lean.check_file(one)).messages[0]["pos"]["line"] == 4
 
 
 def test_surplus_lines_ignores_other_errors():

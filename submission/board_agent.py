@@ -21,6 +21,7 @@ from submission.agent import (
     FEEDBACK_CHARS,
     Config,
     Ledger,
+    ImportAwareLean,
     answer_names,
     declared_names,
     format_messages,
@@ -1151,6 +1152,7 @@ class BoardAgent(FrameworkAgent):
         return ("holds" if tries or given or "holds" in reply else "unverified"), {}
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
+        services.lean = ImportAwareLean(services.lean)
         cfg = self.config
         started = time.monotonic()
         deadline = started + cfg.last_turn_start_s

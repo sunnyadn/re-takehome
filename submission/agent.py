@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import dataclasses
 import re
 import time
 from dataclasses import dataclass, field
@@ -422,6 +423,37 @@ IMPORT_LINE = re.compile(r"^\s*import\s")
 NO_GOALS = "no goals to be solved"
 
 
+def import_lines(source: str) -> int:
+    return sum(1 for l in source.splitlines() if IMPORT_LINE.match(l))
+
+
+class ImportAwareLean:
+    """The REPL client strips every import line before Lean sees the file, so
+    Lean's positions are short by that many lines; everything here was
+    calibrated for one. Positions come back shifted for the others."""
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    async def check_file(self, source: str, timeout_s: Any = None) -> Any:
+        check = await self._inner.check_file(source, timeout_s=timeout_s)
+        extra = import_lines(source) - 1
+        if extra <= 0 or not check.messages:
+            return check
+        shifted = []
+        for m in check.messages:
+            m = dict(m)
+            for key in ("pos", "endPos"):
+                at = m.get(key)
+                if isinstance(at, dict) and isinstance(at.get("line"), int):
+                    m[key] = dict(at, line=at["line"] + extra)
+            shifted.append(m)
+        return dataclasses.replace(check, messages=shifted)
+
+
 def surplus_lines(messages: Sequence[dict[str, Any]], source: str) -> list[int]:
     """Source lines holding a tactic that ran after its goal was closed.
 
@@ -433,8 +465,10 @@ def surplus_lines(messages: Sequence[dict[str, Any]], source: str) -> list[int]:
         if m.get("severity") != "error" or NO_GOALS not in str(m.get("data", "")).lower():
             continue
         reported = (m.get("pos") or {}).get("line")
-        if reported and 1 <= int(reported) <= len(kept):
-            out.add(kept[int(reported) - 1])
+        if reported:
+            reported = int(reported) - (import_lines(source) - 1)   # ImportAwareLean shifted it
+        if reported and 1 <= reported <= len(kept):
+            out.add(kept[reported - 1])
     return sorted(out)
 
 
@@ -466,8 +500,10 @@ def source_lines(
         if pattern is not None and not pattern.search(str(m.get("data", ""))):
             continue
         reported = (m.get("pos") or {}).get("line")
-        if reported and 1 <= int(reported) <= len(kept):
-            out.append(kept[int(reported) - 1])
+        if reported:
+            reported = int(reported) - (import_lines(source) - 1)   # ImportAwareLean shifted it
+        if reported and 1 <= reported <= len(kept):
+            out.append(kept[reported - 1])
     return sorted(set(out))
 
 
