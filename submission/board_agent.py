@@ -370,7 +370,7 @@ NAME_PROBE = """open Lean Elab Command in
   for w in wanted do
     let toks := (((w.splitOn ".").flatMap (·.splitOn "_")).filter (fun t => t.length > 1)).eraseDups
     let tail := (w.splitOn ".").getLast!
-    let need := max 1 (toks.length - 1)
+    let need := if toks.length ≤ 2 then toks.length else toks.length - 1
     let mut hits : Array (Nat × Nat × Name) := #[]
     for (n, s) in names do
       let hit := toks.foldl (fun acc t => if (s.splitOn t).length > 1 then acc + 1 else acc) 0
