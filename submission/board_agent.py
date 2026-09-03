@@ -358,7 +358,7 @@ def binder_names(group: str) -> list[str]:
     return parts[0].split() if parts else []
 
 
-UNKNOWN_NAME = re.compile(r"[Uu]nknown (?:constant|identifier) `([^`]+)`")
+UNKNOWN_NAME = re.compile(r"(?:[Uu]nknown (?:constant|identifier)|environment does not contain) `([^`]+)`")
 # Lean lists, for each misspelt library name, the declarations whose last
 # component shares its tokens, with their types. One CommandElabM pass over
 # the environment; nothing is assumed about which names exist.

@@ -1127,6 +1127,10 @@ def test_a_misspelt_library_name_comes_back_with_the_nearest_real_ones():
     from submission.board_agent import library_names
     assert library_names([{"data": "Unknown identifier `x`"}, {"data": "Unknown identifier `h_k`"},
                           {"data": "Unknown identifier `k.succ`"}], "k x : ℕ\n⊢ True") == []
+    # a field access that does not resolve names the constant Lean looked for
+    assert library_names([{"data": "Invalid field `dvd_pow`: The environment does not contain "
+                                   "`Irreducible.dvd_pow`, so it is not possible"}], "⊢ True") \
+        == ["Irreducible.dvd_pow"]
 
 
 def test_the_crux_opens_two_routes_and_the_second_can_be_the_one_that_closes():
