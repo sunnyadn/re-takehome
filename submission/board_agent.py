@@ -728,6 +728,25 @@ def inflated(before: str, after: str) -> float:
     return len(now_text) / was
 
 
+def inherit(old: Sequence[Goal], new: Sequence[Goal], tables: Sequence[dict]) -> None:
+    """A goal whose key vanished because a fact was added above it keeps its
+    history: the one new goal of the same declaration and target whose
+    hypotheses contain the old ones takes over its entries in each table."""
+    kept = {g.key for g in new}
+    fresh = [g for g in new if g.key not in {o.key for o in old}]
+    for g in old:
+        if g.key in kept:
+            continue
+        hyps, target = set(hypotheses(g.text)), target_of(g.text)
+        matches = [n for n in fresh if n.decl == g.decl and target_of(n.text) == target
+                   and hyps <= set(hypotheses(n.text))]
+        if len(matches) != 1:
+            continue
+        for table in tables:
+            if g.key in table and matches[0].key not in table:
+                table[matches[0].key] = table[g.key]
+
+
 def is_closed(goal_text: str) -> bool:
     """A goal whose target names none of its hypotheses and binds nothing: a
     closed proposition, decided by evaluation alone. Measured on rmo_2000_6:
@@ -1137,6 +1156,7 @@ class BoardAgent(FrameworkAgent):
             bid = board.bid
             fresh = await settle(candidate)
             fresh.bid = bid
+            inherit(board.goals, fresh.goals, (tries, said, plans))
             _, _, dear, broken = classify(fresh.messages)
             if broken or dear:
                 if fresh.text != sound.get(bid, ""):
