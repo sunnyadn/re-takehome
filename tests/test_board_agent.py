@@ -377,6 +377,20 @@ def test_a_step_that_makes_every_check_slow_is_refused():
                                      FakeServices(lean, llm)))
     assert {"stage": "slow", "ms": 25000, "was": 900} in result.metadata["events"]
     assert "heavy_tactic" not in result.solution and result.metadata["accepted_by_repl"] is True
+    # The cap is on the whole file too: a step that adds 4 s to a 24 s file is
+    # refused (the judge's cold compile on 4 cores has 180 s; 24 s warm timed out).
+    class HeavyLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            check = await super().check_file(source)
+            ms = 28_000 if "mild_tactic" in source else 24_000
+            return LeanCheck(check.accepted, check.messages, check.has_sorry, False, ms)
+    lean = HeavyLean()
+    llm = ScriptLLM({"model-a": ["have key : P := by mild_tactic", "have key : P := by trivial", "exact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert {"stage": "slow", "ms": 28000, "was": 24000} in result.metadata["events"]
+    assert "mild_tactic" not in result.solution
 
 
 def test_a_goal_rejected_twice_is_never_probed_for_refutation():

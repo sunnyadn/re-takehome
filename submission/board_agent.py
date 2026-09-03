@@ -152,6 +152,10 @@ def check_timeout_s(base_ms: int) -> int:
 # check from 1s to 38s, and the run then lost 5 minutes to a 120s timeout and
 # the container restart that follows it.
 SLOW_STEP_MS = 10_000
+# The whole file, not one step: the comparator recompiles cold on 4 cores in
+# 180 s, and a 24 s warm p09 file timed out there. Measured on rmo_2000_2
+# (4-core pod): 318 checks, 2229 s of 2645 s in Lean, 5 timeouts, 5 restarts.
+CHECK_CAP_MS = 25_000
 # There is no refutation probe. Proving `¬ target` from the context by
 # decide/omega only refutes the goal when the context is consistent, and a
 # proof by contradiction lives in an inconsistent one: on p09 the probe
@@ -1579,11 +1583,14 @@ class BoardAgent(FrameworkAgent):
                 return None, TIMED_OUT
             if expensive and not failures:
                 return None, BUDGET_RETRY
-            if not failures and nxt.ms - base.ms > SLOW_STEP_MS:
+            over_cap = nxt.ms > CHECK_CAP_MS and nxt.ms - base.ms > SLOW_STEP_MS // 5
+            if not failures and (nxt.ms - base.ms > SLOW_STEP_MS or over_cap):
                 events.append({"stage": "slow", "ms": nxt.ms, "was": base.ms})
                 return None, (f"that step makes the file take {nxt.ms // 1000}s to "
                               f"check, up from {base.ms // 1000}s; every later step "
-                              "pays that. Use a cheaper tactic: a targeted rw or "
+                              "pays that" + (f", and past {CHECK_CAP_MS // 1000}s the judge's "
+                              "cold compile times out" if over_cap else "") +
+                              ". Use a cheaper tactic: a targeted rw or "
                               "exact, not simp with a wide lemma set or decide")
             if failures or expensive:
                 # Every other open goal is an `unsolved goals` error too; the
