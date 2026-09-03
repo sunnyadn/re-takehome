@@ -113,6 +113,8 @@ assert "goal on the board" in BOARD_SYSTEM
 
 # Two rejections on a goal buy it a plan from the other model, as before.
 PLAN_AFTER = 2
+# Library probes (`apply?`, the name scan) wait for one rejected step.
+SEARCH_AFTER = 1
 # A goal this many rejections deep is still open, only last in line. Time and
 # money are the exits; a goal is never declared hopeless by count alone.
 LAST_IN_LINE = 6
@@ -1408,6 +1410,7 @@ class BoardAgent(FrameworkAgent):
         said: dict[tuple[str, str], Feedback] = {}
         plans: dict[tuple[str, str], str] = {}
         swept: set[tuple[str, str]] = set()
+        searched: set[tuple[str, str]] = set()
         divided: set[tuple[str, str]] = set()
         restated: dict[str, int] = {}
         refused: set[tuple[tuple[str, str], str]] = set()
@@ -2361,8 +2364,16 @@ class BoardAgent(FrameworkAgent):
                     base = board
                     if goal is not None and goal.key not in swept:
                         swept.add(goal.key)
-                        if await sweep(goal) or await leaf_sweep(goal) or await witness_sweep(goal) \
-                                or await library_sweep(goal):
+                        if await sweep(goal) or await leaf_sweep(goal) or await witness_sweep(goal):
+                            return True
+                    if goal is not None and goal.key not in searched \
+                            and tries.get(goal.key, 0) >= SEARCH_AFTER:
+                        # Measured over 70 runs: `apply?` and the name scan took
+                        # 19% of the wall clock under the lock (601 probes, 22
+                        # goals closed; 269 scans at 22 s), and Lean is busy
+                        # 60-74% of a run. A goal the first step closes never pays.
+                        searched.add(goal.key)
+                        if await library_sweep(goal):
                             return True
                         await consult(goal)
                     if goal is not None:

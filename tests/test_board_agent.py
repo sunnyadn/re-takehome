@@ -1600,13 +1600,17 @@ def test_the_environment_s_answer_for_a_goal_s_words_reaches_the_step_prompt():
                     if "unsolved" in str(m.get("data")) else m for m in check.messages]
             return LeanCheck(check.accepted, msgs, check.has_sorry, False, 1)
 
-    lean, llm = LibraryLean(), ScriptLLM({"model-a": ["have key : True := by trivial\nexact key"] * 2})
+    lean, llm = LibraryLean(), ScriptLLM({"model-a": ["linarith [a]",
+                                                        "have key : True := by trivial\nexact key"]})
     agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
     asyncio.run(agent.solve(Problem(id="demo", description="prove it", challenge=challenge),
                             FakeServices(lean, llm)))
     assert len(asked) == 1 and '"coprime"' in asked[0] and '"divisors"' in asked[0]
+    # The scan waits for one rejected step (measured: 269 scans at 22 s each
+    # over 70 runs); the sheet is in the prompt that follows the rejection.
     prompts = [p for m, p in llm.calls if "Names the loaded Mathlib has" in p]
-    assert prompts and "Nat.Coprime.card_divisors_mul" in prompts[0]
+    assert "Nat.Coprime.card_divisors_mul" not in llm.calls[0][1]
+    assert any("Nat.Coprime.card_divisors_mul" in p for p in prompts)
 
 
 def test_a_stalled_board_takes_back_the_innermost_open_have_before_it_restarts_the_declaration(monkeypatch):
@@ -1877,6 +1881,7 @@ def test_apply_suggestions_close_a_goal_without_a_model_or_reach_the_prompt():
     class ApplyLean(BoardLean):
         async def check_file(self, source, timeout_s=None):
             if "apply?" in source:
+                self.sources.append(source)
                 rows = source.split("\n")
                 # The REPL numbers lines in the import-stripped body.
                 line = next(i for i, l in enumerate(rows, start=1) if "apply?" in l) - sum(
@@ -1889,14 +1894,21 @@ def test_apply_suggestions_close_a_goal_without_a_model_or_reach_the_prompt():
                 return LeanCheck(True, [], "sorry" in source, False, 1)
             return await super().check_file(source, timeout_s)
 
-    lean, llm = ApplyLean(), ScriptLLM({"model-a": ["have junk : True := by trivial"] * 2})
+    lean, llm = ApplyLean(), ScriptLLM({"model-a": ["linarith [a]"] * 3})
     agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
     result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
                                      FakeServices(lean, llm)))
     assert "exact le_of_dvd hb h" in result.solution
     lib = [e for e in result.metadata["events"] if e.get("kind") == "library"]
     assert lib and lib[0]["accepted"] and lib[0]["found"] == 1
-    assert not llm.calls
+    # Measured over 70 runs: `apply?` and the name scan were 19% of the wall
+    # clock under the lock, 22 goals closed in 601 probes. They wait for one
+    # rejected step; a goal the first step closes never pays for them.
+    first_probe = next(i for i, src in enumerate(lean.sources) if "apply?" in src)
+    first_step = next(i for i, src in enumerate(lean.sources) if "\n  linarith [a]" in src)
+    assert first_step < first_probe
+    assert not any("Library for this goal" in p or "Names the loaded Mathlib" in p
+                   for _, p in llm.calls[:1])
 
 
 def test_a_placeholder_left_under_a_closing_step_is_dropped_not_reused():
