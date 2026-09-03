@@ -685,6 +685,31 @@ def withdraw_only(text: str, goal: Goal) -> tuple[str, str]:
     return "\n".join(lines[:above] + middle + rest), head.group(2).strip()
 
 
+def settled_inside(text: str, goal: Goal) -> int:
+    """Proved facts in the `have` enclosing the goal: sub-`have`s of that block
+    whose bodies hold no placeholder. What withdrawal would throw away."""
+    lines = text.split("\n")
+    above, head = enclosing_have(lines, goal)
+    if not head:
+        return 0
+    depth = len(head.group(1))
+    end = above + 1
+    while end < len(lines) and (not lines[end].strip()
+                                or len(lines[end]) - len(lines[end].lstrip()) > depth):
+        end += 1
+    count = 0
+    for i in range(above + 1, end):
+        m = HAVE_HEAD.match(lines[i])
+        if not m or i + 1 == goal.line:
+            continue
+        j, d = i + 1, len(m.group(1))
+        body = []
+        while j < end and (not lines[j].strip() or len(lines[j]) - len(lines[j].lstrip()) > d):
+            body.append(lines[j]); j += 1
+        if body and not any(l.strip() in ("sorry", "skip") for l in body):
+            count += 1
+    return count
+
 INFLATION = 3.0
 
 
@@ -1259,6 +1284,7 @@ class BoardAgent(FrameworkAgent):
 
         failed_at = 0
         known_names: dict[str, str] = {}
+        leaf_restarts: set[tuple[str, str]] = set()
         # What evaluation found for an existential goal that no closer finished.
         hints: dict[tuple[str, str], str] = {}
         # Every plan asked for a declaration, kept across restarts: the next
@@ -2031,7 +2057,16 @@ class BoardAgent(FrameworkAgent):
                     await apply(model, here, edits)
                     still = board.find(goal.key)
                     if still is not None and tries.get(goal.key, 0) >= WITHDRAW_AFTER:
-                        await take_back(model, still)
+                        if settled_inside(board.text, still) >= 2 and still.key not in leaf_restarts:
+                            # Measured on rmo_2000_6 (win54): one stuck case took the
+                            # have with h2a, h5a and 2 closed cases down. The leaf
+                            # restarts once before proved work is withdrawn.
+                            leaf_restarts.add(still.key)
+                            tries.pop(still.key, None); said.pop(still.key, None); plans.pop(still.key, None)
+                            events.append({"kind": "leaf_restart", "by": model, "goal": still.text[-160:],
+                                           "settled": settled_inside(board.text, still)})
+                        else:
+                            await take_back(model, still)
                 return True
 
         try:

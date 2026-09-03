@@ -1417,3 +1417,29 @@ def test_an_existential_goal_with_a_decidable_body_gets_its_witness_from_evaluat
     assert not llm.calls  # closed before any model was asked
     found = [e for e in result.metadata["events"] if e.get("kind") == "witnesses"]
     assert found and found[0]["found"] == [["1", "10"]] and found[0]["accepted"] is True
+
+
+def test_a_stuck_leaf_inside_a_mostly_proved_have_is_restarted_before_the_have_is_withdrawn():
+    # Measured on rmo_2000_6 (win54, 08:43): `have hmin : 10 ≤ a * b` held h2a,
+    # h5a (both proved) and a 4-way case split with 2 cases closed; `inl.inl`
+    # failed 4 times and the whole have went, proved work included. The board
+    # then filled with `4 ≤ a + b`. A leaf whose have already holds proved facts
+    # is restarted once (tries, feedback and plan cleared) before withdrawal.
+    from submission.board_agent import settled_inside, Goal
+    text = ("import Mathlib\n\ntheorem demo : True := by\n"
+            "  have big : Q := by\n"
+            "    have p1 : P := by\n      trivial\n"
+            "    have p2 : P := by\n      trivial\n"
+            "    have p3 : P := by\n      sorry\n"
+            "    skip\n"
+            "  trivial\n")
+    assert settled_inside(text, Goal(11, "    ", "demo", "⊢ Q")) == 2
+    assert settled_inside(text, Goal(10, "      ", "demo", "⊢ P")) == 0  # inside p3: nothing proved there
+    assert settled_inside("import Mathlib\n\ntheorem demo : True := by\n  skip\n", Goal(4, "  ", "demo", "⊢ True")) == 0
+    # end to end: two proved facts inside `big`, its own goal fails 4 times → restart, not withdraw
+    script = ["have big : Q := by\n  have p1 : P := by\n    trivial\n  have p2 : P := by\n    trivial\n  sorry\nexact big"]
+    script += [f"linarith [x{i}]" for i in range(9)] + ["exact big", "exact big", "exact big"]
+    result, lean, llm, _ = run(ONE, {"model-a": script}, lines=("model-a",))
+    kinds = [e.get("kind") for e in result.metadata["events"]]
+    assert "leaf_restart" in kinds
+    assert kinds.index("leaf_restart") < (kinds.index("withdraw") if "withdraw" in kinds else 10 ** 6)
