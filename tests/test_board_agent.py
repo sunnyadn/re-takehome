@@ -1364,6 +1364,10 @@ def test_a_goal_about_divisibility_carries_the_current_mathlib_names_before_any_
     assert "Nat.Prime.dvd_mul" in sheet and "Nat.le_of_dvd" in sheet
     assert sheet_for("x : ℕ\n⊢ x + 1 = 1 + x") == ""
     assert len(sheet.splitlines()) <= 16
+    # a comparison and a power in different conjuncts is not a power inequality
+    both = sheet_for("⊢ IsLeast {n | ∃ a b, 0 < a ∧ 2000 ∣ a ^ 3 * b ^ 4 ∧ n = a * b} 10")
+    assert "Nat.pow_lt_pow_left" not in both and both.startswith("IsLeast S a is")
+    assert "Nat.pow_lt_pow_left" in sheet_for("⊢ (x + 2) ^ 3 < y ^ 3")
     # the fake Lean prints a goal as its declaration name, so the wiring is
     # checked with a sheet that answers every goal
     import submission.board_agent as ba

@@ -259,6 +259,9 @@ NOTES: tuple[tuple[re.Pattern[str], str], ...] = (
 # the first step to any goal whose vocabulary they fit. Every name and signature
 # below was printed by `#check` in the harness image; nothing is from memory.
 SHEETS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"IsLeast|IsGreatest|lowerBounds|upperBounds"),
+     "IsLeast S a is a ∈ S ∧ a ∈ lowerBounds S: `refine ⟨?_, ?_⟩`. Membership in a set-builder is its existential: `exact ⟨w₁, w₂, by norm_num, by norm_num, by decide, rfl⟩`.\n"
+     "The bound: `intro n hn` then `obtain ⟨a, b, ha, hb, h, rfl⟩ := hn` (Set.mem_setOf_eq). IsGreatest is the mirror with upperBounds."),
     (re.compile(r"∣"),
      "Nat.Prime.dvd_mul (hp : p.Prime) : p ∣ m * n ↔ p ∣ m ∨ p ∣ n\n"
      "Nat.Prime.dvd_of_dvd_pow (hp : p.Prime) : p ∣ m ^ n → p ∣ m ; Nat.dvd_of_pow_dvd : 1 ≤ k → p ^ k ∣ m → p ∣ m\n"
@@ -287,7 +290,7 @@ SHEETS: tuple[tuple[re.Pattern[str], str], ...] = (
      "Nat.factorial_succ (n) : (n + 1).factorial = (n + 1) * n.factorial ; Nat.factorial_pos ; Nat.factorial_le : m ≤ n → m.factorial ≤ n.factorial\n"
      "Nat.dvd_factorial : 0 < m → m ≤ n → m ∣ n.factorial ; Nat.Prime.dvd_factorial (hp) : p ∣ n.factorial ↔ p ≤ n\n"
      "Write Nat.factorial n or n.factorial (the ! notation needs `open Nat`); small values evaluate with `decide` or `norm_num [Nat.factorial]`."),
-    (re.compile(r"\^.*[<≤]|[<≤].*\^"),
+    (re.compile(r"\^[^∧∨,]*[<≤]|[<≤][^∧∨,]*\^"),
      "Nat.pow_lt_pow_left : a < b → n ≠ 0 → a ^ n < b ^ n ; Nat.pow_le_pow_left : a ≤ b → ∀ i, a ^ i ≤ b ^ i\n"
      "Nat.pow_lt_pow_right : 1 < a → m < n → a ^ m < a ^ n ; Nat.pow_le_pow_right : a > 0 → i ≤ j → a ^ i ≤ a ^ j ; Nat.lt_pow_self : 1 < a → n < a ^ n\n"
      "Nat.pow_lt_pow_iff_left : n ≠ 0 → (a ^ n < b ^ n ↔ a < b) ; Nat.pow_le_pow_iff_left ; Nat.pow_left_injective : n ≠ 0 → Function.Injective (· ^ n) ; Nat.mul_self_le_mul_self_iff : m * m ≤ n * n ↔ m ≤ n\n"
@@ -299,9 +302,6 @@ SHEETS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"Coprime|gcd"),
      "Nat.coprime_primes (hp hq) : p.Coprime q ↔ p ≠ q ; Nat.Prime.coprime_iff_not_dvd (hp) : p.Coprime n ↔ ¬p ∣ n ; Nat.Coprime.pow (m n) : k.Coprime l → (k ^ m).Coprime (l ^ n)\n"
      "Nat.Coprime.dvd_of_dvd_mul_left : k.Coprime m → k ∣ m * n → k ∣ n ; Nat.Coprime.gcd_eq_one ; Nat.gcd_comm ; a closed Coprime such as Nat.Coprime 16 125 is `by norm_num`."),
-    (re.compile(r"IsLeast|IsGreatest|lowerBounds|upperBounds"),
-     "IsLeast S a is a ∈ S ∧ a ∈ lowerBounds S: `refine ⟨?_, ?_⟩`. Membership in a set-builder is its existential: `exact ⟨w₁, w₂, by norm_num, by norm_num, by decide, rfl⟩`.\n"
-     "The bound: `intro n hn` then `obtain ⟨a, b, ha, hb, h, rfl⟩ := hn` (Set.mem_setOf_eq). IsGreatest is the mirror with upperBounds."),
 )
 
 
