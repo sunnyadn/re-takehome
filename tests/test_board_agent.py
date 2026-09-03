@@ -42,6 +42,13 @@ class BoardLean:
             body = line.strip()
             if body.startswith("have "):
                 haves.append(body.split()[1])
+            if body == "intro loc":
+                haves.append("loc")
+            if body.startswith("have ") and " loc" in body and \
+                    not any(l.strip() == "intro loc" for l in source.split("\n")[:i - 1]):
+                messages.append({"severity": "error", "pos": {"line": i - 1},
+                                 "endPos": {"line": i - 1},
+                                 "data": "Unknown identifier `loc`"})
             if body.startswith("exact Nat."):
                 messages.append({"severity": "error", "pos": {"line": i - 1},
                                  "endPos": {"line": i - 1},
@@ -1167,3 +1174,18 @@ def test_a_branch_with_more_proved_facts_ranks_ahead_of_one_with_fewer_open_goal
     r = Board(rich, [Goal(7, "    ", "t", "⊢ R"), Goal(8, "  ", "t", "⊢ True")])
     p = Board(poor, [Goal(2, "  ", "t", "⊢ True")])
     assert sorted([p, r], key=lambda b: b.score)[0] is r
+
+
+def test_a_fact_about_a_variable_bound_inside_the_have_stays_inside_it():
+    # Measured on rmo_2000_6 (one44a): the crux sat inside `have h_minimal : ∀ n,
+    # ... := by intro n h; rcases h with ⟨a, b, ...⟩`, and every fact about a
+    # and b was lifted above it, where a and b do not exist: "Unknown identifier
+    # a", step refused. Lean says where the fact can live; lifting stops there.
+    result, lean, llm, _ = run(ONE, {
+        "model-a": ["have outer : True := by\n  intro loc\n  sorry\nexact outer",
+                    "have inner : uses loc := by\n  sorry\nexact inner",
+                    "exact outer", "exact outer"],
+    }, lines=("model-a",))
+    assert "have inner" in result.solution
+    assert result.solution.index("intro loc") < result.solution.index("have inner")
+    assert result.metadata["accepted_by_repl"] is True

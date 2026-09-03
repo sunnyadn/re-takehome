@@ -1443,28 +1443,42 @@ class BoardAgent(FrameworkAgent):
                 names = ", ".join(f"`{n}`" for _, n in dup)
                 return None, (f"every fact in that step is already on the board ({names}); "
                               "prove this goal from those facts, or close it directly")
-            outer, head = chain[-1]
-            lifted = [reindent(f, head.group(1)) for f, _ in fresh]
-            text = "\n".join(lines[:outer] + lifted + lines[outer:])
-            shift = sum(f.count("\n") + 1 for f in lifted)
-            moved = Goal(goal.line + shift, goal.indent, goal.decl, goal.text)
-            staged = Board(text, base.goals, base.messages, base.accepted, base.bid, base.ms)
-            if rest:
-                nxt, why = await advance(staged, moved, rest, author)
+            # Outermost first; a target where Lean does not know one of the
+            # goal's own names is too far out, and the next `have` in is tried.
+            # Measured on rmo_2000_6: the crux sat under `have h_minimal : ∀ n, ...
+            # := by intro n h; rcases h with ⟨a, b, ...⟩`, and every fact about
+            # a and b was lifted to where they do not exist.
+            local = set(hypotheses(goal.text))
+            nxt, why, depth, head = None, "", 0, None
+            for depth in range(len(chain), 0, -1):
+                outer, head = chain[depth - 1]
+                lifted = [reindent(f, head.group(1)) for f, _ in fresh]
+                text = "\n".join(lines[:outer] + lifted + lines[outer:])
+                shift = sum(f.count("\n") + 1 for f in lifted)
+                moved = Goal(goal.line + shift, goal.indent, goal.decl, goal.text)
+                staged = Board(text, base.goals, base.messages, base.accepted, base.bid, base.ms)
+                if rest:
+                    nxt, why = await advance(staged, moved, rest, author)
+                else:
+                    nxt, why = await look(text, base), ""
+                    if classify(nxt.messages)[3]:
+                        nxt, why = None, format_messages(classify(nxt.messages)[3])[:FEEDBACK_CHARS]
+                    elif nxt is not None:
+                        bad = await audit(author, base, nxt)
+                        if bad:
+                            nxt, why = None, bad
+                if nxt is not None or not any(n in local for n in UNKNOWN_NAME.findall(why)):
+                    break
             else:
-                nxt, why = await look(text, base), ""
-                if classify(nxt.messages)[3]:
-                    nxt, why = None, format_messages(classify(nxt.messages)[3])[:FEEDBACK_CHARS]
-                elif nxt is not None:
-                    bad = await audit(author, base, nxt)
-                    if bad:
-                        nxt, why = None, bad
+                depth = 0
+            if nxt is None and depth == 0:
+                return await advance(base, goal, block, author)
             if nxt is None:
                 return None, (why + f"\n(a fact stated inside `{head.group(2).strip()[:60]}` "
                               "is posted before that `have`, at the top of the proof; it can "
                               "only use the theorem's variables and the facts above it)")
             events.append({"kind": "lifted", "by": author, "facts": len(lifted),
-                           "dup": len(dup), "from_depth": len(chain)})
+                           "dup": len(dup), "from_depth": len(chain), "to_depth": depth})
             if dup:
                 said[goal.key] = Feedback(author, "already on the board: " + ", ".join(
                     f"`{n}`" for _, n in dup), "lifted")
