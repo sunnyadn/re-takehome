@@ -1626,3 +1626,32 @@ def test_the_audit_switch_lets_a_false_claim_in_when_off():
         Problem(id="demo", description="prove it", challenge=challenge),
         FakeServices(lean, llm)))
     assert not any(e.get("kind") == "audit" for e in result.metadata["events"])
+
+
+def test_a_false_claim_is_refuted_by_evaluation_before_any_auditor_is_asked():
+    # Measured on rmo_2000_2: `(x+2)^3 < y^3 ↔ x ≥ 9` is false at x = 9, y = 11,
+    # the auditor never named those values, and the board built on it for an hour.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+
+    class SearchLean(WitnessLean):
+        async def check_file(self, source, timeout_s=None):
+            if "List.range" in source and "decide (" in source and "¬ (" in source:
+                self.sources.append(source)
+                return LeanCheck(True, [{"severity": "info", "data": "[[0]]"}], False, False, 1)
+            return await super().check_file(source, timeout_s)
+
+    lean, llm = SearchLean(), ScriptLLM({
+        "model-a": ["have bad : x = 3 := by\n  sorry\nlinarith",
+                    "have key : True := by trivial\nexact key",
+                    "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    audits = [e for e in result.metadata["events"] if e.get("kind") == "audit"]
+    assert audits and audits[0]["verdict"] == "refuted" and audits[0]["by"] == "evaluation"
+    assert audits[0]["values"] == {"x": "0"}
+    assert not any(p.startswith("A goal inside a Lean 4 proof, exactly as Lean states it") for _, p in llm.calls)
+    assert "have bad" not in result.solution
+    search = [src for src in lean.sources if "List.range" in src][0]
+    assert "(x < 2)" in search and "¬ (x = 3)" in search

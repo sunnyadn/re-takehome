@@ -918,6 +918,31 @@ def read_witnesses(messages: Sequence[dict[str, Any]]) -> list[list[str]]:
     return []
 
 
+PROP_SIGNS = re.compile(r"[=<≤>≥≠∣∧∨¬↔]|\bPrime\b|\bCoprime\b|\bEven\b|\bOdd\b")
+
+
+def counterexample_search(groups: Sequence[str], target: str) -> tuple[list[str], str] | None:
+    """The stated goal as a decidable search: every ℕ binder ranges, every
+    hypothesis binder filters, the target is negated. None if a binder is
+    neither (a real, a function, a quantified fact), which evaluation cannot walk."""
+    names, hyps = [], []
+    for g in groups:
+        parts = split_top(g[1:-1], ":")
+        if len(parts) != 2:
+            return None
+        typ = parts[1].strip()
+        if typ == "ℕ":
+            names += parts[0].split()
+        elif PROP_SIGNS.search(typ) and not re.search(r"[∀∃λ→]|\bfun\b", typ):
+            hyps.append(typ)
+        else:
+            return None
+    if not names or len(names) > 3 or re.search(r"[∀∃λ→]|\bfun\b", target):
+        return None
+    body = " ∧ ".join([f"({h})" for h in hyps] + [f"¬ ({target.strip()})"])
+    return names, body
+
+
 def is_closed(goal_text: str) -> bool:
     """A goal whose target names none of its hypotheses and binds nothing: a
     closed proposition, decided by evaluation alone. Measured on rmo_2000_6:
@@ -1182,6 +1207,19 @@ class BoardAgent(FrameworkAgent):
                 text = drop_declaration(text, name)
         return text
 
+    async def _enumerated(self, prefix: str, groups: Sequence[str], target: str,
+                          services: Services) -> dict[str, str] | None:
+        """Values from evaluation that satisfy every hypothesis and break the
+        claim, over 0..WITNESS_BOUND-1, before any model is asked. Measured on
+        rmo_2000_2: `(x+2)^3 < y^3 ↔ x ≥ 9` is false at x = 9, y = 11 and poisoned the board."""
+        search = counterexample_search(groups, target)
+        if not search:
+            return None
+        names, body = search
+        check = await services.lean.check_file(witness_search_file(prefix, names, body), timeout_s=60)
+        rows = read_witnesses(check.messages)
+        return dict(zip(names, rows[0])) if rows and len(rows[0]) == len(names) else None
+
     async def _audit_root(self, text: str, decl: str, services: Services,
                           ledger: Ledger, term: str = "") -> tuple[str, dict[str, str]]:
         """A declaration's statement tried against a witness: Lean states its
@@ -1217,6 +1255,9 @@ class BoardAgent(FrameworkAgent):
         for values in tries:
             if await breaks(values):
                 return "refuted", values
+        found = await self._enumerated(prefix, groups, target, services)
+        if found and await breaks(found):
+            return "refuted", found
         auditor = next((m for m in self.config.lines if not narrates(m)), self.config.lines[0])
         reply, _ = await self._call(auditor, audit_prompt(stmt, prefix.replace("import Mathlib", "")),
                                     AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM)
@@ -1569,8 +1610,13 @@ class BoardAgent(FrameworkAgent):
             prefix = nxt.text[:first[0]] if first else ""
             for sub in subjects:
                 sub["parsed"] = split_statement(sub["stmt"]) if sub.get("stmt") else None
+            # Evaluation first: a claim it breaks needs no auditor.
+            for sub in subjects:
+                sub["found"] = None
+                if sub["parsed"] and sub["parsed"][0]:
+                    sub["found"] = await self._enumerated(prefix, *sub["parsed"], services)
             # No binders, no question: the witness file alone decides a closed claim.
-            asked = [sub for sub in subjects if sub["parsed"] and sub["parsed"][0]]
+            asked = [sub for sub in subjects if sub["parsed"] and sub["parsed"][0] and not sub["found"]]
             replies = await asyncio.gather(*(self._call(
                 other, audit_prompt(sub["stmt"], prefix.replace("import Mathlib", "")),
                 AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM) for sub in asked))
@@ -1582,7 +1628,7 @@ class BoardAgent(FrameworkAgent):
                     groups, target = sub["parsed"]
                     reply, stopped = replies[asked.index(sub)] if sub in asked else ("", "")
                     names = {n for grp in groups for n in binder_names(grp)}
-                    given = read_witness(reply)
+                    given = sub["found"] if sub["found"] else read_witness(reply)
                     values = {n: v for n, v in (given or {}).items() if n in names}
                     verdict = "unverified"
                     if given is None and stopped != "length" and "holds" in reply:
@@ -1593,8 +1639,8 @@ class BoardAgent(FrameworkAgent):
                             timeout_s=CHECK_TIMEOUT_FLOOR_S)
                         if check.accepted:
                             verdict = "refuted"
-                events.append({"kind": "audit", "by": other, "goal": target[:100],
-                               "verdict": verdict, "values": values})
+                events.append({"kind": "audit", "by": "evaluation" if sub.get("found") else other,
+                               "goal": target[:100], "verdict": verdict, "values": values})
                 if verdict == "refuted":
                     stmt = sub["what"] or f"⊢ {target}"
                     if sub["claim"]:
