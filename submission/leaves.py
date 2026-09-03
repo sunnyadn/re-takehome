@@ -9,7 +9,10 @@ import re
 
 NUM = re.compile(r"^\d+$")
 VAR = re.compile(r"^[A-Za-z_][\w']*$")
-FINISH = "first | omega | (norm_num at *; done) | nlinarith | simp_all"
+# Every alternative must close the goal: `simp_all` alone can rewrite a
+# hypothesis, count as success, and leave the goal open (measured on the
+# rmo_2001_2 case leaves).
+FINISH = "first | omega | (norm_num at *; done) | nlinarith | (simp_all; done)"
 LEAF_CAP = 6
 CASES_MAX = 40
 # One check's elaboration is bounded: a candidate that does not finish fast is not one.
@@ -93,11 +96,46 @@ def _shifts(rhs: str, n: int) -> list[str]:
     return out
 
 
+def _primes(hyps) -> list[str]:
+    return [n for n, t in hyps if re.match(r"^Nat\.Prime [A-Za-z_][\w']*$", t)]
+
+
+def _prime_facts(hyps) -> str:
+    """`2 ≤ p` for every `hp : Nat.Prime p`: what omega and nlinarith need and
+    a printed context never carries."""
+    return "".join(f"have hge_{n} := Nat.Prime.two_le {n}\n" for n in _primes(hyps))
+
+
+def _solved_subtractions(hyps) -> list[tuple[str, str, str]]:
+    """(name, `v = t₁ + t₂ + (D)`, D) for a hypothesis `v - t₁ - t₂ = D`: omega
+    solves it once D is known positive and the rest of the context is out of
+    the way (measured: a nonlinear hypothesis sharing the subtraction made
+    omega give up on a linear fact it proves alone)."""
+    out = []
+    for n, t in hyps:
+        m = re.match(r"^([A-Za-z_][\w']*)((?: - [^-=()]+)+) = (.+)$", t)
+        if m:
+            terms = [x.strip() for x in m.group(2).split(" - ") if x.strip()]
+            d = m.group(3).strip()
+            out.append((n, f"{m.group(1)} = {' + '.join(terms)} + ({d})", d))
+    return out
+
+
+def _finish(target: str) -> str:
+    """The closing chain; a disjunction also tries each disjunct."""
+    if "∨" not in target:
+        return FINISH
+    return (FINISH + " | (left; nlinarith) | (right; left; constructor <;> nlinarith)"
+            " | (right; right; constructor <;> nlinarith) | (right; nlinarith)")
+
+
 def leaf_candidates(goal_text: str) -> list[str]:
     hyps = _hyps(goal_text)
     target = _target(goal_text)
     bounds = _bounds(hyps)
     powers = _powers(hyps)
+    primes = _prime_facts(hyps)
+    finish = _finish(target)
     # The tightest bounds first; `0 < v` carries nothing a subtraction needs.
     lowers = sorted(((n, v, c) for n, v, kind, c in bounds if kind == "lower" and c >= 2),
                     key=lambda b: -b[2])
@@ -139,16 +177,27 @@ def leaf_candidates(goal_text: str) -> list[str]:
     for hn, t in hyps:
         d = re.match(r"^([A-Za-z_][\w']*) = (.+)$", t)
         if d and not NUM.match(d.group(2).strip()) and re.search(r"[A-Za-z]", d.group(2)) \
-                and not re.search(r"[∨∧↔→∀∃∣]", goal_text):
-            out.append(f"subst {hn}\n{'nat_sub_exact' + chr(10) if '-' in goal_text else ''}"
-                       "first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)")
+                and not re.search(r"[↔→∀∃∣]", goal_text):
+            out.append(f"{primes}subst {hn}\n{'nat_sub_exact' + chr(10) if '-' in goal_text else ''}"
+                       + finish)
             break
-    if "-" in goal_text and not re.search(r"[∨∧↔→∀∃∣]", target):
-        out.append("nat_sub_exact\nfirst | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)")
+    # A variable defined through ℕ subtraction, `m - p - q = D`: solve for it and
+    # substitute. Measured on rmo_2001_2 (v7.79): divisor_cases left eight such
+    # cases and every model reply on them failed at the truncated subtraction.
+    for hn, eq, d in _solved_subtractions(hyps):
+        if not re.search(r"[↔→∀∃]", target):
+            keep = " ".join([hn, "hpos_d"] + [f"hge_{n}" for n in _primes(hyps)])
+            out.append(f"{primes}have hpos_d : 0 < ({d}) := by first | omega | positivity | nlinarith\n"
+                       f"have hsolve : {eq} := by first | omega | (clear * - {keep}; omega)\n"
+                       f"subst hsolve\n{finish}")
+            break
+    if "-" in goal_text and not re.search(r"[↔→∀∃∣]", target):
+        out.append(f"{primes}nat_sub_exact\n{finish}")
     # d ∣ N: one goal per divisor, each finished mechanically.
     for n, t in hyps:
         if re.match(r"^.+ ∣ .+$", t) and re.search(r"\d", t):
-            out.append(f"divisor_cases {n} <;> {FINISH}")
+            out.append(f"divisor_cases {n} <;> ({primes.replace(chr(10), '; ')}{finish})" if primes
+                       else f"divisor_cases {n} <;> {finish}")
     # A bound below on a variable and ℕ subtraction or a polynomial: substitute.
     if lowers and ("-" in goal_text or "^" in goal_text):
         for hn, _, _ in lowers[:2]:
@@ -169,5 +218,5 @@ def leaf_candidates(goal_text: str) -> list[str]:
         if c not in seen:
             seen.add(c)
             uniq.append(c)
-    return [f"{BUDGET}\n{c}" if not c.startswith(("obtain", "subst", "by_contra")) else c
+    return [f"{BUDGET}\n{c}" if not c.startswith(("obtain", "subst", "by_contra", "have")) else c
             for c in uniq[:LEAF_CAP]]

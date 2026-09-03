@@ -1790,8 +1790,8 @@ def test_leaf_candidates_are_built_from_the_goal_s_shape_and_tried_before_any_mo
     assert got[0].endswith("pow_squeeze y 3 (x + 2) with hxge") and any("Nat.exists_eq_add_of_le hxge" in c for c in got)
     assert not any(c.endswith("with hx") or c.endswith("with hy") for c in got)
     dvd = "m p q : ℕ\nhp : Nat.Prime p\nhA_dvd : m - (p + q) ∣ 5 * p * q\n⊢ m - (p + q) = 1 ∨ m - (p + q) = 5"
-    assert any(c.endswith("divisor_cases hA_dvd <;> first | omega | (norm_num at *; done) | nlinarith | simp_all")
-               for c in leaf_candidates(dvd))
+    assert any("divisor_cases hA_dvd <;> (have hge_hp := Nat.Prime.two_le hp; first | omega" in c
+               and c.endswith("(right; nlinarith))") for c in leaf_candidates(dvd))
     assert leaf_candidates("⊢ True") == []
     small = "x : ℕ\nhb : x ≤ 3\nh : x ^ 2 = 4\n⊢ x = 2"
     assert any("interval_cases x <;>" in c for c in leaf_candidates(small))
@@ -1987,7 +1987,7 @@ def test_powers_bounded_in_the_context_give_a_pow_bounds_leaf():
             "h_up : x ^ 3 + 8 * x ^ 2 - 6 * x + 8 ≤ (x + 3) ^ 3\n"
             "h_low : (x + 2) ^ 3 ≤ x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ y = x + 2 ∨ y = x + 3")
     blocks = [c.split("\n")[-1] for c in leaf_candidates(goal)]
-    assert blocks == ["pow_bounds y 3"]           # x ^ 3 inside P is not a bound on x
+    assert blocks[0] == "pow_bounds y 3" and not any("pow_bounds x" in b for b in blocks)
     direct = "a b : ℕ\nh1 : (b + 1) ^ 2 ≤ a ^ 2\nh2 : a ^ 2 < (b + 3) ^ 2\n⊢ b + 1 ≤ a ∧ a ≤ b + 2"
     assert [c.split("\n")[-1] for c in leaf_candidates(direct)] == ["pow_bounds a 2"]
     assert not any("pow_bounds" in c for c in leaf_candidates("n : ℕ\n⊢ 7 ∣ 2 ^ n - 1 ↔ 3 ∣ n"))
