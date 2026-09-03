@@ -1284,3 +1284,21 @@ def test_withdrawing_a_fact_keeps_the_independent_facts_after_it():
                for e in result.metadata["events"])
     assert "have good" in result.solution and "have bad" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
+
+
+def test_a_reply_that_rewrites_the_enclosing_case_and_have_is_unwrapped():
+    # Measured on rmo_2000_6 (one49a, 3 times at the membership step): asked for
+    # the body of `have h₁ : ... := by` under `case left =>`, qwen answered
+    # `case left =>\n  have h₁ : ... := by\n    refine ⟨1, 10, ...⟩`, and Lean
+    # said "Case tag `left` not found". The context it copied is stripped.
+    from submission.board_agent import unwrap
+    text = ("theorem t : True := by\n  constructor\n  case left =>\n"
+            "    have h₁ : ∃ a b : ℕ, 10 = a * b := by\n      sorry\n    exact h₁\n"
+            "  case right =>\n    sorry\n")
+    goal = Goal(5, "      ", "t", "⊢ ∃ a b, 10 = a * b")
+    wrapped = ("case left =>\n  have h₁ : ∃ a b : ℕ, 10 = a * b := by\n"
+               "    refine ⟨1, 10, ?_⟩\n    norm_num")
+    assert unwrap(wrapped, text, goal) == "refine ⟨1, 10, ?_⟩\nnorm_num"
+    # only the enclosing context is stripped; a fresh have or another case is a step
+    assert unwrap("have h₂ : True := by\n  trivial", text, goal) == "have h₂ : True := by\n  trivial"
+    assert unwrap("case right =>\n  trivial", text, goal) == "case right =>\n  trivial"

@@ -800,11 +800,36 @@ def dialect(block: str) -> str:
     return "\n".join(lines)
 
 
+CASE_LINE = re.compile(r"^(\s*)case\s+([\w.]+)\s*=>\s*$")
+
+
+def unwrap(block: str, text: str, goal: Goal) -> str:
+    """A reply that opens by rewriting the context the goal sits in (its `case`
+    tag, the `have` it is the body of) loses that opening; the body is the step."""
+    lines = text.split("\n")
+    above = [l for l in lines[:goal.line - 1] if l.strip()
+             and len(l) - len(l.lstrip()) < len(goal.indent)]
+    context = {" ".join(l.split()) for l in above}
+    out = block.split("\n")
+    while out and out[0].strip():
+        first = " ".join(out[0].split())
+        head = CASE_LINE.match(out[0]) or HAVE_HEAD.match(out[0])
+        if not head or first not in context:
+            break
+        depth = len(out[0]) - len(out[0].lstrip())
+        rest = out[1:]
+        inner = min((len(l) - len(l.lstrip()) for l in rest if l.strip()), default=depth)
+        if inner <= depth:
+            break
+        out = [l[inner - depth:] if l.strip() else l for l in rest]
+    return "\n".join(out)
+
+
 def put(text: str, goal: Goal, block: str, trailing: bool = True) -> tuple[str, tuple[int, int]]:
     """The block where the goal's placeholder is, and the lines it now covers."""
 
     lines = text.split("\n")
-    body = reindent(normalise_steps(fold_heads(block)), goal.indent)
+    body = reindent(normalise_steps(fold_heads(unwrap(block, text, goal))), goal.indent)
     if trailing:
         body = f"{body}\n{goal.indent}sorry"
     lines[goal.line - 1] = body
