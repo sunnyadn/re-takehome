@@ -1567,3 +1567,26 @@ def test_the_environment_s_answer_for_a_goal_s_words_reaches_the_step_prompt():
     assert len(asked) == 1 and '"coprime"' in asked[0] and '"divisors"' in asked[0]
     prompts = [p for m, p in llm.calls if "Names the loaded Mathlib has" in p]
     assert prompts and "Nat.Coprime.card_divisors_mul" in prompts[0]
+
+
+def test_a_stalled_board_takes_back_the_innermost_open_have_before_it_restarts_the_declaration(monkeypatch):
+    # Undo at the goal, not the declaration: the facts beside the stuck `have`
+    # stay on the board, and only when no open goal sits inside a `have` does
+    # the declaration go back to its statement.
+    import submission.board_agent as ba
+    clock = {"now": 0.0}
+
+    def ticking():
+        clock["now"] += 12.0
+        return clock["now"]
+
+    monkeypatch.setattr(ba.time, "monotonic", ticking)
+    challenge = "import Mathlib\n\ntheorem demo (n : ℕ) : True := by\n  sorry\n"
+    result, _, _, _ = run(challenge, {"model-b": ["have inner : True := by\n  sorry\nexact inner"]
+                                      + ["linarith [h%d]" % i for i in range(40)]
+                                      + ["have key : True := by trivial\nexact key"] * 3},
+                          lines=("model-b",), time_limit=900.0)
+    kinds = [(e.get("kind") or e.get("stage"), e.get("by")) for e in result.metadata["events"]]
+    first_withdraw = next((i for i, k in enumerate(kinds) if k == ("withdraw", "harness")), None)
+    first_restate = next((i for i, k in enumerate(kinds) if k[0] == "restate"), len(kinds))
+    assert first_withdraw is not None and first_withdraw < first_restate

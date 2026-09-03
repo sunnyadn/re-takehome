@@ -1706,9 +1706,11 @@ class BoardAgent(FrameworkAgent):
                            "accepted": accepted, "ms": check.duration_ms})
             return accepted
 
-        async def take_back(author: str, goal: Goal) -> None:
+        async def take_back(author: str, goal: Goal, why: str = "") -> bool:
             """The `have` this goal is the body of comes off the board, with the
-            rest of its block; the goal it was posted on is told why."""
+            rest of its block; the goal it was posted on is told why. True when
+            the board changed."""
+            why = why or f"after {WITHDRAW_AFTER} failed attempts to prove it"
 
             fresh, statement = withdraw_only(board.text, goal)
             if not fresh and goal.decl and goal.decl not in graded:
@@ -1727,9 +1729,10 @@ class BoardAgent(FrameworkAgent):
                     for g in graded:
                         withdrawn.setdefault(g, []).append(statement)
                     await commit(trimmed, progress=False)
-                return
+                    return True
+                return False
             if not fresh:
-                return
+                return False
             # Only the have goes; if Lean then finds the rest of the block broken
             # (it used the name), the rest goes too. Measured on rmo_2000_6:
             # withdrawing h_witness took h_min, the whole crux, which never used it.
@@ -1747,9 +1750,10 @@ class BoardAgent(FrameworkAgent):
             if back is not None:
                 said[back.key] = Feedback(
                     author, f"`{statement}` was posted here as a `have` and withdrawn "
-                    f"after {WITHDRAW_AFTER} failed attempts to prove it. The board is "
+                    f"{why}. The board is "
                     "back to before it. Do not restate that fact; prove this goal "
                     "another way, or through facts that are easier to prove", "withdrawn")
+            return True
 
         async def lift_and_advance(base: Board, goal: Goal, block: str,
                                    author: str) -> tuple[Board | None, str]:
@@ -1977,6 +1981,15 @@ class BoardAgent(FrameworkAgent):
                 events.append({"kind": "leaf_restart", "by": "harness", "goals": len(leaves),
                                "settled": settled_inside(board.text, leaves[0])})
                 return
+            # The innermost open `have` goes first and its siblings stay: undo at
+            # the goal, not the declaration. The declaration restarts only when
+            # no open goal sits inside a `have` any more.
+            inside = [g for g in board.goals if withdraw_only(board.text, g)[0]]
+            if inside:
+                deepest = max(inside, key=lambda g: (len(g.indent), tries.get(g.key, 0)))
+                if await take_back("harness", deepest,
+                                   "after the board made no progress for a while"):
+                    return
             restated[worst.decl] = restated.get(worst.decl, 0) + 1
             fresh_text, _ = restate(board.text, worst.decl)
             events.append({"stage": "restate", "decl": worst.decl,
