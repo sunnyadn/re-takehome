@@ -115,8 +115,8 @@ LAST_IN_LINE = 6
 # posted at t=64 made every later goal a contradiction and the lemma unprovable.
 WITHDRAW_AFTER = 4
 # When every goal is last in line, the declaration holding the worst of them
-# goes back to its statement, this many times at most.
-MAX_RESTATES = 2
+# goes back to its statement, with its goals' history cleared. Time and money
+# bound how often; a count did not, and the branch was unreachable until v7.40.
 # A worker with no goal to take waits this long for the board to change.
 IDLE_WAIT_S = 2.0
 # What the model is told when its step ran the whole check into the timeout.
@@ -1489,16 +1489,24 @@ class BoardAgent(FrameworkAgent):
             best = min(options, key=lambda o: o[:6])
             return best[6], best[7]
 
+        def all_last_in_line() -> bool:
+            return bool(board.goals) and not claimed and all(
+                tries.get(g.key, 0) >= LAST_IN_LINE for g in board.goals)
+
         async def unstick() -> None:
-            """Every goal last in line: the worst one's declaration starts over."""
+            """Every goal last in line: the worst one's declaration starts over,
+            and what was said and planned for its goals goes with it."""
 
             worst = max(board.goals, key=lambda g: tries.get(g.key, 0), default=None)
-            if worst is None or not worst.decl or restated.get(worst.decl, 0) >= MAX_RESTATES:
+            if worst is None or not worst.decl:
                 return
             restated[worst.decl] = restated.get(worst.decl, 0) + 1
             fresh_text, _ = restate(board.text, worst.decl)
             events.append({"stage": "restate", "decl": worst.decl,
                            "tries": tries.get(worst.key, 0)})
+            for table in (tries, said, plans):
+                for key in [k for k in table if k[0] == worst.decl]:
+                    del table[key]
             await commit(await look(fresh_text))
 
         def prompt_for(goal: Goal, model: str, skeleton: bool = False) -> str:
@@ -1561,6 +1569,8 @@ class BoardAgent(FrameworkAgent):
                     if any(b.accepted and is_done(b.text) for b in branches):
                         finished = True
                         return True
+                    if all_last_in_line():
+                        await unstick()
                     picked = pick(model)
                     goal = picked[1] if picked else None
                     if picked:
@@ -1570,11 +1580,7 @@ class BoardAgent(FrameworkAgent):
                         swept.add(goal.key)
                         if await sweep(goal):
                             return True
-                    if goal is None:
-                        if not claimed and board.goals and all(
-                                tries.get(g.key, 0) >= LAST_IN_LINE for g in board.goals):
-                            await unstick()
-                    else:
+                    if goal is not None:
                         claimed.setdefault(goal.key, model)
                         wants_plan = (tries.get(goal.key, 0) >= PLAN_AFTER
                                       and not plans.get(goal.key))

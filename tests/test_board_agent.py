@@ -1057,3 +1057,18 @@ def test_a_proved_fact_re_derived_inside_a_new_claims_body_is_not_a_restatement(
     assert not restates(block, ["(5 : ℕ) ∣ a ^ 2 * b ^ 5"])
     assert restates(block, ["5 ∣ a * b"])
     assert restates("  have : (5 : ℕ) ∣ a ^ 2 * b ^ 5 := h5_pow", ["(5 : ℕ) ∣ a ^ 2 * b ^ 5"])
+
+
+def test_a_board_with_every_goal_last_in_line_starts_the_declaration_over():
+    # Measured across 43 archived runs: the restart never fired once, because it
+    # was reachable only when no goal could be picked, and a goal can always be
+    # picked. A stuck board ground on unchanged until the clock ran out.
+    challenge = "import Mathlib\n\ntheorem demo (n : ℕ) : True := by\n  sorry\n"
+    result, lean, llm, _ = run(challenge, {
+        "model-b": ["induction n with\n| zero => sorry\n| succ k ih => sorry"]
+                   + [f"linarith [h{i}]" for i in range(1, 15)]
+                   + ["have key : True := by trivial\nexact key"] * 2},
+        lines=("model-b",), time_limit=60)
+    assert any(e.get("stage") == "restate" for e in result.metadata["events"])
+    assert result.metadata["accepted_by_repl"] is True
+    assert "induction" not in result.solution
