@@ -269,7 +269,7 @@ SHEETS: tuple[tuple[re.Pattern[str], str], ...] = (
      "Nat.dvd_sub : k ∣ m → k ∣ n → k ∣ m - n ; Nat.dvd_add_right (h : a ∣ b) : a ∣ b + c ↔ a ∣ c ; Nat.pow_dvd_pow_iff_le_right : 1 < x → (x ^ k ∣ x ^ l ↔ k ≤ l)\n"
      "Nat.Prime.pow_dvd_iff_le_factorization (hp) (hn : n ≠ 0) : p ^ k ∣ n ↔ k ≤ n.factorization p. Prefer the route through a prime dividing a factor; factorization arithmetic needs nonzero side goals at every step.\n"
      "A closed fact such as 2000 ∣ 5 ^ 3 * 2 ^ 4 is `by decide` or `by norm_num`.\n"
-     "d ∣ N for a numeral N: factor N, never decide its divisor set (measured at N = 4072324: recursion depth and heartbeats blow up). `have hN : (N : ℕ) = p ^ a * q ^ b := by norm_num; rw [hN] at h; obtain ⟨d₁, d₂, h₁, h₂, rfl⟩ := Nat.dvd_mul.mp h; rw [Nat.dvd_prime_pow (by norm_num)] at h₁ h₂; obtain ⟨i, hi, rfl⟩ := h₁; obtain ⟨j, hj, rfl⟩ := h₂; interval_cases i <;> interval_cases j <;> simp_all` (Nat.dvd_mul : k ∣ m * n ↔ ∃ k₁ k₂, k₁ ∣ m ∧ k₂ ∣ n ∧ k₁ * k₂ = k; Nat.dvd_prime_pow (hp) : i ∣ p ^ m ↔ ∃ k ≤ m, i = p ^ k)."),
+     "d ∣ N for a numeral N: `dvd_cases h : (N : ℕ) = p ^ a * q ^ b` (a tactic defined in this file); never decide the divisor set of a large numeral (measured at 4072324: recursion depth and heartbeats blow up)."),
     (re.compile(r"divisors"),
      "Nat.mem_divisors : n ∈ m.divisors ↔ n ∣ m ∧ m ≠ 0 ; Nat.Prime.divisors (hp) : p.divisors = {1, p}\n"
      "Nat.divisors_mul (m n) : (m * n).divisors = m.divisors * n.divisors (pointwise product, no coprimality needed; Finset.mem_mul)\n"
