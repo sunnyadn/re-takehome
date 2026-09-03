@@ -1189,3 +1189,23 @@ def test_a_fact_about_a_variable_bound_inside_the_have_stays_inside_it():
     assert "have inner" in result.solution
     assert result.solution.index("intro loc") < result.solution.index("have inner")
     assert result.metadata["accepted_by_repl"] is True
+
+
+def test_a_claim_that_enters_through_a_prefix_cut_is_audited_too():
+    # Measured on rmo_2000_6 (one45a, 05:43:58): a skeleton whose whole block was
+    # rejected came in as its accepted prefix, unaudited, carrying `h1 : 2000 ∣
+    # 4 ^ 2 * 1 ^ 5` (false); the closers then proved three goals from it.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = WitnessLean(), ScriptLLM({
+        "model-a": ["have bad : x = 3 := by\n  sorry\nlinarith",
+                    '{"counterexample": {"x": "0"}}',
+                    "have key : True := by trivial\nexact key",
+                    "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    assert any(e.get("kind") == "audit" and e.get("verdict") == "refuted"
+               for e in result.metadata["events"])
+    assert "have bad" not in result.solution
+    assert result.metadata["accepted_by_repl"] is True

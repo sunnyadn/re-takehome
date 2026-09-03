@@ -1347,10 +1347,6 @@ class BoardAgent(FrameworkAgent):
 
             nonlocal raised
             nxt, why = await judge(base, goal, block)
-            if nxt is not None:
-                bad = await audit(author, base, nxt)
-                if bad:
-                    return None, bad
             if nxt is None and why not in (BUDGET_RETRY, TIMED_OUT):
                 # The first error's line says where to cut; one check instead of
                 # eight. Measured: 3.7 checks per model call, most of them here.
@@ -1365,10 +1361,11 @@ class BoardAgent(FrameworkAgent):
                     if nxt is not None:
                         events.append({"kind": "prefix", "by": author,
                                        "lines": shorter.count("\n") + 1})
-                        return nxt, ""
+                        why = ""
+                        break
                     order = order[len(order) // 2 + 1:] if len(order) > 1 else []
                 retry = hand_to_search(block)
-                if retry != block:
+                if nxt is None and retry != block:
                     nxt, _ = await judge(base, goal, retry)
                     events.append({"kind": "search-retry", "by": author,
                                    "accepted": nxt is not None})
@@ -1381,6 +1378,13 @@ class BoardAgent(FrameworkAgent):
             if nxt is None and why == BUDGET_RETRY:
                 why = ("the step exceeded Lean's elaboration budget even at a "
                        "raised budget; make it cheaper")
+            # Every board that leaves here is audited, whichever path accepted it.
+            # Measured on rmo_2000_6: a prefix cut carried a false claim past it.
+            if nxt is not None:
+                bad = await audit(author, base, nxt)
+                if bad:
+                    return None, bad
+                return nxt, ""
             return nxt, why
 
         async def sweep(goal: Goal) -> bool:
