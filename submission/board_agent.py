@@ -1598,10 +1598,13 @@ class BoardAgent(FrameworkAgent):
                         break
                 if accepted:
                     break
-            if found and not accepted:
+            if found:
+                # Kept even when the goal closed: the same goal on a sibling
+                # branch is not swept again (same key) and reads it from the prompt.
                 hints[goal.key] = ("Evaluation over 0 ≤ " + ", ".join(names) + f" < {WITNESS_BOUND} found "
                                    "these values satisfy the body: " + "; ".join(
-                                       ", ".join(f"{n} = {v}" for n, v in zip(names, row)) for row in found))
+                                       ", ".join(f"{n} = {v}" for n, v in zip(names, row)) for row in found)
+                                   + (f". `{block}` closed it." if accepted else ""))
             events.append({"kind": "witnesses", "goal": goal.text[-160:], "found": found,
                            "accepted": accepted, "ms": check.duration_ms})
             return accepted
