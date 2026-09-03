@@ -54,7 +54,10 @@ class TreeLean:
             elif prev == "constructor":
                 msgs.append({"severity": "error", "pos": {"line": i}, "endPos": {"line": i},
                              "data": "unsolved goals\ncase left\n⊢ A\n\ncase right\n⊢ B"})
-            elif prev == "boom":
+            elif prev.startswith("| rfl"):   # the closers block: never closes anything here
+                msgs.append({"severity": "error", "pos": {"line": i - 1}, "endPos": {"line": i - 1},
+                             "data": "linarith failed to find a contradiction"})
+            elif prev == "exact boom":
                 msgs.append({"severity": "error", "pos": {"line": i - 1}, "endPos": {"line": i - 1},
                              "data": "unknown identifier `boom`"})
             else:
@@ -79,6 +82,29 @@ def test_an_attempt_settles_its_leaves_from_what_lean_prints():
     assert ok and [g.text for g in tree.leaves()] == ["case right\n⊢ B"]   # the spare placeholder went
     assert "case left =>\n    exact done\n  case right =>" in tree.render()
     right = tree.leaves()[0]
-    ok, why = asyncio.run(attempt(forest, tree, right, "boom", lean))
-    assert not ok and right.tactic is None and right.history == ["boom"] and "boom" in str(why)
+    ok, why = asyncio.run(attempt(forest, tree, right, "exact boom", lean))
+    assert not ok and right.tactic is None and right.history == ["exact boom"] and "boom" in str(why)
     assert [g.text for g in tree.leaves()] == ["case right\n⊢ B"]
+
+
+def test_the_tree_agent_proves_a_two_goal_theorem_and_drops_one_level_up_when_a_leaf_keeps_failing():
+    import asyncio
+    from submission.tree_agent import TreeAgent
+    from submission.agent import Config
+    from re_harness import Problem
+    from tests.test_board_agent import FakeServices, ScriptLLM
+
+    class Lean(TreeLean):
+        """`constructor` opens A and B; `exact done` closes; `boom` fails."""
+    # A and B alternate (least tries first): 4 failures each drop a leaf's own
+    # block (nothing yet), 4 more each drop one level up, the constructor; the
+    # root is asked again and closed directly.
+    llm = ScriptLLM({"m": ["constructor"] + ["exact boom"] * 16 + ["exact done"]})
+    agent = TreeAgent(Config(lines=("m",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p",
+                                             challenge="import Mathlib\n\ntheorem demo : A ∧ B := by\n  sorry\n"),
+                                     FakeServices(Lean(), llm)))
+    kinds = [e.get("kind") or e.get("stage") for e in result.metadata["events"]]
+    assert "drop" in kinds
+    assert result.solution.endswith("theorem demo : A ∧ B := by\n  exact done\n")
+    assert result.metadata["accepted_by_repl"] is True

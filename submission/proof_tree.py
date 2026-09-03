@@ -21,7 +21,12 @@ class GoalNode:
     history: list[str] = field(default_factory=list)
 
     def parent_goal(self) -> "GoalNode | None":
-        return self.parent.goal if self.parent else None
+        """The goal whose block produced this one; a scaffold is not a choice
+        anyone made, so it does not count as a level."""
+        node = self.parent
+        while node is not None and node.scaffold:
+            node = node.goal.parent
+        return node.goal if node else None
 
 
 @dataclass(eq=False)
@@ -32,6 +37,7 @@ class TacticNode:
     goal: GoalNode
     block: str
     subgoals: list[GoalNode] = field(default_factory=list)
+    scaffold: bool = False   # written by the harness to give each goal a placeholder
 
 
 class ProofTree:
@@ -49,13 +55,20 @@ class ProofTree:
         goal.tactic = node
         return node.subgoals
 
-    def drop(self, goal: GoalNode) -> None:
-        """Forget everything under this goal. Its siblings, and every proved
-        fact above it, are untouched."""
+    def retract(self, goal: GoalNode) -> None:
+        """Take the block at this goal back (Lean rejected it); the goal keeps
+        its count of attempts."""
 
         if goal.tactic is not None:
             goal.history.append(goal.tactic.block)
-        goal.tactic, goal.tries, goal.swept = None, 0, False
+        goal.tactic = None
+
+    def drop(self, goal: GoalNode) -> None:
+        """Forget everything under this goal and start it afresh. Its siblings,
+        and every proved fact above it, are untouched."""
+
+        self.retract(goal)
+        goal.tries, goal.swept = 0, False
 
     def leaves(self) -> list[GoalNode]:
         out: list[GoalNode] = []
