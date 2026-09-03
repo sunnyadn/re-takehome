@@ -299,6 +299,28 @@ SHEETS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"factorization"),
      "Nat.factorization_mul : a ≠ 0 → b ≠ 0 → (a * b).factorization = a.factorization + b.factorization ; Nat.factorization_pow (n k) : (n ^ k).factorization = k • n.factorization\n"
      "Nat.Prime.factorization_self (hp) : p.factorization p = 1 ; Nat.factorization_eq_zero_of_not_dvd : ¬p ∣ n → n.factorization p = 0 ; Nat.eq_of_factorization_eq"),
+    (re.compile(r"ℤ|ℚ|Int\.|Rat\.|\(↑|natAbs"),
+     "Over ℚ clear denominators first: `field_simp at h ⊢` (needs `(a : ℚ) ≠ 0` facts: `by positivity` or `by exact_mod_cast ha.ne'`), then `norm_cast at h` (or `push_cast`) to land in ℤ, then `nlinarith`/`omega`.\n"
+     "div_add_div (a c) (hb : b ≠ 0) (hd : d ≠ 0) : a / b + c / d = (a * d + b * c) / (b * d) ; div_eq_div_iff (hb) (hd) : a / b = c / d ↔ a * d = c * b\n"
+     "Int.le_of_dvd : 0 < b → a ∣ b → a ≤ b ; Int.natAbs_dvd_natAbs : a.natAbs ∣ b.natAbs ↔ a ∣ b ; Int.natAbs_mul ; Int.natAbs_pow ; Int.natAbs_of_nonneg : 0 ≤ a → ↑a.natAbs = a ; Int.toNat_of_nonneg\n"
+     "Int.emod_emod_of_dvd (n) : m ∣ k → n % k % m = n % m ; Int.emod_two_eq_zero_or_one (n). An equation over ℤ with bounded unknowns: bound them, `interval_cases`, `omega`/`decide`.\n"
+     "Membership in a literal set: `simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq]` then `omega`; the ↔ splits with `constructor` and each direction `rintro` / `rcases h with h | h | h`."),
+    (re.compile(r"choose|Icc|Ico"),
+     "Nat.choose_succ_succ (n k) : (n+1).choose (k+1) = n.choose k + n.choose (k+1) ; Nat.choose_zero_right ; Nat.choose_self ; Nat.sum_range_choose (n) : ∑ m ∈ range (n + 1), n.choose m = 2 ^ n\n"
+     "Nat.choose_mul_succ_eq (n k) : n.choose k * (n + 1) = (n + 1).choose k * (n + 1 - k) ; Nat.succ_mul_choose_eq (n k) : (n+1) * n.choose k = (n+1).choose (k+1) * (k+1)\n"
+     "Finset.sum_Icc_succ_top (h : a ≤ b + 1) (f) : ∑ k ∈ Icc a (b + 1), f k = ∑ k ∈ Icc a b, f k + f (b + 1) ; Finset.sum_Ico_succ_top (h : a ≤ b) (f) : ∑ k ∈ Ico a (b + 1), f k = ∑ k ∈ Ico a b, f k + f b\n"
+     "Finset.sum_Ico_consecutive (f) : m ≤ n → n ≤ k → ∑ i ∈ Ico m n, f i + ∑ i ∈ Ico n k, f i = ∑ i ∈ Ico m k, f i ; Finset.sum_Ico_eq_sum_range (f m n) : ∑ k ∈ Ico m n, f k = ∑ k ∈ range (n - m), f (m + k) ; Finset.range_eq_Ico\n"
+     "Finset.mem_Icc : x ∈ Icc a b ↔ a ≤ x ∧ x ≤ b ; Finset.mem_Ico ; Finset.mem_range ; Finset.sum_comm ; Finset.sum_range_succ_comm. An identity in k over a sum: `induction k with | zero => simp | succ k ih => …` and strengthen the statement if the step needs more than ih."),
+    (re.compile(r"ℝ|Real\.|/ ↑|/ \(↑"),
+     "one_div_le_one_div_of_le : 0 < a → a ≤ b → 1 / b ≤ 1 / a ; div_le_div_of_nonneg_left : 0 ≤ a → 0 < c → c ≤ b → a / b ≤ a / c ; div_le_div_iff_of_pos_right : 0 < c → (a / c ≤ b / c ↔ a ≤ b)\n"
+     "Finset.sum_le_sum : (∀ i ∈ s, f i ≤ g i) → ∑ i ∈ s, f i ≤ ∑ i ∈ s, g i ; Finset.sum_le_card_nsmul (s f n) : (∀ x ∈ s, f x ≤ n) → s.sum f ≤ s.card • n ; nsmul_eq_mul (n a) : n • a = ↑n * a ; Finset.sum_nonneg ; Finset.sum_div\n"
+     "Finset.Ico_union_Ico_eq_Ico : a ≤ b → b ≤ c → Ico a b ∪ Ico b c = Ico a c ; Finset.sum_union (Finset.Ico_disjoint_Ico_consecutive a b c) ; Finset.sum_Ico_consecutive (f) : m ≤ n → n ≤ k → ∑ i ∈ Ico m n, f i + ∑ i ∈ Ico n k, f i = ∑ i ∈ Ico m k, f i\n"
+     "Casts: `push_cast`, `exact_mod_cast`, `Nat.cast_pos.mpr`, `Nat.cast_le.mpr`; positivity closes `0 < (n : ℝ)` from `0 < n` in context. Compare terms one block at a time: bound each summand by the block's first term, then the block sum by card • bound."),
+    (re.compile(r"Prime|sqrt|\^ 2 = |= m \^ 2|\* m = "),
+     "Nat.prime_dvd_prime_iff_eq (hp hq) : p ∣ q ↔ p = q ; Nat.Prime.eq_one_or_self_of_dvd (hp) (m) : m ∣ p → m = 1 ∨ m = p ; Nat.Prime.two_le ; Nat.Prime.pos ; Nat.Prime.one_lt ; Nat.Prime.eq_two_or_odd (hp) : p = 2 ∨ p % 2 = 1\n"
+     "Nat.Prime.dvd_mul (hp) : p ∣ m * n ↔ p ∣ m ∨ p ∣ n ; Nat.sq_sub_sq (a b) : a ^ 2 - b ^ 2 = (a + b) * (a - b) (ℕ subtraction: state b ≤ a first, or work in ℤ with `zify`)\n"
+     "A square between consecutive squares: `Nat.pow_lt_pow_left : a < b → n ≠ 0 → a ^ n < b ^ n` and `Nat.pow_lt_pow_iff_left : n ≠ 0 → (a ^ n < b ^ n ↔ a < b)` pin m; Nat.exists_mul_self (x) : (∃ n, n * n = x) ↔ x.sqrt * x.sqrt = x ; Nat.le_sqrt ; Nat.sqrt_lt ; Nat.eq_sqrt\n"
+     "For a product of primes equal to a factorisation `(m - p - q) * (m + p + q) = 5 * p * q`, the divisor of the right side is one of 1, 5, p, q, 5p, 5q, pq, 5pq: case on `Nat.Prime.eq_one_or_self_of_dvd` and `Nat.Prime.dvd_mul`, then `omega`/`nlinarith`."),
     (re.compile(r"Coprime|gcd"),
      "Nat.coprime_primes (hp hq) : p.Coprime q ↔ p ≠ q ; Nat.Prime.coprime_iff_not_dvd (hp) : p.Coprime n ↔ ¬p ∣ n ; Nat.Coprime.pow (m n) : k.Coprime l → (k ^ m).Coprime (l ^ n)\n"
      "Nat.Coprime.dvd_of_dvd_mul_left : k.Coprime m → k ∣ m * n → k ∣ n ; Nat.Coprime.gcd_eq_one ; Nat.gcd_comm ; a closed Coprime such as Nat.Coprime 16 125 is `by norm_num`."),

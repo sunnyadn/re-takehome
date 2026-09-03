@@ -280,7 +280,7 @@ def grade(source: str, check: Any, names: Sequence[str],
 # Generic tactic library. RULES.md allows these explicitly, and `first`
 # backtracks between alternatives, so the whole cocktail costs one Lean check.
 COCKTAIL = (
-    "rfl", "trivial", "norm_num", "simp", "omega", "positivity", "ring",
+    "rfl", "trivial", "assumption", "norm_num", "simp", "omega", "positivity", "ring",
     "linarith", "nlinarith", "field_simp; ring", "simp; omega",
     "norm_num; omega", "constructor <;> norm_num", "simp_all", "aesop",
     "decide", "gcongr", "bound", "norm_cast", "push_cast; ring",

@@ -1368,6 +1368,13 @@ def test_a_goal_about_divisibility_carries_the_current_mathlib_names_before_any_
     both = sheet_for("⊢ IsLeast {n | ∃ a b, 0 < a ∧ 2000 ∣ a ^ 3 * b ^ 4 ∧ n = a * b} 10")
     assert "Nat.pow_lt_pow_left" not in both and both.startswith("IsLeast S a is")
     assert "Nat.pow_lt_pow_left" in sheet_for("⊢ (x + 2) ^ 3 < y ^ 3")
+    # the other five hard problems' vocabularies (names #check'd in the image)
+    assert "field_simp" in sheet_for("a b : ℤ\n⊢ (1 : ℚ) / ↑a + 1 / ↑b = 3 / 2018 ↔ (a, b) ∈ S")
+    assert "Nat.choose_succ_succ" in sheet_for("k : ℕ\n⊢ ∑ j ∈ Finset.Icc 0 k, 2 ^ (k - j) * (k + j).choose j = 4 ^ k")
+    assert "Finset.sum_le_card_nsmul" in sheet_for("x : ℕ → ℝ\n⊢ ∑ i ∈ Finset.Ico 1 (k + 1), x i / ↑i ≤ 3")
+    assert "Nat.prime_dvd_prime_iff_eq" in sheet_for("p q m : ℕ\nhp : Nat.Prime p\n⊢ p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2 → p = q")
+    from submission.agent import COCKTAIL
+    assert "assumption" in COCKTAIL
     # the fake Lean prints a goal as its declaration name, so the wiring is
     # checked with a sheet that answers every goal
     import submission.board_agent as ba
