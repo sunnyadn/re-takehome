@@ -1302,3 +1302,19 @@ def test_a_reply_that_rewrites_the_enclosing_case_and_have_is_unwrapped():
     # only the enclosing context is stripped; a fresh have or another case is a step
     assert unwrap("have h₂ : True := by\n  trivial", text, goal) == "have h₂ : True := by\n  trivial"
     assert unwrap("case right =>\n  trivial", text, goal) == "case right =>\n  trivial"
+
+
+def test_a_hoisted_lemma_whose_goal_keeps_failing_is_dropped_like_a_have():
+    # Measured on rmo_2000_6 (one49a 06:57): a model hoisted `rmo_2000_6_part1 :
+    # IsLeast S 20` (false; the original contest answer), the audit could not
+    # decide a closed IsLeast, and nothing ever took the lemma back: a `have`
+    # is withdrawn after WITHDRAW_AFTER failures, a lemma was not.
+    result, lean, llm, _ = run(ONE, {
+        "model-a": ["lemma part1 : P := by\n  sorry", "linarith [x0]",
+                    "have key : True := by trivial\nexact key"]
+                   + [f"linarith [x{i}]" for i in range(1, 9)],
+    }, lines=("model-a",))
+    events = result.metadata["events"]
+    assert any(e.get("kind") == "withdraw" and e.get("decl") == "part1" for e in events)
+    assert "lemma part1" not in result.solution
+    assert result.metadata["accepted_by_repl"] is True

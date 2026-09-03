@@ -1448,6 +1448,23 @@ class BoardAgent(FrameworkAgent):
             rest of its block; the goal it was posted on is told why."""
 
             fresh, statement = withdraw_only(board.text, goal)
+            if not fresh and goal.decl and goal.decl not in graded:
+                # A hoisted lemma has no enclosing have; it goes as a whole when
+                # its goal keeps failing, if the file still stands without it.
+                # Measured on rmo_2000_6: rmo_2000_6_part1 : IsLeast S 20 (false,
+                # undecidable for the audit) sat on the board with nothing to take it back.
+                span = proof_span(board.text, goal.decl)
+                head = DECL_HEAD.match(board.text[span[0]:span[1]]) if span else None
+                dropped = drop_declaration(board.text, goal.decl)
+                trimmed = await look(dropped)
+                if head and not classify(trimmed.messages)[3]:
+                    statement = head.group(1).strip()
+                    events.append({"kind": "withdraw", "by": author, "decl": goal.decl,
+                                   "have": statement[:120], "tries": tries.get(goal.key, 0)})
+                    for g in graded:
+                        withdrawn.setdefault(g, []).append(statement)
+                    await commit(trimmed)
+                return
             if not fresh:
                 return
             # Only the have goes; if Lean then finds the rest of the block broken
