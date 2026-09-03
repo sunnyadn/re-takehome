@@ -258,7 +258,9 @@ NOTES: tuple[tuple[re.Pattern[str], str], ...] = (
      "does not have. Write `Nat.factorial n` or `n.factorial`."),
     (re.compile(r"ℕ|Nat\.sub"),
      "ℕ subtraction is truncated. State `b ≤ a` as its own `have` and let omega "
-     "move the term across, or move to ℤ."),
+     "move the term across, or move to ℤ. Under `h : a ≤ x`, `obtain ⟨k, rfl⟩ := "
+     "Nat.exists_eq_add_of_le h` replaces x by a + k everywhere, after which "
+     "`ring_nf at *; omega` or `nlinarith` sees no subtraction; `cases x` does not."),
 )
 
 
