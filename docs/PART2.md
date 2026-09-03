@@ -48,6 +48,8 @@ Wall time is the agent's own `wall_s` in `result.json`, comparator time excluded
 
 Note on `rmo_2000_3`: the challenge file as shipped does not build under its own imports in the comparator (`Finset.sum` and `Finset.Ico` on ℕ need `Mathlib.Algebra.BigOperators.Group.Finset.Basic` and `Mathlib.Order.Interval.Finset.Nat`), so no solution can score on it as published. I added the two imports in my local copy so the agent could be measured on it. That run had not finished when this note was written, and the row above is on the unedited problem for the solo arms.
 
+Two disclosures found in a final read of the shipped files. First, the system prompt that goes to every problem carried, until the last commit, one sentence of rationale for the shared-lemma rule that quoted p09's own key identity (`2 ^ n % 7 = 2 ^ (n % 3) % 7`). It was written as a measurement note and should never have been in prompt text. Every p09 run in this note ran with that sentence present, so p09's board results are not clean evidence and should be read as such; the sentence is removed in the final commit and p09 has not been rerun without it. Second, `result.json` keeps only the last 60 agent events per run, so the per-model step counts in the next table are the tail of the run for the two runs longer than 60 events (p09 and `rmo_2000_6`); `transcript.json` holds every call (p09: 67 model calls, not the 17 the truncated list shows).
+
 ## Where the pair won, and what did the work
 
 The transcripts of the board's passing runs (`outputs/board/<problem>/`, the `agent_metadata.events` list in each `result.json`) record who wrote each accepted step, who audited it, and what closed each goal without a model. Q is qwen, G is gpt-oss. "Steps" counts accepted over attempted.
@@ -59,9 +61,9 @@ The transcripts of the board's passing runs (`outputs/board/<problem>/`, the `ag
 | p06 | 23 | 4/10 | 3/4 | 7 | 2 goals |
 | p07 | 1 | 0 | 0 | 0 | 1 goal |
 | p08 | 4 | 1/1 | 0/1 | 2 | |
-| p09 | 17 | 10/15 | 3/4 | 6 | 2 goals |
+| p09 | 67 | 10/15 (tail) | 3/4 (tail) | 6 | 2 goals |
 | p10 | 17 | 3/5 | 3/3 | 11 | |
-| rmo_2000_6 | 57 | 5/8 | 5/6 | 15 | 2 goals (witness search) |
+| rmo_2000_6 | 57 | 5/8 (tail) | 5/6 (tail) | 15 | 2 goals (witness search) |
 
 Three things follow.
 

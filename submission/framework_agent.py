@@ -192,9 +192,7 @@ own instead of as a `have` inside one of them. Reply with
 
 and it is placed above the graded theorems, where every goal can reach it. Its
 `sorry` becomes the next cursor, so you prove it one step at a time like
-anything else. Measured on p09: both directions of `7 ∣ 2 ^ n - 1 ↔ 3 ∣ n` and
-the separate `¬7 ∣ 2 ^ n + 1` all need `2 ^ n % 7 = 2 ^ (n % 3) % 7`, and a
-`have` proved inside one of them is invisible to the other two.
+anything else. A `have` proved inside one theorem is invisible to the others.
 
 Do not open a `·` bullet you cannot close in the same step: a bullet whose
 interior is unfinished is an error, not a placeholder. A step that splits the
