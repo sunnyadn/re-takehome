@@ -116,6 +116,10 @@ LAST_IN_LINE = 6
 # back to before the decomposition. Measured on rmo_2000_2: a false `have`
 # posted at t=64 made every later goal a contradiction and the lemma unprovable.
 WITHDRAW_AFTER = 4
+# A board that has accepted nothing for this share of the window is stuck
+# whatever its counts say. Measured on p09 (reg61b): 7 of 30 steps accepted,
+# both withdrawals on one route, and the clock ran out before the counts did.
+STALL_SHARE = 0.12
 # When every goal is last in line, the declaration holding the worst of them
 # goes back to its statement, with its goals' history cleared. Time and money
 # bound how often; a count did not, and the branch was unreachable until v7.40.
@@ -1156,6 +1160,7 @@ class BoardAgent(FrameworkAgent):
         cfg = self.config
         started = time.monotonic()
         deadline = started + cfg.last_turn_start_s
+        progress_at = started
         ledger = Ledger()
         names = answer_names(problem.challenge)
         graded = declared_names(problem.challenge)
@@ -1247,10 +1252,13 @@ class BoardAgent(FrameworkAgent):
             found.ms = check.duration_ms
             return found
 
-        async def commit(candidate: Board) -> None:
-            """Make a board current, after its own housekeeping."""
+        async def commit(candidate: Board, progress: bool = True) -> None:
+            """Make a board current, after its own housekeeping. Every commit
+            but a restart or a withdrawal is progress for the stall clock."""
 
-            nonlocal board
+            nonlocal board, progress_at
+            if progress:
+                progress_at = time.monotonic()
             bid = board.bid
             fresh = await settle(candidate)
             fresh.bid = bid
@@ -1631,7 +1639,7 @@ class BoardAgent(FrameworkAgent):
                                    "have": statement[:120], "tries": tries.get(goal.key, 0)})
                     for g in graded:
                         withdrawn.setdefault(g, []).append(statement)
-                    await commit(trimmed)
+                    await commit(trimmed, progress=False)
                 return
             if not fresh:
                 return
@@ -1646,7 +1654,7 @@ class BoardAgent(FrameworkAgent):
             events.append({"kind": "withdraw", "by": author, "have": statement[:120],
                            "tries": tries.get(goal.key, 0), "whole_block": whole})
             withdrawn.setdefault(goal.decl, []).append(statement)
-            await commit(trimmed)
+            await commit(trimmed, progress=False)
             back = next((g for g in reversed(board.goals) if g.decl == goal.decl
                          and g.line <= goal.line), None)
             if back is not None:
@@ -1858,6 +1866,11 @@ class BoardAgent(FrameworkAgent):
             return bool(board.goals) and not claimed and all(
                 tries.get(g.key, 0) >= LAST_IN_LINE for g in board.goals)
 
+        def stalled() -> bool:
+            """Nothing accepted for STALL_SHARE of the window, no worker mid-step."""
+            return bool(board.goals) and not claimed and (
+                time.monotonic() - progress_at > STALL_SHARE * cfg.time_limit_s)
+
         async def unstick() -> None:
             """Every goal last in line: the worst one's declaration starts over,
             and what was said and planned for its goals goes with it."""
@@ -1884,7 +1897,7 @@ class BoardAgent(FrameworkAgent):
             for table in (tries, said, plans):
                 for key in [k for k in table if k[0] == worst.decl]:
                     del table[key]
-            await commit(await look(fresh_text))
+            await commit(await look(fresh_text), progress=False)
 
         def prompt_for(goal: Goal, model: str, skeleton: bool = False,
                        plan: str | None = None) -> str:
@@ -1954,7 +1967,7 @@ class BoardAgent(FrameworkAgent):
                     if any(b.accepted and is_done(b.text) for b in branches):
                         finished = True
                         return True
-                    if all_last_in_line():
+                    if all_last_in_line() or stalled():
                         await unstick()
                     picked = pick(model)
                     goal = picked[1] if picked else None

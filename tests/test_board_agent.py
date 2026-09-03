@@ -1509,3 +1509,23 @@ def test_the_challenge_imports_are_kept_and_numeral_exponents_typed_when_they_ar
     # exponents that are not numerals, and proof bodies, are left alone
     assert type_exponents("theorem t : 2 ^ n = 2 ^ n := by\n  have : 3 ^ 2 = 9 := by norm_num\n  rfl\n") \
         == "theorem t : 2 ^ n = 2 ^ n := by\n  have : 3 ^ 2 = 9 := by norm_num\n  rfl\n"
+
+
+def test_a_board_that_accepts_nothing_for_a_share_of_the_window_restarts_before_the_counts_say_so(monkeypatch):
+    # Measured on p09 (reg61b, 2026-09-03 10:14Z): 7 of 30 steps accepted, both
+    # withdrawals on one route, and the clock ran out before every goal reached
+    # LAST_IN_LINE. Time without an accepted step is a reason to start over.
+    import submission.board_agent as ba
+    clock = {"now": 0.0}
+
+    def ticking():
+        clock["now"] += 5.0
+        return clock["now"]
+
+    monkeypatch.setattr(ba.time, "monotonic", ticking)
+    challenge = "import Mathlib\n\ntheorem demo (n : ℕ) : True := by\n  sorry\n"
+    result, _, _, _ = run(challenge, {"model-b": ["linarith [h%d]" % i for i in range(40)]
+                                      + ["have key : True := by trivial\nexact key"] * 3},
+                          lines=("model-b",), time_limit=600.0)
+    first = next(e for e in result.metadata["events"] if e.get("stage") == "restate")
+    assert first["tries"] < ba.LAST_IN_LINE
