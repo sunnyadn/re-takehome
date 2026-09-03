@@ -748,6 +748,61 @@ def inherit(old: Sequence[Goal], new: Sequence[Goal], tables: Sequence[dict]) ->
                 table[matches[0].key] = table[g.key]
 
 
+EXISTS = re.compile(r"^∃\s+(?:\(\s*)?([\w' ]+?)(?:\s*:\s*([^,)]+))?\)?\s*,\s*(.*)$", re.S)
+MEMBER = re.compile(r"^(\d+)\s*∈\s*\{\s*(\w+)\s*\|\s*(.*)\}$", re.S)
+
+
+def existential(goal_text: str) -> tuple[list[str], str] | None:
+    """`∃ a b, body` or `N ∈ {n | ∃ a b, body}` with ℕ binders and a body that
+    binds nothing more and names no hypothesis: what evaluation can search."""
+
+    target = target_of(goal_text)
+    m = MEMBER.match(target)
+    if m:
+        value, var, target = m.groups()
+        target = re.sub(rf"(?<![\w'.]){re.escape(var)}(?![\w'])", value, target.strip())
+    names: list[str] = []
+    while True:
+        m = EXISTS.match(target.strip())
+        if not m:
+            break
+        binders, typ, target = m.groups()
+        if typ and typ.strip() != "ℕ":
+            return None
+        names += binders.split()
+    if not names or len(names) > 3:
+        return None
+    if re.search(r"[∀∃λ→]|\bfun\b", target) or not target.strip():
+        return None
+    if any(re.search(rf"(?<![\w'.]){re.escape(n)}(?![\w'])", target) for n in hypotheses(goal_text)):
+        return None
+    return names, target.strip()
+
+
+WITNESS_BOUND = 40
+
+
+def witness_search_file(prefix: str, names: Sequence[str], body: str) -> str:
+    """A Lean `#eval` that walks the binders over 0..WITNESS_BOUND-1 and keeps the
+    first 3 tuples whose body decides true."""
+
+    loops = "".join(f"{'  ' * (i + 1)}for {n} in List.range {WITNESS_BOUND} do\n"
+                    for i, n in enumerate(names))
+    pad = "  " * (len(names) + 1)
+    tuple_ = ", ".join(names)
+    return (prefix.rstrip("\n") + "\n\n#eval Id.run do\n  let mut found : List (List Nat) := []\n"
+            + loops + f"{pad}if found.length < 3 ∧ decide ({body}) then\n"
+            + f"{pad}  found := found ++ [[{tuple_}]]\n  return found\n")
+
+
+def read_witnesses(messages: Sequence[dict[str, Any]]) -> list[list[str]]:
+    for m in messages:
+        data = str(m.get("data", "")).strip()
+        if m.get("severity") in INFO and data.startswith("[["):
+            return [[v.strip() for v in row.split(",")] for row in re.findall(r"\[([\d, ]+)\]", data)]
+    return []
+
+
 def is_closed(goal_text: str) -> bool:
     """A goal whose target names none of its hypotheses and binds nothing: a
     closed proposition, decided by evaluation alone. Measured on rmo_2000_6:
@@ -1204,6 +1259,8 @@ class BoardAgent(FrameworkAgent):
 
         failed_at = 0
         known_names: dict[str, str] = {}
+        # What evaluation found for an existential goal that no closer finished.
+        hints: dict[tuple[str, str], str] = {}
         # Every plan asked for a declaration, kept across restarts: the next
         # plan is asked to differ from them.
         routes: dict[str, list[str]] = {}
@@ -1475,6 +1532,38 @@ class BoardAgent(FrameworkAgent):
             events.append({"kind": "collapse", "tactic": tactic, "accepted": nxt is flat})
             await commit(nxt)
             return True
+
+        async def witness_sweep(goal: Goal) -> bool:
+            """An existential with a decidable body: Lean enumerates the witnesses
+            and the first tuple that closes the goal is written, no model asked.
+            Measured on rmo_2000_6: both models guessed `use 10, 1` and `use 2, 4`
+            for 12 minutes; the only small witness is a = 1, b = 10."""
+
+            parsed = existential(goal.text)
+            if not parsed:
+                return False
+            names, body = parsed
+            imports = "\n".join(l for l in text.split("\n") if l.startswith("import "))
+            check = await services.lean.check_file(witness_search_file(imports, names, body), timeout_s=60)
+            found = read_witnesses(check.messages)
+            accepted = False
+            for row in found:
+                for closer in ("norm_num", "decide"):
+                    block = f"exact ⟨{', '.join(row)}, by {closer}⟩"
+                    nxt, _ = await judge(board, goal, block)
+                    if nxt is not None:
+                        await commit(nxt)
+                        accepted = True
+                        break
+                if accepted:
+                    break
+            if found and not accepted:
+                hints[goal.key] = ("Evaluation over 0 ≤ " + ", ".join(names) + f" < {WITNESS_BOUND} found "
+                                   "these values satisfy the body: " + "; ".join(
+                                       ", ".join(f"{n} = {v}" for n, v in zip(names, row)) for row in found))
+            events.append({"kind": "witnesses", "goal": goal.text[-160:], "found": found,
+                           "accepted": accepted, "ms": check.duration_ms})
+            return accepted
 
         async def take_back(author: str, goal: Goal) -> None:
             """The `have` this goal is the body of comes off the board, with the
@@ -1748,6 +1837,8 @@ class BoardAgent(FrameworkAgent):
                      "What Lean reports as open, with its hypotheses. The first goal "
                      f"is the active one, at `skip` on line {line}:\n"
                      f"{goal.text[:GOAL_CHARS]}"]
+            if hints.get(goal.key):
+                parts.append(hints[goal.key])
             sheet = sheet_for(goal.text)
             if sheet:
                 parts.append("Names the loaded Mathlib has for this goal's vocabulary, "
@@ -1814,7 +1905,7 @@ class BoardAgent(FrameworkAgent):
                     base = board
                     if goal is not None and goal.key not in swept:
                         swept.add(goal.key)
-                        if await sweep(goal):
+                        if await sweep(goal) or await witness_sweep(goal):
                             return True
                     if goal is not None:
                         claimed.setdefault(goal.key, model)

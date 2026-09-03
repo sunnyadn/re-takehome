@@ -1376,3 +1376,40 @@ def test_a_goal_about_divisibility_carries_the_current_mathlib_names_before_any_
     finally:
         ba.sheet_for = real
     assert any("as #check prints them:\nSHEET-MARK demo" in p for m, p in llm.calls)
+
+
+def test_an_existential_goal_with_a_decidable_body_gets_its_witness_from_evaluation():
+    # Measured on rmo_2000_6 (one52c, 12 min in): both models guessed witnesses
+    # for `10 ∈ {n | ∃ a b, … ∧ n = a * b}` (`use 10, 1`, `use 2, 4`) and each
+    # wrong guess cost a model call and an audit; the only small witness is
+    # a = 1, b = 10. Lean finds it by evaluating the body over 0..39 in one check.
+    from submission.board_agent import existential, witness_search_file, read_witnesses
+    member = "⊢ 10 ∈ {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b}"
+    assert existential(member) == (["a", "b"], "0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ 10 = a * b")
+    assert existential("⊢ ∃ x : ℕ, x * x = 49") == (["x"], "x * x = 49")
+    assert existential("⊢ ∃ x : ℤ, x * x = 49") is None
+    assert existential("k : ℕ\nh : 0 < k\n⊢ ∃ x, x * k = 49") is None  # the body names a variable
+    assert existential("⊢ ∃ f : ℕ → ℕ, ∀ x, f x = x") is None
+    src = witness_search_file("import Mathlib", ["a", "b"], "0 < a ∧ 10 = a * b")
+    assert "for a in List.range" in src and "for b in List.range" in src and "decide (0 < a ∧ 10 = a * b)" in src
+    assert read_witnesses([{"severity": "info", "data": "[[1, 10], [5, 2]]"}]) == [["1", "10"], ["5", "2"]]
+
+    class ExistLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            if "List.range" in source and "decide (" in source:
+                self.sources.append(source)
+                return LeanCheck(True, [{"severity": "info", "data": "[[1, 10]]"}], False, False, 1)
+            if "exact ⟨1, 10, by norm_num⟩" in source:
+                return LeanCheck(True, [], "sorry" in source, False, 1)
+            check = await super().check_file(source)
+            msgs = [dict(m, data=m["data"].replace("⊢ demo", member))
+                    if "unsolved" in str(m.get("data")) else m for m in check.messages]
+            return LeanCheck(check.accepted, msgs, check.has_sorry, False, 1)
+    lean, llm = ExistLean(), ScriptLLM({"model-a": ["have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert "exact ⟨1, 10, by norm_num⟩" in result.solution
+    assert not llm.calls  # closed before any model was asked
+    found = [e for e in result.metadata["events"] if e.get("kind") == "witnesses"]
+    assert found and found[0]["found"] == [["1", "10"]] and found[0]["accepted"] is True
