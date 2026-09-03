@@ -2010,3 +2010,21 @@ def test_an_upper_bound_on_the_variable_under_a_power_gets_the_contradiction_squ
     # Under the contradiction hypothesis the squeeze uses it as the lower bound.
     blocks = leaf_candidates("x y : ℕ\nhc : 9 < x\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ False")
     assert "pow_squeeze y 3 (x + 2) with hc" in blocks[0]
+
+
+def test_a_claim_that_holds_only_past_a_threshold_is_split_there():
+    # Measured on rmo_2000_2 (v7.84, second run, 0 at 2612 s): the models
+    # posted `(x + 2) ^ 3 ≤ y ^ 3` and `y ≤ x + 2` with no case split; both
+    # hold from x = 10 on (P − (x+2)³ = 2x(x−9)) and below that the equation
+    # y³ = P has no solution, which cases over x then y establish.
+    from submission.leaves import leaf_candidates, _threshold, _evaluate
+    assert _evaluate("x ^ 3 + 8 * x ^ 2 - 6 * x + 8", "x", 9) == 1331
+    assert _evaluate("x - 5", "x", 3) == 0                       # ℕ subtraction truncates
+    assert _threshold("x ^ 3 + 8 * x ^ 2 - 6 * x + 8", "x + 2", 3, "x") == 10
+    assert _threshold("x ^ 3 + 8 * x ^ 2 - 6 * x + 8", "x + 3", 3, "x") is None
+    ctx = "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n"
+    for target in ("⊢ (x + 2) ^ 3 ≤ y ^ 3", "⊢ y ≤ x + 2", "⊢ x + 2 ≤ y"):
+        block = leaf_candidates(ctx + target)[0]
+        assert block.startswith("rcases Nat.lt_or_ge x 10 with hlt | hge\n· interval_cases x <;> "
+                                "first | omega | (bounded_cases y 13)\n· obtain")
+    assert not any("rcases Nat.lt_or_ge" in c for c in leaf_candidates(ctx + "⊢ y ^ 3 < (x + 3) ^ 3"))

@@ -80,6 +80,43 @@ def _powered(hyps) -> list[tuple[str, str, str, str]]:
     return out
 
 
+class _Nat(int):
+    """ℕ arithmetic for evaluating a printed polynomial: subtraction truncates."""
+    def __add__(self, o): return _Nat(int(self) + int(o))
+    def __radd__(self, o): return _Nat(int(o) + int(self))
+    def __sub__(self, o): return _Nat(max(0, int(self) - int(o)))
+    def __rsub__(self, o): return _Nat(max(0, int(o) - int(self)))
+    def __mul__(self, o): return _Nat(int(self) * int(o))
+    def __rmul__(self, o): return _Nat(int(o) * int(self))
+    def __pow__(self, o): return _Nat(int(self) ** int(o))
+
+
+def _evaluate(expr: str, var: str, value: int):
+    """The printed ℕ expression at var = value, or None if it is not one."""
+    if not re.fullmatch(r"[\w\s+\-*^()']+", expr) or re.search(r"[A-Za-z_][\w']*", expr.replace(var, "")):
+        return None
+    try:
+        return int(eval(re.sub(rf"\b{re.escape(var)}\b", f"_Nat({value})", expr).replace("^", "**"),
+                        {"__builtins__": {}}, {"_Nat": _Nat}))
+    except Exception:  # noqa: BLE001 - a shape the evaluator does not read is not a leaf
+        return None
+
+
+def _threshold(p: str, e: str, n: int, var: str) -> int | None:
+    """The T with sign(P(x) - E(x)^n) fixed for x ≥ T, from a scan to CASES_MAX;
+    None when the sign never settles or never changes."""
+    signs = []
+    for x in range(CASES_MAX + 1):
+        pv, ev = _evaluate(p, var, x), _evaluate(e, var, x)
+        if pv is None or ev is None:
+            return None
+        d = pv - ev ** n
+        signs.append((d > 0) - (d < 0))
+    last = signs[-1]
+    t = max((i + 1 for i, sg in enumerate(signs) if sg != last), default=0)
+    return t if 1 <= t <= CASES_MAX else None
+
+
 def _shifts(rhs: str, n: int) -> list[str]:
     """For P = v ^ n + a * v ^ (n-1) + ..., the E with E ^ n ≤ P < (E + 1) ^ n
     for large v: v + a // n, and v + a // n - 1 when a divides evenly."""
@@ -131,6 +168,22 @@ def _finish(target: str) -> str:
             " | (right; right; constructor <;> nlinarith) | (right; nlinarith)")
 
 
+def _claims_about(target: str, y: str, n: str) -> list[tuple[str, str]]:
+    """(E, x) for a target comparing y with E or y ^ n with E ^ n, x the one
+    variable of E other than y."""
+    out = []
+    for m in (re.match(rf"^{re.escape(y)} (?:≤|<|≥|>|=) (.+)$", target),
+              re.match(rf"^(.+) (?:≤|<|≥|>|=) {re.escape(y)}$", target),
+              re.match(rf"^{re.escape(y)} \^ {n} (?:≤|<|≥|>) \((.+)\) \^ {n}$", target),
+              re.match(rf"^\((.+)\) \^ {n} (?:≤|<|≥|>) {re.escape(y)} \^ {n}$", target)):
+        if m:
+            e = m.group(1).strip()
+            names = sorted(set(re.findall(r"[A-Za-z_][\w']*", e)) - {y})
+            if len(names) == 1 and not re.search(r"[∨∧↔→]", e):
+                out.append((e, names[0]))
+    return out
+
+
 def leaf_candidates(goal_text: str) -> list[str]:
     hyps = _hyps(goal_text)
     target = _target(goal_text)
@@ -174,6 +227,26 @@ def leaf_candidates(goal_text: str) -> list[str]:
                 for hn, _, _ in lowers[:2]:
                     out.append(f"pow_squeeze {y} {n} ({e}) with {hn}")
                 out.append(f"pow_squeeze {y} {n} ({e})")
+    # A claim about y against E (y ≤ E, E ≤ y, E ^ n ≤ y ^ n, ...) under
+    # y ^ n = P(x) that holds only from some x on: below the threshold the
+    # equation has no solution (every x, then every y, by cases), above it the
+    # arithmetic goes through. Measured on rmo_2000_2 (v7.84, second run):
+    # `⊢ (x + 2) ^ 3 ≤ y ^ 3` and `⊢ y ≤ x + 2` were posted with no case split
+    # and 26 leaf tries went nowhere.
+    for _, y, n, rhs in powers:
+        for e, x in _claims_about(target, y, n):
+            t = _threshold(rhs, e, int(n), x)
+            if t is None:
+                continue
+            small = max((_evaluate(rhs, x, v) or 0) for v in range(t))
+            root = int(round(small ** (1 / int(n)))) + 2
+            if root > CASES_MAX:
+                continue
+            out.append(f"rcases Nat.lt_or_ge {x} {t} with hlt | hge\n"
+                       f"· interval_cases {x} <;> first | omega | (bounded_cases {y} {root})\n"
+                       f"· obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le hge\n  subst hk\n"
+                       f"  first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)")
+            break
     # A variable defined by an equation `w = E`: substitute, make ℕ subtraction
     # exact, then arithmetic. Measured on rmo_2000_2: `hyx : y = x + 2 ⊢ x = 9`.
     for hn, t in hyps:
@@ -220,5 +293,5 @@ def leaf_candidates(goal_text: str) -> list[str]:
         if c not in seen:
             seen.add(c)
             uniq.append(c)
-    return [f"{BUDGET}\n{c}" if not c.startswith(("obtain", "subst", "by_contra", "have")) else c
+    return [f"{BUDGET}\n{c}" if not c.startswith(("obtain", "subst", "by_contra", "have", "rcases")) else c
             for c in uniq[:LEAF_CAP]]
