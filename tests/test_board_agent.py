@@ -1865,8 +1865,11 @@ def test_the_technique_preamble_sits_after_the_header_and_the_models_are_told_ab
     assert len(text) > TIDY_ABOVE_BYTES // 2 and len(below_header(text)) < 200
     result, lean, llm, _ = run(ONE, {"model-a": ["have key : True := by trivial\nexact key"] * 2},
                                lines=("model-a",))
-    assert all("divisor_cases" in src for src in lean.sources if "have key" in src)
-    assert "divisor_cases" in result.solution
+    # Every check during the search carries the block; the delivered file of
+    # a proof that calls no technique does not (the last check verifies that).
+    checks = [src for src in lean.sources if "have key" in src]
+    assert all("divisor_cases" in src for src in checks[:-1]) and "divisor_cases" not in checks[-1]
+    assert "divisor_cases" not in result.solution
     assert any("`divisor_cases h`" in s for s in llm.systems)
     # Lean sees the block; a model sees one comment line in its place. Measured:
     # 4.6 KB of elab code sat in every step and audit prompt of three runs.
@@ -1926,3 +1929,20 @@ def test_a_placeholder_left_under_a_closing_step_is_dropped_not_reused():
     assert proof == " : True := by\n  have h : P := by\n    exact h\n  exact h\n"
     assert not any("no goals left where that step was written" in p
                    for _, p in llm.calls)
+
+
+def test_a_finished_proof_that_calls_no_technique_ships_without_the_block():
+    # The judge compiles the solution cold (180 s, 4 cores); the technique
+    # block is 6.8 KB of elab code that a proof of `True` never needs.
+    result, lean, llm, _ = run(ONE, {"model-a": ["have key : True := by trivial\nexact key"]},
+                               lines=("model-a",), time_limit=20)
+    assert result.metadata["accepted_by_repl"] is True
+    assert "techniques defined for this file" not in result.solution
+    assert "divisor_cases" not in result.solution
+    verify = next(e for e in result.metadata["events"] if e.get("stage") == "verify")
+    assert verify["techniques"] == "dropped"
+    # A proof that calls one keeps the block (the fake accepts any `exact key`).
+    result2, _, _, _ = run(ONE, {"model-a": ["have key : True := by divisor_cases h\nexact key"]},
+                           lines=("model-a",), time_limit=20)
+    assert result2.metadata["accepted_by_repl"] is True
+    assert "techniques defined for this file" in result2.solution

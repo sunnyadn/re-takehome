@@ -176,6 +176,31 @@ ELIDED = "-- tactics defined for this file (see the system prompt): " + ", ".joi
     n.split("`")[1].split()[0] for _, n in TECHNIQUES)
 
 
+def technique_names() -> list[str]:
+    """Every tactic the preamble declares (`syntax "name" ...`)."""
+    import re
+    return re.findall(r'^syntax "(\w+)"', "\n".join(src for src, _ in TECHNIQUES), re.M)
+
+
+def uses_techniques(text: str) -> bool:
+    """Whether the file, preamble aside, calls any tactic the preamble defines."""
+    import re
+    body = strip_techniques(text)
+    return any(re.search(rf"\b{n}\b", body) for n in technique_names())
+
+
+def strip_techniques(text: str) -> str:
+    """The file without the technique block: a solution that never calls one
+    should not make the judge's cold compile pay for 6.8 KB of elab code."""
+    a, b = text.find(PREAMBLE_MARK), text.find(PREAMBLE_END)
+    if a < 0 or b < 0:
+        return text
+    b += len(PREAMBLE_END)
+    while b < len(text) and text[b] == "\n":
+        b += 1
+    return text[:a] + text[b:]
+
+
 def without_techniques(text: str) -> tuple[str, int]:
     """The file with the technique block replaced by one comment line, and how
     many lines went: what a model reads is the proof, not Lean metaprogramming

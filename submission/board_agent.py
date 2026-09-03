@@ -17,7 +17,8 @@ from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
 from submission.leaves import leaf_candidates
-from submission.techniques import without_techniques
+from submission.techniques import (PREAMBLE_MARK, strip_techniques, uses_techniques,
+                                   without_techniques)
 from submission.agent import (
     BUDGET_HEADROOM,
     technique_card,
@@ -1447,16 +1448,27 @@ class BoardAgent(FrameworkAgent):
 
         async def deliver(text: str, how: str) -> AgentResult | None:
             state = await self._finish(State(text=text, accepted=True), services, time_left)
+            final = state.text
+            if not uses_techniques(final):
+                # The judge compiles cold, 180 s on 4 cores; a proof that never
+                # calls a technique does not carry the block that defines them.
+                final = strip_techniques(final)
             check = await services.lean.check_file(
-                axiom_probe(state.text, declared_names(problem.challenge)))
-            faults, _ = grade(state.text, check, names, problem.challenge)
+                axiom_probe(final, declared_names(problem.challenge)))
+            faults, _ = grade(final, check, names, problem.challenge)
+            if (not check.accepted or faults) and final != state.text:
+                final = state.text
+                check = await services.lean.check_file(
+                    axiom_probe(final, declared_names(problem.challenge)))
+                faults, _ = grade(final, check, names, problem.challenge)
             events.append({"stage": "verify", "accepted": check.accepted,
                            "faults": faults[:5], "compile_ms": check.duration_ms,
-                           "slow": check.duration_ms > SLOW_COMPILE_MS})
+                           "slow": check.duration_ms > SLOW_COMPILE_MS,
+                           "techniques": "kept" if PREAMBLE_MARK in final else "dropped"})
             if not check.accepted or faults:
                 return None
-            offer(state.text, True)
-            return result(state.text, how, True)
+            offer(final, True)
+            return result(final, how, True)
 
         board = Board(text)
         branches: list[Board] = []
