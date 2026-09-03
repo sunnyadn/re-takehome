@@ -241,6 +241,14 @@ NOTES: tuple[tuple[re.Pattern[str], str], ...] = (
      "rcases on an inductively defined Prop loses the induction hypothesis. Use "
      "`induction h with | c₁ ... | c₂ ...`, labelled by constructor name, and "
      "clear hypotheses mentioning the variable first."),
+    (re.compile(r"unexpected token '(,|have|with|in)'; expected (command|',')"),
+     "The parser left the proof on the line before, which is what Lean 3 "
+     "spellings do here: no comma at the end of a tactic line, `obtain ⟨a, b⟩ "
+     ":= h` for `cases h with a b`, `∑ x ∈ s` for `∑ x in s`, and every line of "
+     "one block at one indentation."),
+    (re.compile(r"unexpected token '!'"),
+     "`n !` is `Nat.factorial` notation that `open Nat` provides and this file "
+     "does not have. Write `Nat.factorial n` or `n.factorial`."),
     (re.compile(r"ℕ|Nat\.sub"),
      "ℕ subtraction is truncated. State `b ≤ a` as its own `have` and let omega "
      "move the term across, or move to ℤ."),

@@ -34,6 +34,20 @@ def test_only_the_triggered_notes_are_sent():
     assert fa.notes_for("omega could not prove the goal").count("\n- ") == 0
 
 
+def test_a_parse_error_from_an_older_dialect_is_named_as_such():
+    # Measured across 9 runs: ~450 rejections ending in "expected command"
+    # were Lean 3 spellings (`intro n hn,`, `cases h with a b`) and ~90
+    # "unexpected token '!'" were `7!` with no `open Nat`; Lean's message
+    # names neither and the models wrote the same line again.
+    lean3 = fa.notes_for("error at {'line': 10, 'column': 12}: unexpected token ','; expected command")
+    assert "Lean 3" in lean3 and "comma" in lean3
+    assert "Lean 3" in fa.notes_for("unexpected token 'have'; expected command")
+    assert "Lean 3" in fa.notes_for("unexpected token 'with'; expected command")
+    bang = fa.notes_for("unexpected token '!'; expected command")
+    assert "Nat.factorial" in bang and "open Nat" in bang
+    assert "Lean 3" not in fa.notes_for("unexpected token ')'; expected command")
+
+
 def test_probe_output_keeps_numerals_only():
     msgs = [
         {"severity": "info", "data": "19"},
