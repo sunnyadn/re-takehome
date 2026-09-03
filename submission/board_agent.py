@@ -1256,9 +1256,14 @@ class BoardAgent(FrameworkAgent):
                 # `⊢ False` is provable only in an inconsistent context, so a witness
                 # for the context alone proves the branch dead. Measured on p09: a
                 # satisfiable `⊢ False` held both models for the rest of the run.
+                # A goal with nothing in scope is a closed proposition: a wrong
+                # witness or rewrite leaves one that is false, and its negation
+                # decides it in one check. Measured on rmo_2000_6: `use 10; use 1`
+                # left `⊢ 0 < 1 ∧ 2000 ∣ 10 ^ 3 * 1 ^ 4 ∧ ...` and the branch died.
                 dead_end = target_of(g.text) == "False"
+                closed = not hypotheses(g.text) and not re.search(r"[∀∃λ]|fun\b", target_of(g.text))
                 if (g.key in had or not g.text or META.search(target_of(g.text))
-                        or not (dead_end or is_stated(lines, g))
+                        or not (dead_end or closed or is_stated(lines, g))
                         or enclosing_have(lines, g)[0] in covered):
                     continue
                 subjects.append({"key": g.key, "decl": g.decl, "goal": g, "what": "",
@@ -1289,7 +1294,8 @@ class BoardAgent(FrameworkAgent):
             prefix = nxt.text[:first[0]] if first else ""
             for sub in subjects:
                 sub["parsed"] = split_statement(sub["stmt"]) if sub.get("stmt") else None
-            asked = [sub for sub in subjects if sub["parsed"]]
+            # No binders, no question: the witness file alone decides a closed claim.
+            asked = [sub for sub in subjects if sub["parsed"] and sub["parsed"][0]]
             replies = await asyncio.gather(*(self._call(
                 other, audit_prompt(sub["stmt"], prefix.replace("import Mathlib", "")),
                 AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM) for sub in asked))
@@ -1299,7 +1305,7 @@ class BoardAgent(FrameworkAgent):
                 target = sub["claim"] or target_of(sub["goal"].text)
                 if sub["parsed"]:
                     groups, target = sub["parsed"]
-                    reply, stopped = replies[asked.index(sub)]
+                    reply, stopped = replies[asked.index(sub)] if sub in asked else ("", "")
                     names = {n for grp in groups for n in binder_names(grp)}
                     given = read_witness(reply)
                     values = {n: v for n, v in (given or {}).items() if n in names}
@@ -1322,7 +1328,10 @@ class BoardAgent(FrameworkAgent):
                     audited[sub["key"]] = (
                         f"`{stmt}` is false, so the step was not posted: with {at} every "
                         "hypothesis in scope holds and it fails (Lean checked this). Do "
-                        "not restate it; state a fact that is true at those values too")
+                        "not restate it; state a fact that is true at those values too"
+                        if values else
+                        f"that step left the goal `{stmt}`, which is false (Lean decided "
+                        "it): the witness, rewrite or case was wrong. Undo it and choose again")
                     return audited[sub["key"]]
             return ""
 

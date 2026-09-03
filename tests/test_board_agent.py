@@ -68,7 +68,8 @@ class BoardLean:
                 above = source.split("\n")[i - 2].strip() if i > 1 else ""
                 target = (above.split(":", 1)[1].split(":=")[0].strip()
                           if above.startswith("have ") and above.endswith(":= by")
-                          else "False" if above == "exfalso" else decl)
+                          else "False" if above == "exfalso"
+                          else f"P {above.split()[1]}" if above.startswith("use ") else decl)
                 messages.append({"severity": "error", "pos": {"line": i - 2},
                                  "endPos": {"line": i - 1},
                                  "data": f"unsolved goals\n{hyps}⊢ {target}"})
@@ -655,6 +656,7 @@ class WitnessLean(BoardLean):
                 claim = (above.split(":", 1)[1].split(":=")[0].strip()
                          if above.strip().startswith("have") else
                          "False" if prev == "exfalso" else
+                         f"P {prev.split()[1]}" if prev.startswith("use ") else
                          target if above.strip().startswith("theorem") else "True")
                 messages.append({"severity": "info", "pos": {"line": i - 1},
                                  "data": f"theorem extracted_1 {binders} : {claim} := sorry"})
@@ -1227,3 +1229,32 @@ def test_with_two_routes_open_the_second_worker_takes_the_other_one():
     assert any(e.get("stage") == "route" for e in result.metadata["events"])
     assert result.metadata["accepted_by_repl"] is True
     assert "k1" in result.solution and "dead" not in result.solution
+
+
+class ClosedLean(WitnessLean):
+    """The witness against `P 10` passes (10 is the wrong witness); `P 5` holds."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "(w_" in source or "¬ (P " in source:
+            self.sources.append(source)
+            return LeanCheck("¬ (P 10)" in source, [], False, False, 1)
+        return await super().check_file(source, timeout_s)
+
+
+def test_a_step_that_leaves_a_closed_false_goal_is_refused_without_a_model_call():
+    # Measured on rmo_2000_6 (one46a 06:03): `use 10; use 1` left `⊢ 0 < 1 ∧
+    # 2000 ∣ 10 ^ 3 * 1 ^ 4 ∧ 10 = 10 * 1`, false and variable-free; Lean took the
+    # step and the branch was dead until withdrawal. A new goal with nothing in
+    # scope is tried against its own negation, no auditor needed.
+    challenge = "import Mathlib\n\ntheorem demo : True := by\n  sorry\n"
+    lean, llm = ClosedLean(), ScriptLLM({
+        "model-a": ["use 10\nsorry", "use 5\nsorry", "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(
+        Problem(id="demo", description="prove it", challenge=challenge),
+        FakeServices(lean, llm)))
+    audits = [e for e in result.metadata["events"] if e.get("kind") == "audit"]
+    assert any(e.get("verdict") == "refuted" and e.get("goal") == "P 10" for e in audits)
+    assert not any("Is the target a consequence" in p for _, p in llm.calls)
+    assert "use 10" not in result.solution and "use 5" in result.solution
+    assert result.metadata["accepted_by_repl"] is True
