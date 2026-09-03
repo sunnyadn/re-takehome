@@ -18,6 +18,8 @@ from re_harness.lean import LeanRuntimeError
 
 from submission.agent import (
     BUDGET_HEADROOM,
+    technique_card,
+    with_preamble,
     FEEDBACK_CHARS,
     Config,
     Ledger,
@@ -104,6 +106,7 @@ BOARD_SYSTEM = FRAMEWORK_SYSTEM.replace(
     "  proved in its own turn. When the proof left is more than about twenty lines,\n"
     "  post its facts this way and prove one of them, do not write it all at once:\n"
     "  a reply that runs past the token limit keeps only its complete steps.")
+BOARD_SYSTEM = BOARD_SYSTEM + "\n\n" + technique_card()
 assert "goal on the board" in BOARD_SYSTEM
 
 # Two rejections on a goal buy it a plan from the other model, as before.
@@ -1275,7 +1278,7 @@ class BoardAgent(FrameworkAgent):
         ledger = Ledger()
         names = answer_names(problem.challenge)
         graded = declared_names(problem.challenge)
-        text = normalise_imports(problem.challenge, problem.challenge)
+        text = with_preamble(normalise_imports(problem.challenge, problem.challenge))
         first_graded = next(iter(root_names(text)), "")
         best = text
         events: list[dict[str, Any]] = []

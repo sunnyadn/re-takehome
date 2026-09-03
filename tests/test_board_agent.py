@@ -1655,3 +1655,22 @@ def test_a_false_claim_is_refuted_by_evaluation_before_any_auditor_is_asked():
     assert "have bad" not in result.solution
     search = [src for src in lean.sources if "List.range" in src][0]
     assert "(x < 2)" in search and "¬ (x = 3)" in search
+
+
+def test_the_technique_preamble_sits_after_the_header_and_the_models_are_told_about_it():
+    # Techniques are Lean tactics defined once in the file, not prose recipes:
+    # checked once in the image, callable by either model anywhere in the file.
+    from submission.agent import normalise_imports, with_preamble
+    from submission.techniques import PREAMBLE_MARK
+    narrow = ("import Mathlib.Data.Nat.Basic\n\ntheorem demo (d : ℕ) (h : d ∣ 2000) : 5 ≤ d := by\n  sorry\n")
+    text = with_preamble(normalise_imports(narrow, narrow))
+    lines = text.split("\n")
+    assert lines[0] == "import Mathlib.Data.Nat.Basic" and lines[1] == "import Mathlib"
+    assert lines.index("attribute [instance 2000] instPowNat") < lines.index(PREAMBLE_MARK) < lines.index(
+        "theorem demo (d : ℕ) (h : d ∣ 2000) : 5 ≤ d := by")
+    assert 'macro "dvd_cases"' in text and with_preamble(text) == text
+    result, lean, llm, _ = run(ONE, {"model-a": ["have key : True := by trivial\nexact key"] * 2},
+                               lines=("model-a",))
+    assert all("dvd_cases" in src for src in lean.sources if "have key" in src)
+    assert "dvd_cases" in result.solution
+    assert any("dvd_cases" in s for s in llm.systems)

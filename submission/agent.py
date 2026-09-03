@@ -19,6 +19,7 @@ from re_harness.llm import REFUSED_BEFORE_GENERATION
 from re_harness.config import HarnessSettings
 from re_harness.lean import LeanRuntimeError, numeric_answers_are_literals
 from re_harness.models import ALLOWED_MODELS, MODEL_A, MODEL_B
+from submission.techniques import PREAMBLE_MARK, preamble, technique_card
 
 # A refused call releases its reservation, so repeating it is free and the
 # problem stays winnable. Without this a single 429 ends the problem.
@@ -191,6 +192,16 @@ def normalise_imports(source: str, fallback: str) -> str:
             body = NAT_POW_LINE + "\n\n" + body
         body = type_exponents(body)
     return "\n".join(imports) + "\n\n" + body + "\n"
+
+
+def with_preamble(text: str) -> str:
+    """The technique tactics (techniques.py), defined once after the header
+    of a normalised file: imports, then the instance line if any."""
+    if PREAMBLE_MARK in text:
+        return text
+    lines = text.split("\n")
+    k = max((i for i, l in enumerate(lines) if l.startswith("import ") or l == NAT_POW_LINE), default=-1)
+    return "\n".join(lines[:k + 1] + ["", preamble()] + lines[k + 1:])
 
 
 FENCE_LINE = re.compile(r"^\s*```.*$", re.MULTILINE)
