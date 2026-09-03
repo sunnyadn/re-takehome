@@ -57,7 +57,7 @@ class BoardLean:
                 messages.append({"severity": "error", "pos": {"line": i - 1},
                                  "endPos": {"line": i - 1},
                                  "data": f"Unknown constant `{body.split()[1]}`"})
-            if body.startswith(("first", "exact?", "linarith")):
+            if decl and body.startswith(("first", "exact?", "linarith")):
                 messages.append({"severity": "error", "pos": {"line": i - 1},
                                  "endPos": {"line": i - 1},
                                  "data": "linarith failed to find a contradiction"})
@@ -594,7 +594,8 @@ def test_a_closer_that_fires_is_flattened_from_its_own_trace_in_one_check():
     result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
                                      FakeServices(lean, llm)))
     assert result.metadata["accepted_by_repl"] is True
-    assert "  omega\n" in result.solution and "first" not in result.solution
+    proof = result.solution.split("theorem demo", 1)[1]
+    assert "  omega\n" in proof and "first" not in proof
     closed = max(i for i, s in enumerate(lean.sources) if "\n  first\n" in s)
     flat = next(i for i, s in enumerate(lean.sources) if "\n  omega\n" in s)
     assert flat - closed == 1
@@ -1669,12 +1670,18 @@ def test_the_technique_preamble_sits_after_the_header_and_the_models_are_told_ab
     assert lines[0] == "import Mathlib.Data.Nat.Basic" and lines[1] == "import Mathlib"
     assert lines.index("attribute [instance 2000] instPowNat") < lines.index(PREAMBLE_MARK) < lines.index(
         "theorem demo (d : ℕ) (h : d ∣ 2000) : 5 ≤ d := by")
-    assert 'macro "dvd_cases"' in text and with_preamble(text) == text
+    assert 'syntax "divisor_cases"' in text and with_preamble(text) == text
+    # A hoisted lemma, a probe or a set_option lands below the technique block,
+    # else a lemma that calls a technique is written above its definition.
+    from submission.framework import insert_preamble
+    from submission.techniques import PREAMBLE_END
+    hoisted = insert_preamble(text, "lemma aux : True := by\n  sorry")
+    assert hoisted.index(PREAMBLE_END) < hoisted.index("lemma aux") < hoisted.index("theorem demo")
     result, lean, llm, _ = run(ONE, {"model-a": ["have key : True := by trivial\nexact key"] * 2},
                                lines=("model-a",))
-    assert all("dvd_cases" in src for src in lean.sources if "have key" in src)
-    assert "dvd_cases" in result.solution
-    assert any("dvd_cases" in s for s in llm.systems)
+    assert all("divisor_cases" in src for src in lean.sources if "have key" in src)
+    assert "divisor_cases" in result.solution
+    assert any("divisor_cases h : e" in s for s in llm.systems)
 
 
 def test_apply_suggestions_close_a_goal_without_a_model_or_reach_the_prompt():

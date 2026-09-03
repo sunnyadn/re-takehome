@@ -12,7 +12,8 @@ from typing import Any, Sequence
 # `first` takes the first alternative that does not fail, and `norm_num` can
 # succeed by rewriting without closing; `done` turns that into a failure so the
 # block keeps searching. Never emit an alternative without it.
-from submission.agent import DECL_START, COCKTAIL, PROOF_DECL, wrap_tactic
+from submission.agent import DECL_START, COCKTAIL, NAT_POW_LINE, PROOF_DECL, wrap_tactic
+from submission.techniques import PREAMBLE_END
 
 # A placeholder is a whole line. A term-position `:= sorry` (an answer slot) is
 # not one, and `skip` would not typecheck there anyway.
@@ -99,10 +100,15 @@ def replace_cursor(text: str, block: str, *, index: int = 0,
 
 
 def insert_preamble(text: str, block: str) -> str:
-    """Probes and `set_option` go above the theorem, never inside the proof."""
+    """Probes, `set_option` and hoisted lemmas go below the whole header (imports,
+    the instance line, the technique tactics), never inside the proof."""
 
     ends = [m.end() for m in IMPORT_LINE.finditer(text)]
-    at = text.find("\n", ends[-1]) + 1 if ends else 0
+    for line in (NAT_POW_LINE, PREAMBLE_END):
+        i = text.find("\n" + line + "\n")
+        if i >= 0:
+            ends.append(i + len(line) + 1)
+    at = text.find("\n", max(ends)) + 1 if ends else 0
     return text[:at] + block.rstrip() + "\n\n" + text[at:]
 
 
