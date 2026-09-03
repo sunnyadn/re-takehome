@@ -729,6 +729,39 @@ def split_facts(block: str) -> tuple[list[str], str]:
     return facts, "\n".join(rest).strip("\n")
 
 
+MINE_CAP = 6
+HAVE_ANY = re.compile(r"^\s*(have\b.*?)\s*:=")
+
+
+def mine_statements(block: str, known: dict[str, str], withdrawn: Sequence[str]) -> list[str]:
+    """The `have name : P` heads of a rejected block, in order, as facts to
+    post with `sorry`: a reply is read for what it states, not only run as a
+    script that stops at its first error. Measured on putnam_2018_a1 (v7.74):
+    30 replies called the divisor technique and none reached Lean, every call
+    sitting below the first error of a long reply. Statements below an intro-
+    like line, already on the board, withdrawn, or reusing a name are left out."""
+    out, seen, grown = [], set(known.values()), False
+    base = min((len(l) - len(l.lstrip()) for l in normalise_steps(block).split("\n") if l.strip()),
+               default=0)
+    for line in normalise_steps(block).split("\n"):
+        if not line.strip() or len(line) - len(line.lstrip()) != base:
+            continue
+        if INTRO_LIKE.match(line):
+            grown = True
+        head = HAVE_ANY.match(line)
+        name = HAVE_NAME.match(line)
+        if grown or not head or not name:
+            continue
+        claim = " ".join(claim_of(head.group(1)).split())
+        if not claim or claim in known or claim in withdrawn or name.group(1) in seen:
+            continue
+        seen.add(name.group(1))
+        out.append(f"{head.group(1)} := by")
+        if len(out) >= MINE_CAP:
+            break
+    return out
+
+
 def restates(block: str, claims: Sequence[str]) -> bool:
     """Whether a block posts, at its own top level, a `have` whose claim is one
     of these. A repeat inside a new claim's body is an alias, not a post."""
@@ -1741,6 +1774,33 @@ class BoardAgent(FrameworkAgent):
                     return audited[sub["key"]]
             return ""
 
+        async def mine(base: Board, goal: Goal, block: str, author: str,
+                       why: str) -> tuple[Board | None, str]:
+            """The statements of a rejected block, posted as `sorry` facts at
+            the goal. A statement Lean cannot elaborate or the audit refutes is
+            dropped and the rest tried once more; the feedback stays the step's."""
+
+            heads = mine_statements(block, stated_facts(base.text, goal.decl),
+                                    withdrawn.get(goal.decl, []))
+            if len(heads) < 2:
+                return None, why
+            for _ in range(2):
+                skeleton = "\n".join(f"{h}\n  sorry" for h in heads)
+                nxt, said_ = await judge(base, goal, skeleton)
+                bad = await audit(author, base, nxt) if nxt is not None else ""
+                if nxt is not None and not bad:
+                    events.append({"kind": "mined", "by": author, "facts": len(heads)})
+                    return nxt, ""
+                if nxt is None:
+                    at = failed_at // 2 if failed_at else -1
+                    keep = [h for i, h in enumerate(heads) if i != at]
+                else:
+                    keep = [h for h in heads if claim_of(h[:-len(" := by")]).strip() not in bad]
+                if len(keep) < 2 or keep == heads:
+                    break
+                heads = keep
+            return None, why
+
         async def advance(base: Board, goal: Goal, block: str,
                           author: str) -> tuple[Board | None, str]:
             """A step, then its prefixes, then `exact?` in place of a bad proof."""
@@ -1769,6 +1829,8 @@ class BoardAgent(FrameworkAgent):
                     nxt, _ = await judge(base, goal, retry)
                     events.append({"kind": "search-retry", "by": author,
                                    "accepted": nxt is not None})
+                if nxt is None:
+                    nxt, why = await mine(base, goal, block, author, why)
             if nxt is None and why == BUDGET_RETRY and not raised:
                 raised = True
                 lifted = await look(insert_preamble(base.text, RAISED_BUDGETS))

@@ -1714,6 +1714,27 @@ def test_an_auditor_that_does_not_answer_in_time_lets_the_step_through_unverifie
     assert wall >= 0.8, wall
 
 
+def test_a_rejected_reply_is_read_for_the_statements_it_makes():
+    # Measured on putnam_2018_a1 (v7.74): 30 replies called the divisor technique
+    # and none reached Lean, each call below the first error of a long reply.
+    # The statements of a rejected block go on the board as facts to prove.
+    from submission.board_agent import mine_statements
+    block = ("linarith\nhave a : True := by\n  trivial\nhave b : 1 = 1 := by rfl\n"
+             "have a : 2 = 2 := by rfl\nintro loc\nhave c : True := by trivial\n")
+    assert mine_statements(block, {}, []) == ["have a : True := by", "have b : 1 = 1 := by"]
+    assert mine_statements(block, {"True": "k"}, ["1 = 1"]) == ["have a : 2 = 2 := by"]
+    result, lean, llm, _ = run(ONE, {
+        "model-a": ["linarith\nhave a : True := by\n  trivial\nhave b : 1 = 1 := by rfl\nexact a",
+                    "exact a", "have k : True := by trivial\nexact k", "have k : True := by trivial\nexact k"]},
+        lines=("model-a",))
+    events = result.metadata["events"]
+    mined = [e for e in events if e.get("kind") == "mined"]
+    assert mined and mined[0]["facts"] == 2
+    proofs = [src.split("theorem demo", 1)[1] for src in lean.sources if "theorem demo" in src]
+    assert any("have a : True := by" in p and "have b : 1 = 1 := by" in p and "linarith" not in p
+               for p in proofs)
+
+
 def test_a_claim_the_walk_covers_is_settled_without_an_auditor_call():
     # Measured over 7 runs: every refutation with ℕ binders came from the walk,
     # the auditor's came from closed claims and ℤ, and audit calls were half of
