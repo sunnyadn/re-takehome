@@ -1529,3 +1529,41 @@ def test_a_board_that_accepts_nothing_for_a_share_of_the_window_restarts_before_
                           lines=("model-b",), time_limit=600.0)
     first = next(e for e in result.metadata["events"] if e.get("stage") == "restate")
     assert first["tries"] < ba.LAST_IN_LINE
+
+
+def test_goal_tokens_are_the_goal_s_identifiers_then_its_notation_with_the_weak_words_last():
+    from submission.board_agent import goal_tokens
+    assert goal_tokens("hp : Nat.Prime p\n⊢ (2 ^ 2 * 1009 ^ 2).divisors.card = 9") == [
+        "divisors", "pow", "nat", "prime"]
+    assert goal_tokens("a b : ℕ\nhdiv : 2000 ∣ a ^ 2 * b ^ 5\n⊢ 10 ≤ a * b")[:2] == ["dvd", "pow"]
+    assert goal_tokens("⊢ True") == []
+
+
+def test_the_environment_s_answer_for_a_goal_s_words_reaches_the_step_prompt():
+    # The curated sheets cover 13 vocabularies; a holdout goal outside them got
+    # nothing. Lean scans its own constants for the goal's tokens instead.
+    from submission.board_agent import goal_tokens
+    challenge = ("import Mathlib\n\ntheorem demo (m n : ℕ) (h : m.Coprime n) : "
+                 "(m * n).divisors.card = 1 := by\n  sorry\n")
+    asked = []
+
+    class LibraryLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            if "Library for this goal" in source:
+                asked.append(source)
+                return LeanCheck(True, [{"severity": "info", "data":
+                                         "Library for this goal:\n  Nat.Coprime.card_divisors_mul : "
+                                         "∀ {m n : ℕ}, m.Coprime n → (m * n).divisors.card = "
+                                         "m.divisors.card * n.divisors.card"}], False, False, 1)
+            check = await super().check_file(source, timeout_s)
+            msgs = [dict(m, data=m["data"].replace("⊢ demo", "h : m.Coprime n\n⊢ (m * n).divisors.card = 1"))
+                    if "unsolved" in str(m.get("data")) else m for m in check.messages]
+            return LeanCheck(check.accepted, msgs, check.has_sorry, False, 1)
+
+    lean, llm = LibraryLean(), ScriptLLM({"model-a": ["have key : True := by trivial\nexact key"] * 2})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    asyncio.run(agent.solve(Problem(id="demo", description="prove it", challenge=challenge),
+                            FakeServices(lean, llm)))
+    assert len(asked) == 1 and '"coprime"' in asked[0] and '"divisors"' in asked[0]
+    prompts = [p for m, p in llm.calls if "Names the loaded Mathlib has" in p]
+    assert prompts and "Nat.Coprime.card_divisors_mul" in prompts[0]

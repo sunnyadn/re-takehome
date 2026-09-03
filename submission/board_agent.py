@@ -394,6 +394,76 @@ NAME_PROBE = """open Lean Elab Command in
 """
 
 
+# The goal's own vocabulary, asked of the environment: every constant whose
+# name carries two or more of the goal's tokens, best first, with its type.
+# Measured in the image: 1 to 3 s a query; [Coprime, divisors, mul] returns
+# Nat.Coprime.divisors_mul first, [Nat, pow, mod, add] Nat.pow_mod and Nat.pow_add.
+LIBRARY_PROBE = """open Lean Elab Command in
+#eval show CommandElabM Unit from do
+  let env ← getEnv
+  let toks : List String := [{tokens}]
+  let skip := ["_proof_", "._", "match_", "proof_", ".eq_", ".rec", ".casesOn", ".noConfusion", ".sizeOf", ".injEq", ".inj", ".below", ".brecOn", ".binductionOn", "Decidable", ".mk", "inst", "Lex"]
+  let mut hits : Array (Nat × Nat × Name) := #[]
+  for (n, _) in env.constants.toList do
+    if n.isInternal then continue
+    let s := n.toString
+    if skip.any (fun k => (s.splitOn k).length > 1) then continue
+    let low := s.toLower
+    let hit := toks.foldl (fun acc t => if (low.splitOn t).length > 1 then acc + 1 else acc) 0
+    if hit ≥ 2 then hits := hits.push (hit, s.length, n)
+  let sorted := hits.qsort (fun a b => decide (a.1 > b.1) || (a.1 == b.1 && decide (a.2.1 < b.2.1)))
+  let mut out := "Library for this goal:"
+  for (_, _, n) in sorted.toList.take {limit} do
+    if let some ci := env.find? n then
+      let ty ← liftTermElabM (Meta.ppExpr ci.type)
+      let t := ((toString ty).replace "\\n" " ").take 160
+      out := out ++ s!"\\n  {{n}} : {{t}}"
+  logInfo out
+"""
+LIBRARY_LIMIT = 12
+# Notation to the word Mathlib spells it with in a name.
+NOTATION_TOKENS = (("∣", "dvd"), ("%", "mod"), ("^", "pow"), ("∑", "sum"), ("∏", "prod"),
+                   ("!", "factorial"), ("√", "sqrt"), ("⌊", "floor"), ("⌈", "ceil"), ("≡", "modeq"),
+                   ("ℕ", "nat"), ("ℤ", "int"), ("ℚ", "rat"), ("ℝ", "real"), ("≤", "le"), ("<", "lt"))
+IDENTIFIER = re.compile(r"\b(?:[A-Z][A-Za-z]+(?:\.[A-Za-z][A-Za-z0-9]*)*|[a-z][A-Za-z]*[A-Z][A-Za-z]*|[a-z]{4,})\b")
+NOT_TOKENS = {"type", "prop", "sort", "true", "false", "with", "have", "show", "this", "then", "else", "card"}
+# Too common to rank a name on their own; they go last and only fill the list.
+WEAK_TOKENS = {"le", "lt", "nat", "int", "rat", "real"}
+
+
+def goal_tokens(goal_text: str) -> list[str]:
+    """The words of the goal a library name could carry: each identifier's
+    components, then the notation's names, the type's name last; at most 6."""
+    target = goal_text.split("⊢", 1)[1] if "⊢" in goal_text else goal_text
+    hyps = "\n".join(v for v in hypotheses(goal_text).values())
+    words: list[str] = []
+    late: list[str] = []
+    for text in (target, hyps):
+        for m in IDENTIFIER.findall(text):
+            for part in m.split("."):
+                low = part.lower()
+                if len(low) > 2 and low not in NOT_TOKENS and low not in words:
+                    words.append(low)
+        for sym, word in NOTATION_TOKENS:
+            if sym in text and word not in words and word not in late:
+                (late if word in WEAK_TOKENS else words).append(word)
+    return (words + late)[:6]
+
+
+def library_file(prefix: str, tokens: Sequence[str]) -> str:
+    quoted = ", ".join('"' + t.replace('"', "") + '"' for t in tokens)
+    return prefix.rstrip("\n") + "\n\n" + LIBRARY_PROBE.format(tokens=quoted, limit=LIBRARY_LIMIT)
+
+
+def read_library(messages: Sequence[dict[str, Any]]) -> str:
+    for m in messages:
+        data = str(m.get("data", ""))
+        if m.get("severity") in INFO and data.startswith("Library for this goal:"):
+            lines = [l for l in data.split("\n")[1:] if l.strip()]
+            return "\n".join(l.strip()[:200] for l in lines)
+    return ""
+
+
 def library_names(messages: Sequence[dict[str, Any]], goal_text: str) -> list[str]:
     """Unknown names in Lean's messages that look like library declarations:
     dotted or underscored, and not a variable or hypothesis of the goal."""
@@ -1309,12 +1379,29 @@ class BoardAgent(FrameworkAgent):
 
         failed_at = 0
         known_names: dict[str, str] = {}
+        # The environment's answer to a goal's vocabulary, once per token set.
+        shelf: dict[tuple[str, ...], str] = {}
+        shelved: dict[tuple[str, str], str] = {}
         leaf_restarts: set[tuple[str, str]] = set()
         # What evaluation found for an existential goal that no closer finished.
         hints: dict[tuple[str, str], str] = {}
         # Every plan asked for a declaration, kept across restarts: the next
         # plan is asked to differ from them.
         routes: dict[str, list[str]] = {}
+
+        async def consult(goal: Goal) -> None:
+            """Ask the loaded Mathlib what it has for this goal's words, once."""
+            tokens = tuple(goal_tokens(goal.text))
+            if len(tokens) < 2:
+                return
+            if tokens not in shelf:
+                imports = "\n".join(l for l in text.split("\n") if l.startswith("import "))
+                check = await services.lean.check_file(library_file(imports, tokens), timeout_s=90)
+                shelf[tokens] = read_library(check.messages)
+                events.append({"stage": "library", "tokens": list(tokens),
+                               "lines": shelf[tokens].count("\n") + bool(shelf[tokens]),
+                               "ms": check.duration_ms})
+            shelved[goal.key] = shelf[tokens]
 
         async def nearest_names(messages: Sequence[dict[str, Any]], goal: Goal) -> str:
             """Lean's own answer to a misspelt library name, once per name."""
@@ -1910,7 +1997,7 @@ class BoardAgent(FrameworkAgent):
                      f"{goal.text[:GOAL_CHARS]}"]
             if hints.get(goal.key):
                 parts.append(hints[goal.key])
-            sheet = sheet_for(goal.text)
+            sheet = "\n".join(x for x in (sheet_for(goal.text), shelved.get(goal.key, "")) if x)
             if sheet:
                 parts.append("Names the loaded Mathlib has for this goal's vocabulary, "
                              f"as #check prints them:\n{sheet}")
@@ -1978,6 +2065,7 @@ class BoardAgent(FrameworkAgent):
                         swept.add(goal.key)
                         if await sweep(goal) or await witness_sweep(goal):
                             return True
+                        await consult(goal)
                     if goal is not None:
                         claimed.setdefault(goal.key, model)
                         wants_plan = (tries.get(goal.key, 0) >= PLAN_AFTER
