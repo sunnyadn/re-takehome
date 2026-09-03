@@ -116,6 +116,13 @@ assert "goal on the board" in BOARD_SYSTEM
 PLAN_AFTER = 2
 # Library probes (`apply?`, the name scan) wait for one rejected step.
 SEARCH_AFTER = 1
+# What the harness's own Lean probes may take of the wall clock so far: the
+# environment scans (names, the vocabulary scan, apply?) and the leaf blocks,
+# each at this share, after a grace period. Measured on a 4-core pod
+# (rmo_2000_6, v7.85): 425 checks, Lean 2443 s of 2642 s, of which names 689 s,
+# apply? and the scan 478 s, leaves 466 s; 91 model calls in 44 minutes.
+PROBE_SHARE = 0.15
+PROBE_GRACE_S = 60.0
 # A goal this many rejections deep is still open, only last in line. Time and
 # money are the exits; a goal is never declared hopeless by count alone.
 LAST_IN_LINE = 6
@@ -1412,6 +1419,16 @@ class BoardAgent(FrameworkAgent):
         plans: dict[tuple[str, str], str] = {}
         swept: set[tuple[str, str]] = set()
         searched: set[tuple[str, str]] = set()
+        probe_spent: dict[str, float] = {"scan": 0.0, "leaf": 0.0}
+
+        def affordable(kind: str) -> bool:
+            """Whether this probe kind is still inside its share of the clock."""
+            elapsed = time.monotonic() - started
+            if probe_spent[kind] <= PROBE_GRACE_S or probe_spent[kind] <= PROBE_SHARE * elapsed:
+                return True
+            events.append({"stage": "probe_skipped", "kind": kind,
+                           "spent_s": round(probe_spent[kind]), "elapsed_s": round(elapsed)})
+            return False
         divided: set[tuple[str, str]] = set()
         restated: dict[str, int] = {}
         refused: set[tuple[tuple[str, str], str]] = set()
@@ -1568,8 +1585,11 @@ class BoardAgent(FrameworkAgent):
             if len(tokens) < 2:
                 return
             if tokens not in shelf:
+                if not affordable("scan"):
+                    return
                 imports = "\n".join(l for l in text.split("\n") if l.startswith("import "))
                 check = await services.lean.check_file(library_file(imports, tokens), timeout_s=90)
+                probe_spent["scan"] += check.duration_ms / 1000
                 shelf[tokens] = read_library(check.messages)
                 events.append({"stage": "library", "tokens": list(tokens),
                                "lines": shelf[tokens].count("\n") + bool(shelf[tokens]),
@@ -1580,9 +1600,10 @@ class BoardAgent(FrameworkAgent):
             """Lean's own answer to a misspelt library name, once per name."""
             names = library_names(messages, goal.text)
             fresh = [n for n in names if n not in known_names]
-            if fresh:
+            if fresh and affordable("scan"):
                 imports = "\n".join(l for l in text.split("\n") if l.startswith("import "))
                 check = await services.lean.check_file(name_probe_file(imports, fresh), timeout_s=90)
+                probe_spent["scan"] += check.duration_ms / 1000
                 found = read_name_probe(check.messages)
                 for n in fresh:
                     part = next((p for p in found.split("\n\n") if p.startswith(n + " ")), "")
@@ -1949,22 +1970,27 @@ class BoardAgent(FrameworkAgent):
 
             base = board
             candidates = leaf_candidates(goal.text)
-            if not candidates:
+            if not candidates or not affordable("leaf"):
                 return False
             t0 = time.monotonic()
-            for block in candidates:
-                nxt, why = await judge(base, goal, block)
-                if nxt is not None:
-                    events.append({"kind": "leaf", "goal": goal.text[-120:],
-                                   "block": block.split("\n")[-1][:80], "accepted": True,
-                                   "ms": int((time.monotonic() - t0) * 1000)})
-                    await commit(nxt)
-                    return True
-                if why == TIMED_OUT:
-                    break
-            events.append({"kind": "leaf", "goal": goal.text[-120:], "accepted": False,
-                           "tried": len(candidates), "ms": int((time.monotonic() - t0) * 1000)})
-            return False
+            tried = 0
+            try:
+                for block in candidates:
+                    tried += 1
+                    nxt, why = await judge(base, goal, block)
+                    if nxt is not None:
+                        events.append({"kind": "leaf", "goal": goal.text[-120:],
+                                       "block": block.split("\n")[-1][:80], "accepted": True,
+                                       "ms": int((time.monotonic() - t0) * 1000)})
+                        await commit(nxt)
+                        return True
+                    if why == TIMED_OUT or not affordable("leaf"):
+                        break
+                events.append({"kind": "leaf", "goal": goal.text[-120:], "accepted": False,
+                               "tried": tried, "ms": int((time.monotonic() - t0) * 1000)})
+                return False
+            finally:
+                probe_spent["leaf"] += time.monotonic() - t0
 
         async def library_sweep(goal: Goal) -> bool:
             """Mathlib asked what unifies with the goal (`apply?`), after the
@@ -1972,9 +1998,12 @@ class BoardAgent(FrameworkAgent):
             rest go into the prompt as the names that fit. Measured in the
             image: 4 of 4 leaf goals closed by exact, about 8 s each."""
 
+            if not affordable("scan"):
+                return False
             # The file's own check time plus the heartbeat-capped search.
             check = await services.lean.check_file(apply_file(board.text, goal),
                                                    timeout_s=check_timeout_s(board.ms) + 30)
+            probe_spent["scan"] += check.duration_ms / 1000
             found = read_suggestions(check.messages, goal.line)
             accepted = False
             for how, term in found:

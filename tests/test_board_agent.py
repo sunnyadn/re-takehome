@@ -2028,3 +2028,27 @@ def test_a_claim_that_holds_only_past_a_threshold_is_split_there():
         assert block.startswith("rcases Nat.lt_or_ge x 10 with hlt | hge\n· interval_cases x <;> "
                                 "first | omega | (bounded_cases y 13)\n· obtain")
     assert not any("rcases Nat.lt_or_ge" in c for c in leaf_candidates(ctx + "⊢ y ^ 3 < (x + 3) ^ 3"))
+
+
+def test_environment_scans_stop_when_they_have_had_their_share_of_the_clock():
+    # Measured on a 4-core pod (rmo_2000_6, v7.85): 425 Lean checks, 2443 s of
+    # 2642 s in Lean, the name scan 689 s and apply? with the vocabulary scan
+    # 478 s of it, 91 model calls in 44 minutes. A slow machine gets the probes
+    # it can afford: each kind stops past PROBE_SHARE of the elapsed clock.
+    class SlowScanLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            if "apply?" in source or "Library for this goal" in source:
+                self.sources.append(source)
+                return LeanCheck(False, [], False, False, 100_000)      # 100 s each
+            return await super().check_file(source, timeout_s)
+
+    two = ("import Mathlib\n\ntheorem demo : True := by\n  have a : P := by\n    sorry\n"
+           "  have b : Q := by\n    sorry\n  have c : R := by\n    sorry\n  sorry\n")
+    lean = SlowScanLean()
+    llm = ScriptLLM({"model-a": ["linarith [x]"] * 40})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=3.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=two),
+                                     FakeServices(lean, llm)))
+    scans = [s for s in lean.sources if "apply?" in s or "Library for this goal" in s]
+    skipped = [e for e in result.metadata["events"] if e.get("stage") == "probe_skipped"]
+    assert len(scans) == 1 and skipped and skipped[0]["kind"] == "scan"
