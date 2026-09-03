@@ -536,9 +536,14 @@ def split_facts(block: str) -> tuple[list[str], str]:
 
 
 def restates(block: str, claims: Sequence[str]) -> bool:
-    """Whether a block posts a `have` whose claim is one of these."""
+    """Whether a block posts, at its own top level, a `have` whose claim is one
+    of these. A repeat inside a new claim's body is an alias, not a post."""
     gone = {" ".join(c.split()) for c in claims}
-    for line in block.split("\n"):
+    lines = [l for l in block.split("\n") if l.strip()]
+    top = min((len(l) - len(l.lstrip()) for l in lines), default=0)
+    for line in lines:
+        if len(line) - len(line.lstrip()) != top:
+            continue
         head = HAVE_HEAD.match(line) or re.match(r"^(\s*)(have\b.*?)\s*:=", line)
         if head and " ".join(claim_of(head.group(2).strip()).split()) in gone:
             return True

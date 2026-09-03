@@ -1044,3 +1044,16 @@ def test_a_big_operator_written_with_in_is_spelled_the_way_this_mathlib_reads_it
                       board, goal, ["t"])
     assert [e.kind for e in edits] == ["step", "hoist"]
     assert all(" in " not in e.block + e.body and "∈" in e.block + e.body for e in edits)
+
+
+def test_a_proved_fact_re_derived_inside_a_new_claims_body_is_not_a_restatement():
+    # Measured on rmo_2000_6 (one35a): `have h_v5 : 5 ∣ a * b := by\n  have : 5 ∣ a ^ 2
+    # * b ^ 5 := h5_pow ...` was refused twice as "already on the board as h5";
+    # the new claim was new, only a local alias inside its body repeated h5.
+    from submission.board_agent import restates
+    block = ("have h_v5 : 5 ∣ a * b := by\n"
+             "  have : (5 : ℕ) ∣ a ^ 2 * b ^ 5 := h5_pow\n"
+             "  exact Nat.Prime.dvd_of_dvd_pow Nat.prime_five this")
+    assert not restates(block, ["(5 : ℕ) ∣ a ^ 2 * b ^ 5"])
+    assert restates(block, ["5 ∣ a * b"])
+    assert restates("  have : (5 : ℕ) ∣ a ^ 2 * b ^ 5 := h5_pow", ["(5 : ℕ) ∣ a ^ 2 * b ^ 5"])
