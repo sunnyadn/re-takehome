@@ -8,6 +8,7 @@ from __future__ import annotations
 DIVISOR_CASES = ("""-- `divisor_cases h : e` (h : d ∣ e) or `divisor_cases h : N = e` (h : d ∣ N,
 -- N a numeral) puts one goal per divisor of e, d replaced by it. e is a product
 -- of prime variables (Nat.Prime in context), numeral primes and prime powers.
+-- Over ℤ: `divisor_cases h for x : N = e` (h : x ∣ N) gives hx : x = ±d per case.
 syntax "divisor_split" ident " : " term : tactic
 set_option linter.unusedVariables false in
 macro_rules
@@ -25,15 +26,26 @@ macro_rules
       rcases (Nat.dvd_prime hp).mp $h with hd | hd <;> subst hd))
 
 syntax "divisor_cases" ident " : " term : tactic
+syntax "divisor_cases" ident " for " term " : " term : tactic
 macro_rules
   | `(tactic| divisor_cases $h : $l = $r) => `(tactic| (
       rw [show $l = $r by norm_num] at $h:ident
       divisor_split $h : $r))
-  | `(tactic| divisor_cases $h : $e) => `(tactic| divisor_split $h : $e)""",
+  | `(tactic| divisor_cases $h : $e) => `(tactic| divisor_split $h : $e)
+  | `(tactic| divisor_cases $h for $x : $l = $r) => `(tactic| (
+      have hn : ($x).natAbs ∣ $r := by
+        have hh := Int.natAbs_dvd_natAbs.mpr $h
+        rw [show (($l : ℤ)).natAbs = $r by norm_num] at hh
+        exact hh
+      have hx := Int.natAbs_eq $x
+      generalize hm : ($x).natAbs = m at hn hx
+      (divisor_split hn : $r) <;> (rcases hx with hx | hx) <;> norm_num at hx))""",
                  "`divisor_cases h : e` (h : d ∣ e, e a product of prime variables with Nat.Prime "
                  "in context, numeral primes and prime powers, such as `5 * p * q` or `2 ^ 2 * 1009 ^ 2`) "
                  "or `divisor_cases h : N = e` for a numeral N: one goal per divisor, d replaced by it; "
-                 "for `h : a * b = e` first `have hd : a ∣ e := Dvd.intro _ h`. Never `decide` a divisor set.")
+                 "for `h : a * b = e` first `have hd : a ∣ e := Dvd.intro _ h`. Over ℤ, "
+                 "`divisor_cases h for x : (N : ℤ) = e` (h : x ∣ N) leaves `hx : x = d` or `hx : x = -d` "
+                 "in each case. Never `decide` a divisor set.")
 
 TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES,)
 

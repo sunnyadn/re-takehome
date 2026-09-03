@@ -1670,13 +1670,17 @@ def test_the_technique_preamble_sits_after_the_header_and_the_models_are_told_ab
     assert lines[0] == "import Mathlib.Data.Nat.Basic" and lines[1] == "import Mathlib"
     assert lines.index("attribute [instance 2000] instPowNat") < lines.index(PREAMBLE_MARK) < lines.index(
         "theorem demo (d : ℕ) (h : d ∣ 2000) : 5 ≤ d := by")
-    assert 'syntax "divisor_cases"' in text and with_preamble(text) == text
+    assert 'syntax "divisor_cases" ident " for " term' in text and with_preamble(text) == text
     # A hoisted lemma, a probe or a set_option lands below the technique block,
     # else a lemma that calls a technique is written above its definition.
     from submission.framework import insert_preamble
     from submission.techniques import PREAMBLE_END
     hoisted = insert_preamble(text, "lemma aux : True := by\n  sorry")
     assert hoisted.index(PREAMBLE_END) < hoisted.index("lemma aux") < hoisted.index("theorem demo")
+    # The finishing tidy (lighten, prune) measures the proof, not the file: the
+    # block is the same size in every file and a short proof must not be pruned.
+    from submission.framework_agent import below_header, TIDY_ABOVE_BYTES
+    assert len(text) > TIDY_ABOVE_BYTES // 2 and len(below_header(text)) < 200
     result, lean, llm, _ = run(ONE, {"model-a": ["have key : True := by trivial\nexact key"] * 2},
                                lines=("model-a",))
     assert all("divisor_cases" in src for src in lean.sources if "have key" in src)

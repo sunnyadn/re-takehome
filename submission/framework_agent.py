@@ -18,6 +18,7 @@ from re_harness import AgentResult, LLMCallError, Problem, Services
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
+from submission.techniques import PREAMBLE_END
 from submission.agent import (
     in_file_coordinates,
     BUDGET_HEADROOM,
@@ -127,6 +128,13 @@ MAX_COLLAPSE = 24
 MAX_LIGHTEN = 16
 # Below this a proof is already small; tidying it only risks it.
 TIDY_ABOVE_BYTES = 2000
+
+
+def below_header(text: str) -> str:
+    """The file without the technique block: the tidy threshold is about the
+    proof's size, and the block is the same 1.8 KB in every file."""
+    i = text.find(PREAMBLE_END)
+    return text[i + len(PREAMBLE_END):] if i >= 0 else text
 HEAVY = ("nlinarith", "polyrith", "decide", "interval_cases")
 LIGHTER = ("linarith", "norm_num", "positivity", "simp", "omega", "ring")
 # The cocktail is ordered by how often each tactic wins, so the one that fired
@@ -936,7 +944,7 @@ class FrameworkAgent:
         # into one it timed out on, because deleting a fact a closer was using
         # makes that closer redo the work in a term the kernel then re-checks.
         # A short file has nothing to win here, and §4 says not to touch it.
-        if len(state.text) > TIDY_ABOVE_BYTES:
+        if len(below_header(state.text)) > TIDY_ABOVE_BYTES:
             state = await self._lighten(state, services, time_left)
             state = await self._prune(state, services, time_left)
         for _ in range(MAX_COLLAPSE):
