@@ -27,6 +27,12 @@ class BoardLean:
         self.sources.append(source)
         if "vm_probe" in source:
             return LeanCheck(True, [], False, False, 1)
+        if "Nearest that exist" in source:
+            asked = re.findall(r'"([^"]+)"', source.split("wanted", 1)[1].split("\n", 1)[0])
+            return LeanCheck(True, [{"severity": "info", "pos": {"line": 3}, "endPos": {"line": 3},
+                                     "data": f"{n} is not a name. Nearest that exist:\n  "
+                                             f"Nat.real_{n.split('.')[-1]} : ∀ n, True"}
+                                    for n in asked], False, False, 1)
         messages, decl, haves = [], "", []
         for i, line in enumerate(source.split("\n"), start=1):
             head = HEAD.match(line)
@@ -36,6 +42,10 @@ class BoardLean:
             body = line.strip()
             if body.startswith("have "):
                 haves.append(body.split()[1])
+            if body.startswith("exact Nat."):
+                messages.append({"severity": "error", "pos": {"line": i - 1},
+                                 "endPos": {"line": i - 1},
+                                 "data": f"Unknown constant `{body.split()[1]}`"})
             if body.startswith(("first", "exact?", "linarith")):
                 messages.append({"severity": "error", "pos": {"line": i - 1},
                                  "endPos": {"line": i - 1},
@@ -1087,3 +1097,22 @@ def test_a_lean_3_comma_at_the_end_of_a_tactic_line_is_dropped():
     assert dialect("refine ⟨a,\n  b⟩") == "refine ⟨a,\n  b⟩"
     assert dialect("simp only [foo,\n  bar] at h") == "simp only [foo,\n  bar] at h"
     assert dialect("· norm_num [Nat.factorial],") == "· norm_num [Nat.factorial]"
+
+
+def test_a_misspelt_library_name_comes_back_with_the_nearest_real_ones():
+    # Measured on r3's archive: 99 of 610 rejections named an unknown identifier;
+    # after the locals, the top ones were renamed Mathlib lemmas (div_le_div_iff 19,
+    # Int.mod_eq_of_lt 12, Finset.Ico.mem 12). Lean's environment knows the real names.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) : True := by\n  sorry\n"
+    result, lean, llm, _ = run(challenge, {
+        "model-b": ["exact Nat.mod_pow_self x", "exact Nat.mod_pow_self x",
+                    "have key : True := by trivial\nexact key"]},
+        lines=("model-b",))
+    prompts = [p for m, p in llm.calls if "Nearest that exist" in p]
+    assert prompts and "Nat.real_mod_pow_self" in prompts[0]
+    asked = [e for e in result.metadata["events"] if e.get("stage") == "names"]
+    assert len(asked) == 1 and asked[0]["asked"] == ["Nat.mod_pow_self"]
+    # the local `x` and hypothesis-style names never go to Lean
+    from submission.board_agent import library_names
+    assert library_names([{"data": "Unknown identifier `x`"}, {"data": "Unknown identifier `h_k`"},
+                          {"data": "Unknown identifier `k.succ`"}], "k x : ℕ\n⊢ True") == []

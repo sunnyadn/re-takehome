@@ -357,6 +357,67 @@ def binder_names(group: str) -> list[str]:
     return parts[0].split() if parts else []
 
 
+UNKNOWN_NAME = re.compile(r"[Uu]nknown (?:constant|identifier) `([^`]+)`")
+# Lean lists, for each misspelt library name, the declarations whose last
+# component shares its tokens, with their types. One CommandElabM pass over
+# the environment; nothing is assumed about which names exist.
+NAME_PROBE = """open Lean Elab Command in
+#eval show CommandElabM Unit from do
+  let env ← getEnv
+  let wanted : List String := [{names}]
+  let names := env.constants.toList.filterMap fun (n, _) =>
+    if n.isInternal then none else some (n, n.toString)
+  for w in wanted do
+    let toks := (((w.splitOn ".").flatMap (·.splitOn "_")).filter (fun t => t.length > 1)).eraseDups
+    let tail := (w.splitOn ".").getLast!
+    let need := max 1 (toks.length - 1)
+    let mut hits : Array (Nat × Nat × Name) := #[]
+    for (n, s) in names do
+      let hit := toks.foldl (fun acc t => if (s.splitOn t).length > 1 then acc + 1 else acc) 0
+      if hit ≥ need then
+        let bonus := if (s.splitOn tail).length > 1 then 2 else 0
+        hits := hits.push (hit + bonus, s.length, n)
+    let sorted := hits.qsort (fun a b => decide (a.1 > b.1) || (a.1 == b.1 && decide (a.2.1 < b.2.1)))
+    let mut out := s!"{{w}} is not a name. Nearest that exist:"
+    for (_, _, n) in sorted.toList.take 5 do
+      if let some ci := env.find? n then
+        let ty ← liftTermElabM (Meta.ppExpr ci.type)
+        out := out ++ s!"\\n  {{n}} : {{ty}}"
+    logInfo out
+"""
+
+
+def library_names(messages: Sequence[dict[str, Any]], goal_text: str) -> list[str]:
+    """Unknown names in Lean's messages that look like library declarations:
+    dotted or underscored, and not a variable or hypothesis of the goal."""
+    local = set(hypotheses(goal_text))
+    out: list[str] = []
+    for m in messages:
+        for name in UNKNOWN_NAME.findall(str(m.get("data", ""))):
+            head = name.split(".")[0]
+            if ("." in name or "_" in name) and head not in local and not name.startswith("h") \
+                    and name not in out:
+                out.append(name)
+    return out[:3]
+
+
+def name_probe_file(prefix: str, names: Sequence[str]) -> str:
+    quoted = ", ".join('"' + n.replace('"', "") + '"' for n in names)
+    return prefix.rstrip("\n") + "\n\n" + NAME_PROBE.format(names=quoted)
+
+
+def read_name_probe(messages: Sequence[dict[str, Any]]) -> str:
+    """Each name's answer, one candidate per line, types cut so a long instance
+    chain does not crowd the feedback."""
+    parts = []
+    for m in messages:
+        data = str(m.get("data", ""))
+        if m.get("severity") in INFO and "Nearest that exist" in data:
+            lines = [l for l in data.split("\n") if l.strip()]
+            parts.append("\n".join(l[:200] for l in lines))
+    return "\n\n".join(parts)
+
+
 def witness_file(prefix: str, groups: Sequence[str], values: dict[str, str],
                  target: str) -> str:
     """One `example`: the binders the auditor assigned stay binders, pinned to
@@ -1065,6 +1126,22 @@ class BoardAgent(FrameworkAgent):
             return candidate
 
         failed_at = 0
+        known_names: dict[str, str] = {}
+
+        async def nearest_names(messages: Sequence[dict[str, Any]], goal: Goal) -> str:
+            """Lean's own answer to a misspelt library name, once per name."""
+            names = library_names(messages, goal.text)
+            fresh = [n for n in names if n not in known_names]
+            if fresh:
+                imports = "\n".join(l for l in text.split("\n") if l.startswith("import "))
+                check = await services.lean.check_file(name_probe_file(imports, fresh), timeout_s=90)
+                found = read_name_probe(check.messages)
+                for n in fresh:
+                    part = next((p for p in found.split("\n\n") if p.startswith(n + " ")), "")
+                    known_names[n] = part
+                events.append({"stage": "names", "asked": fresh, "ms": check.duration_ms,
+                               "found": bool(found)})
+            return "\n".join(known_names[n] for n in names if known_names.get(n))
 
         async def judge(base: Board, goal: Goal, block: str) -> tuple[Board | None, str]:
             """One edit at one goal, judged against the whole file. `failed_at`
@@ -1093,8 +1170,9 @@ class BoardAgent(FrameworkAgent):
                 # model is told about its own step, not the rest of the board.
                 own = [m for m in nxt.messages
                        if m in failures or m in expensive or in_span(m, span)]
-                text = format_messages(own)[:FEEDBACK_CHARS]
-                return None, f"{text}\n{notes_for(text)}".strip()
+                said_text = format_messages(own)[:FEEDBACK_CHARS]
+                names = await nearest_names(own, goal)
+                return None, f"{said_text}\n{names}\n{notes_for(said_text)}".strip()
             if unreachable(nxt.messages, nxt.text, -1):
                 return None, ("that step left a goal open inside a branch nothing "
                               "can get back to. A step that splits the goal gives "
