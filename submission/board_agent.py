@@ -211,14 +211,22 @@ class Board:
         return [g.line for g in self.goals].index(goal.line)
 
 
+# `skip` succeeds where no goal is left, so a placeholder under a step that
+# closed its goal was silent and took the enclosing block's goal for its own
+# (measured on rmo_2000_6: every step for `⊢ 10 ≤ n` went to a dead line 34
+# lines above it, nine times over). `focus` fails there: "no goals to be solved".
+PROBE = "focus skip"
+
+
 def render_all(text: str) -> str:
-    """Every placeholder as `skip`, so one check prints every goal."""
+    """Every placeholder as the probe, so one check prints every goal and
+    names every placeholder with no goal behind it."""
 
     out, shift = text, 0
     for match in placeholders(text):
         start, end = match.start() + shift, match.end() + shift
-        out = out[:start] + f"{match.group(1)}skip" + out[end:]
-        shift += len("skip") - (match.end() - match.start() - len(match.group(1)))
+        out = out[:start] + f"{match.group(1)}{PROBE}" + out[end:]
+        shift += len(PROBE) - (match.end() - match.start() - len(match.group(1)))
     return out
 
 
@@ -1576,6 +1584,11 @@ class BoardAgent(FrameworkAgent):
             candidate, span = put(base.text, goal, block)
             nxt = await look(candidate, base)
             _, surplus, expensive, failures = classify(nxt.messages)
+            if not failures and {message_line(m) for m in surplus if in_span(m, span)} == {span[1]}:
+                # Only the trailing placeholder has no goal: the step closed it.
+                candidate, span = put(base.text, goal, block, trailing=False)
+                nxt = await look(candidate, base)
+                _, surplus, expensive, failures = classify(nxt.messages)
             lines = [l for l in (message_line(m) for m in failures) if l and span[0] <= l <= span[1]]
             failed_at = (min(lines) - span[0]) if lines else 0
             if any("TIMEOUT" in str(m.get("data")) for m in failures):
@@ -1868,7 +1881,7 @@ class BoardAgent(FrameworkAgent):
             if nxt is None:
                 return False
             tactic = fired_closer(nxt.messages, put(base.text, goal, block)[1], cocktail)
-            flat = await look(put(base.text, goal, tactic)[0]) if tactic else None
+            flat = await look(put(base.text, goal, tactic, trailing=False)[0]) if tactic else None
             if flat is not None and flat.find(goal.key) is None and not any(
                     classify(flat.messages)[2:]):
                 nxt = flat

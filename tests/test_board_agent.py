@@ -6,6 +6,7 @@ from re_harness import Problem
 from re_harness.lean import LeanCheck
 from submission.agent import COCKTAIL, Config
 from submission.board_agent import (
+    PROBE,
     Board, BoardAgent, Goal, interpret, read_board, render_all,
 )
 from tests.test_framework_loop import FakeServices, said
@@ -61,20 +62,38 @@ class BoardLean:
                 messages.append({"severity": "error", "pos": {"line": i - 1},
                                  "endPos": {"line": i - 1},
                                  "data": "linarith failed to find a contradiction"})
-            if body == "skip":
-                closed = any(f"exact {h}" in source.split("\n")[j]
-                             for j in range(i - 2, -1, -1)
-                             if HEAD.match(source.split("\n")[j]) is None
-                             for h in haves) if haves else False
+            if body in ("skip", PROBE):
+                # An `exact` of a name in scope closes the block it is in: the
+                # placeholders after it in that block have no goal (real Lean:
+                # `skip` is silent there, the probe reports it).
+                rows = source.split("\n")
+                depth = len(line) - len(line.lstrip())
+                closed = False
+                for j in range(i - 2, -1, -1):
+                    if HEAD.match(rows[j]) or (rows[j].strip() and
+                                               len(rows[j]) - len(rows[j].lstrip()) < depth):
+                        break
+                    if len(rows[j]) - len(rows[j].lstrip()) == depth and \
+                            any(rows[j].strip() == f"exact {h}" for h in haves):
+                        closed = True
+                        break
                 if closed:
+                    if body == PROBE:
+                        messages.append({"severity": "error", "pos": {"line": i - 1},
+                                         "endPos": {"line": i - 1},
+                                         "data": "No goals to be solved"})
                     continue
                 hyps = "".join(f"{h} : P\n" for h in haves)
-                above = source.split("\n")[i - 2].strip() if i > 1 else ""
+                above = rows[i - 2].strip() if i > 1 else ""
                 target = (above.split(":", 1)[1].split(":=")[0].strip()
                           if above.startswith("have ") and above.endswith(":= by")
                           else "False" if above == "exfalso"
                           else f"P {above.split()[1]}" if above.startswith("use ") else decl)
-                messages.append({"severity": "error", "pos": {"line": i - 2},
+                # Lean reports the block's open goal on its `by`, spanning the
+                # block: the nearest line above at a shallower indent.
+                head_at = next((j for j in range(i - 2, -1, -1) if rows[j].strip() and
+                                len(rows[j]) - len(rows[j].lstrip()) < depth), i - 2)
+                messages.append({"severity": "error", "pos": {"line": head_at},
                                  "endPos": {"line": i - 1},
                                  "data": f"unsolved goals\n{hyps}⊢ {target}"})
         errors = [m for m in messages if m["severity"] == "error"]
@@ -590,9 +609,12 @@ def test_a_closer_that_fires_is_flattened_from_its_own_trace_in_one_check():
                     else:
                         msgs.append({"severity": "error", "pos": {"line": i - 1},
                                      "data": "no closer"})
-                elif body == "skip" and closed:
+                elif body in ("skip", PROBE) and closed:
                     closed = False
-                elif body == "skip":
+                    if body == PROBE:
+                        msgs.append({"severity": "error", "pos": {"line": i - 1},
+                                     "data": "No goals to be solved"})
+                elif body in ("skip", PROBE):
                     msgs.append({"severity": "error", "pos": {"line": i - 2},
                                  "endPos": {"line": i - 1}, "data": "unsolved goals\n⊢ demo"})
                 elif body == "omega":
@@ -1251,12 +1273,14 @@ def test_with_two_routes_open_the_second_worker_takes_the_other_one():
                     "have k1 : P := by\n  sorry\nhave k2 : Q := by\n  sorry\n"
                     "have k3 : R := by\n  sorry\nexact k1",                      # second route
                     "have gone : P := by\n  sorry\nhave gone2 : Q := by\n  sorry\nexact gone"]
-                   + [f"linarith [x{i}]" for i in range(12)],
-        "model-b": ["exact k1"] * 3,
-    }, delay={"model-b": 0.6}, time_limit=60)
+                   + [f"linarith [x{i}]" for i in range(400)],
+        "model-b": ["exact k1"] * 6,      # three go to the skeleton's audits
+    }, delay={"model-a": 0.05, "model-b": 0.6}, time_limit=60)
     assert any(e.get("stage") == "route" for e in result.metadata["events"])
     assert result.metadata["accepted_by_repl"] is True
     assert "k1" in result.solution and "gone" not in result.solution
+    assert not re.search(r":= by\n\s*(?:have|exact|$)", result.solution.split("k1 : P", 1)[1]
+                         .split("theorem", 1)[0].replace(":= by\n    exact", ""))
 
 
 class ClosedLean(WitnessLean):
@@ -1873,3 +1897,20 @@ def test_apply_suggestions_close_a_goal_without_a_model_or_reach_the_prompt():
     lib = [e for e in result.metadata["events"] if e.get("kind") == "library"]
     assert lib and lib[0]["accepted"] and lib[0]["found"] == 1
     assert not llm.calls
+
+
+def test_a_placeholder_left_under_a_closing_step_is_dropped_not_reused():
+    # Measured on rmo_2000_6 (v7.74, 5 of 6 runs lost): a step that closed a
+    # nested goal left its trailing `sorry` behind; rendered as `skip` it was
+    # silent, took the enclosing block's goal for its own text, and every later
+    # step for that goal was written at the dead line ("no goals left where
+    # that step was written", nine times over).
+    nest = ("import Mathlib\n\ntheorem demo : True := by\n  have h : P := by\n"
+            "    sorry\n  sorry\n")
+    result, lean, llm, _ = run(nest, {"model-a": ["exact h", "exact h", "exact h"]},
+                               lines=("model-a",), time_limit=20)
+    proof = result.solution.split("theorem demo", 1)[1]
+    assert result.metadata["accepted_by_repl"] is True
+    assert proof == " : True := by\n  have h : P := by\n    exact h\n  exact h\n"
+    assert not any("no goals left where that step was written" in p
+                   for _, p in llm.calls)
