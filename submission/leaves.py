@@ -75,6 +75,24 @@ def _powered(hyps) -> list[tuple[str, str, str, str]]:
     return out
 
 
+def _shifts(rhs: str, n: int) -> list[str]:
+    """For P = v ^ n + a * v ^ (n-1) + ..., the E with E ^ n ≤ P < (E + 1) ^ n
+    for large v: v + a // n, and v + a // n - 1 when a divides evenly."""
+    m = re.match(rf"^([A-Za-z_][\w']*) \^ {n} \+ (\d+) \* \1 \^ {n - 1}\b", rhs)
+    if not m:
+        m2 = re.match(rf"^([A-Za-z_][\w']*) \^ {n} \+ \1 \^ {n - 1}\b", rhs)
+        if not m2:
+            return []
+        v, a = m2.group(1), 1
+    else:
+        v, a = m.group(1), int(m.group(2))
+    k = a // n
+    out = [f"{v} + {k}" if k else v]
+    if a % n == 0 and k >= 1:
+        out.append(f"{v} + {k - 1}" if k > 1 else v)
+    return out
+
+
 def leaf_candidates(goal_text: str) -> list[str]:
     hyps = _hyps(goal_text)
     target = _target(goal_text)
@@ -103,6 +121,30 @@ def leaf_candidates(goal_text: str) -> list[str]:
                 for hn, _, _ in lowers[:2]:
                     out.append(f"pow_squeeze {y} {n} ({rhs}) with {hn}")
                 out.append(f"pow_squeeze {y} {n} ({rhs})")
+    # `v ≤ c` / `v < c` / False with y ^ n = P(v): for v large, P sits strictly
+    # between consecutive n-th powers of v + k, k read off P's leading terms.
+    # Measured on rmo_2000_2 (v7.79): the board was one goal short, `x ≤ 9`,
+    # for 40 minutes; by contradiction the strict squeeze closes it.
+    up = re.match(r"^([A-Za-z_][\w']*) (≤|<) (\d+)$", target)
+    for _, y, n, rhs in powers:
+        for e in _shifts(rhs, int(n)):
+            if up and up.group(1) in rhs and up.group(1) != y:
+                out.append(f"by_contra hc\npush_neg at hc\npow_squeeze {y} {n} ({e}) with hc")
+            elif target == "False":
+                for hn, _, _ in lowers[:2]:
+                    out.append(f"pow_squeeze {y} {n} ({e}) with {hn}")
+                out.append(f"pow_squeeze {y} {n} ({e})")
+    # A variable defined by an equation `w = E`: substitute, make ℕ subtraction
+    # exact, then arithmetic. Measured on rmo_2000_2: `hyx : y = x + 2 ⊢ x = 9`.
+    for hn, t in hyps:
+        d = re.match(r"^([A-Za-z_][\w']*) = (.+)$", t)
+        if d and not NUM.match(d.group(2).strip()) and re.search(r"[A-Za-z]", d.group(2)) \
+                and not re.search(r"[∨∧↔→∀∃∣]", goal_text):
+            out.append(f"subst {hn}\n{'nat_sub_exact' + chr(10) if '-' in goal_text else ''}"
+                       "first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)")
+            break
+    if "-" in goal_text and not re.search(r"[∨∧↔→∀∃∣]", target):
+        out.append("nat_sub_exact\nfirst | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)")
     # d ∣ N: one goal per divisor, each finished mechanically.
     for n, t in hyps:
         if re.match(r"^.+ ∣ .+$", t) and re.search(r"\d", t):
@@ -127,4 +169,5 @@ def leaf_candidates(goal_text: str) -> list[str]:
         if c not in seen:
             seen.add(c)
             uniq.append(c)
-    return [f"{BUDGET}\n{c}" if not c.startswith("obtain") else c for c in uniq[:LEAF_CAP]]
+    return [f"{BUDGET}\n{c}" if not c.startswith(("obtain", "subst", "by_contra")) else c
+            for c in uniq[:LEAF_CAP]]

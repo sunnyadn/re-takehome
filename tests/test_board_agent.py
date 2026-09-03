@@ -590,8 +590,11 @@ def test_a_closer_that_fires_is_flattened_from_its_own_trace_in_one_check():
             self.sources.append(source)
             lines = source.split("\n")
             msgs, closed = [], False
+            start = next((i for i, l in enumerate(lines, start=1) if l.startswith("theorem")), 0)
             for i, line in enumerate(lines, start=1):
                 body = line.strip()
+                if i < start:
+                    continue                      # the technique block has its own `first`
                 if body == "first":
                     alts = []
                     j = i
@@ -1988,3 +1991,22 @@ def test_powers_bounded_in_the_context_give_a_pow_bounds_leaf():
     direct = "a b : ℕ\nh1 : (b + 1) ^ 2 ≤ a ^ 2\nh2 : a ^ 2 < (b + 3) ^ 2\n⊢ b + 1 ≤ a ∧ a ≤ b + 2"
     assert [c.split("\n")[-1] for c in leaf_candidates(direct)] == ["pow_bounds a 2"]
     assert not any("pow_bounds" in c for c in leaf_candidates("n : ℕ\n⊢ 7 ∣ 2 ^ n - 1 ↔ 3 ∣ n"))
+
+
+def test_an_upper_bound_on_the_variable_under_a_power_gets_the_contradiction_squeeze():
+    # Measured on rmo_2000_2 (v7.79, h78r1): at 20:28 the board was one goal
+    # short, `h_bound : x ≤ 9`, and stayed so; for x ≥ 10 the cube sits
+    # strictly between (x+2)³ and (x+3)³, and 2 is 8 // 3 from P's second term.
+    from submission.leaves import leaf_candidates, _shifts
+    assert _shifts("x ^ 3 + 8 * x ^ 2 - 6 * x + 8", 3) == ["x + 2"]
+    assert _shifts("x ^ 3 + 9 * x ^ 2 + 1", 3) == ["x + 3", "x + 2"]
+    assert _shifts("x ^ 2 + x + 5", 2) == [] and _shifts("11", 3) == []
+    ctx = "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n"
+    blocks = leaf_candidates(ctx + "⊢ x ≤ 9")
+    assert blocks[0] == "by_contra hc\npush_neg at hc\npow_squeeze y 3 (x + 2) with hc"
+    # `hyx : y = x + 2 ⊢ x = 9`: substitute, make the ℕ subtraction exact, arithmetic.
+    blocks = leaf_candidates(ctx + "hyx : y = x + 2\n⊢ x = 9")
+    assert blocks[0].startswith("subst hyx\nnat_sub_exact\nfirst | omega")
+    # Under the contradiction hypothesis the squeeze uses it as the lower bound.
+    blocks = leaf_candidates("x y : ℕ\nhc : 9 < x\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ False")
+    assert "pow_squeeze y 3 (x + 2) with hc" in blocks[0]

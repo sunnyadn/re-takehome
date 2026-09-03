@@ -112,31 +112,82 @@ end DivisorCases""",
 
 # Measured on rmo_2000_2: the route reached `hxge : x ≥ 9 ⊢ y = x + 2` with
 # `h : y ^ 3 = ...` by 306 s and no model closed it in three runs.
-LEAF_TACTICS = ("""-- `pow_squeeze y n E` (goal y = E, a hypothesis y ^ n = ...): E ^ n ≤ y ^ n < (E + 1) ^ n
--- by omega/nlinarith, then Nat.pow_le/lt_pow_iff_left; `with h` first replaces
--- the variable of `h : c ≤ x` by c + k inside those two proofs.
+LEAF_TACTICS = ("""-- `pow_squeeze y n E` (a hypothesis y ^ n = ...): E ^ n < y ^ n < (E + 1) ^ n (or ≤ below) by
+-- omega/nlinarith, then Nat.pow_le/lt_pow_iff_left and omega, which also closes False when
+-- the squeeze is strict; `with h` first replaces the variable of `h : c ≤ x` by c + k inside
+-- those proofs.
 syntax "pow_squeeze" term:max term:max term:max (" with " ident)? : tactic
 macro_rules
   | `(tactic| pow_squeeze $y $n $lo) => `(tactic| (
-      have hlo : ($lo : ℕ) ^ $n ≤ $y ^ $n := by
-        first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
+      have hn : ($n : ℕ) ≠ 0 := by norm_num
       have hhi : $y ^ $n < ($lo + 1) ^ $n := by
         first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
-      have h1 := (Nat.pow_le_pow_iff_left (by norm_num : ($n : ℕ) ≠ 0)).1 hlo
-      have h2 := (Nat.pow_lt_pow_iff_left (by norm_num : ($n : ℕ) ≠ 0)).1 hhi
-      omega))
+      have h2 := (Nat.pow_lt_pow_iff_left hn).1 hhi
+      first
+        | (have hlo : ($lo : ℕ) ^ $n < $y ^ $n := by
+             first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
+           have h1 := (Nat.pow_lt_pow_iff_left hn).1 hlo
+           omega)
+        | (have hlo : ($lo : ℕ) ^ $n ≤ $y ^ $n := by
+             first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
+           have h1 := (Nat.pow_le_pow_iff_left hn).1 hlo
+           omega)))
   | `(tactic| pow_squeeze $y $n $lo with $h) => `(tactic| (
-      have hlo : ($lo : ℕ) ^ $n ≤ $y ^ $n := by
-        obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le $h
-        subst hk
-        first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
+      have hn : ($n : ℕ) ≠ 0 := by norm_num
       have hhi : $y ^ $n < ($lo + 1) ^ $n := by
         obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le $h
         subst hk
         first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
-      have h1 := (Nat.pow_le_pow_iff_left (by norm_num : ($n : ℕ) ≠ 0)).1 hlo
-      have h2 := (Nat.pow_lt_pow_iff_left (by norm_num : ($n : ℕ) ≠ 0)).1 hhi
-      omega))
+      have h2 := (Nat.pow_lt_pow_iff_left hn).1 hhi
+      first
+        | (have hlo : ($lo : ℕ) ^ $n < $y ^ $n := by
+             obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le $h
+             subst hk
+             first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
+           have h1 := (Nat.pow_lt_pow_iff_left hn).1 hlo
+           omega)
+        | (have hlo : ($lo : ℕ) ^ $n ≤ $y ^ $n := by
+             obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le $h
+             subst hk
+             first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
+           have h1 := (Nat.pow_le_pow_iff_left hn).1 hlo
+           omega)))
+
+-- `nat_sub_exact`: every `a - b : ℕ` in a hypothesis gets `b ≤ a` when omega or nlinarith
+-- proves it, and the hypotheses are cast to ℤ with those facts, so the subtraction is exact.
+section NatSubExact
+open Lean Elab Tactic Meta
+
+partial def natSubs (e : Expr) (acc : Array (Expr × Expr)) : Array (Expr × Expr) :=
+  let acc := if e.isAppOfArity ``HSub.hSub 6 && (e.getArg! 0).isConstOf ``Nat then
+    acc.push (e.getArg! 4, e.getArg! 5) else acc
+  match e with
+  | .app f a => natSubs a (natSubs f acc)
+  | .lam _ _ b _ | .forallE _ _ b _ => natSubs b acc
+  | .mdata _ b => natSubs b acc
+  | _ => acc
+
+elab "nat_sub_exact" : tactic => withMainContext do
+  let mut pairs : Array (Expr × Expr) := #[]
+  for decl in (← getLCtx) do
+    if decl.isImplementationDetail then continue
+    pairs := natSubs (← instantiateMVars decl.type) pairs
+  pairs := natSubs (← instantiateMVars (← getMainTarget)) pairs
+  let mut names : Array Ident := #[]
+  let mut i := 0
+  for (a, b) in pairs do
+    let sa ← PrettyPrinter.delab a
+    let sb ← PrettyPrinter.delab b
+    let nm := mkIdent (Name.mkSimple s!"hsub{i}")
+    i := i + 1
+    try
+      evalTactic (← `(tactic| have $nm : $sb ≤ $sa := by first | omega | nlinarith))
+      names := names.push nm
+    catch _ => pure ()
+  if names.isEmpty then throwError "nat_sub_exact: no subtraction made exact"
+  let args ← names.mapM fun n => `(Lean.Parser.Tactic.simpLemma| $n:ident)
+  evalTactic (← `(tactic| zify [$args,*] at *))
+end NatSubExact
 
 -- `pow_bounds y n`: bounds on y ^ n in the context (on y ^ n itself, or on the right side of
 -- a hypothesis `y ^ n = P`) become bounds on y, then omega.
@@ -165,9 +216,12 @@ macro_rules
         | (apply Nat.lt_succ_iff.mp; apply (Nat.pow_lt_pow_iff_left (by norm_num : (3 : ℕ) ≠ 0)).1
            first | omega | (norm_num at *; omega) | (norm_num at *; done))
       interval_cases $x <;> first | omega | (norm_num at *; done) | nlinarith | simp_all))""",
-                "`pow_squeeze y n E` (goal `y = E`, a hypothesis `y ^ n = ...`, n = 2 or 3): proves "
-                "E ^ n ≤ y ^ n < (E + 1) ^ n by omega/nlinarith and concludes; `pow_squeeze y n E with h` "
-                "first replaces the variable of `h : c ≤ x` by c + k inside those proofs. "
+                "`pow_squeeze y n E` (a hypothesis `y ^ n = ...`, n = 2 or 3): proves E ^ n < y ^ n < "
+                "(E + 1) ^ n (or ≤ below) by omega/nlinarith and concludes by omega, so it closes `y = E` "
+                "and, when the squeeze is strict, `False`; `pow_squeeze y n E with h` first replaces the "
+                "variable of `h : c ≤ x` by c + k inside those proofs. `nat_sub_exact`: for every `a - b` "
+                "over ℕ in the context, proves `b ≤ a` (omega/nlinarith) and casts the hypotheses to ℤ so "
+                "the subtraction is exact; follow with nlinarith or omega. "
                 "`pow_bounds y n`: when the context bounds y ^ n by powers (`(x+2)^3 ≤ y^3`, or "
                 "`(x+2)^3 ≤ P` with `h : y^3 = P`), turns them into bounds on y and finishes by omega. "
                 "`bounded_cases x N`: proves x ≤ N (omega, nlinarith, or from x ^ 2 or x ^ 3 equal to a "
@@ -197,7 +251,7 @@ ELIDED = "-- tactics defined for this file (see the system prompt): " + ", ".joi
 def technique_names() -> list[str]:
     """Every tactic the preamble declares (`syntax "name" ...`)."""
     import re
-    return re.findall(r'^syntax "(\w+)"', "\n".join(src for src, _ in TECHNIQUES), re.M)
+    return sorted(set(re.findall(r'^(?:syntax|elab) "(\w+)"', "\n".join(src for src, _ in TECHNIQUES), re.M)))
 
 
 def uses_techniques(text: str) -> bool:
