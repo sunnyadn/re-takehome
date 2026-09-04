@@ -24,6 +24,7 @@ from submission.cells import (CELL_PROBE, Cells, dissolve, enclosing, marker, mo
 from submission.conjecture import (families, fits, lemma_text, read_table, table_file,
                                    verified, verify_file)
 from submission.leaves import _hyps as leaf_hyps, _sum_variables, leaf_candidates
+from submission.sampling import read_sample_hit, sample_file, sampled_search
 from submission.techniques import (PREAMBLE_MARK, blank_techniques, strip_techniques,
                                    uses_techniques, without_techniques)
 from submission.agent import (
@@ -1506,7 +1507,16 @@ class BoardAgent(FrameworkAgent):
         putnam_2020_a2, 1990 s of latency, one reply 482 s under the board lock)."""
         search = counterexample_search(groups, target)
         if not search:
-            return False, None
+            # A statement over a sequence (x : ℕ → ℝ) with ∀-hypotheses: sampled
+            # sequences over ℚ, the ∀s bounded (measured on rmo_2000_3: every
+            # claim carries hpos/hmono/hsq and the walk cannot bind a function).
+            sampled = sampled_search(groups, target)
+            if not sampled:
+                return False, None
+            names, seq, body = sampled
+            check = await services.lean.check_file(sample_file(prefix, names, seq, body), timeout_s=60)
+            met, hit = read_sample_hit(check.messages, names)
+            return met, hit
         names, body = search
         check = await services.lean.check_file(witness_search_file(prefix, names, body), timeout_s=60)
         rows = read_witnesses(check.messages)
@@ -2147,7 +2157,10 @@ class BoardAgent(FrameworkAgent):
                         verdict = "holds"
                     if sub["searched"] and not sub["found"]:
                         verdict = "holds"
-                    if values or not names:
+                    if sub["found"] and "sequence" in sub["found"]:
+                        # Lean evaluated the sampled sequence itself: the hit is the verdict.
+                        verdict, values = "refuted", dict(sub["found"])
+                    elif values or not names:
                         check = await services.lean.check_file(
                             witness_file(prefix, groups, values, target),
                             timeout_s=CHECK_TIMEOUT_FLOOR_S)
