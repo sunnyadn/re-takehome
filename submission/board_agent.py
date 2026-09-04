@@ -1788,6 +1788,17 @@ class BoardAgent(FrameworkAgent):
             found.ms = check.duration_ms
             if rendered.region is not None and base is not None and old is not None:
                 new = rendered.region
+                if isinstance(focus, int) and not any(new[0] <= g.line <= new[1] for g in found.goals) \
+                        and not errors:
+                    # The cell closed: what encloses it is checked next, so a goal
+                    # of the parent that has no placeholder (Lean reports it on
+                    # the parent's header) is seen again. Measured on rmo_2000_6:
+                    # the stale-report filter alone let `case refine_1.refine_2`
+                    # vanish and the board was delivered with a sorry.
+                    above = [sp for sp in all_cell_spans(candidate) if sp.holds(new[0]) and sp.id != focus]
+                    parent: int | str = max(above, key=lambda sp: sp.start).id if above else owner(candidate, new[0])
+                    if parent and parent != focus:
+                        return await look(candidate, base, parent)
                 inside_old = [g for g in base.goals if old[0] <= g.line <= old[1]]
                 outside_old = [g for g in base.goals if g not in inside_old]
                 outside_new = [g for g in found.goals if not new[0] <= g.line <= new[1]]
