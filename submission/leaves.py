@@ -27,19 +27,27 @@ BUDGET = "set_option maxHeartbeats 60000 in"
 
 
 def _hyps(goal_text: str) -> list[tuple[str, str]]:
+    """Lean wraps a long type over indented continuation lines (and may end the
+    `name :` line there); each hypothesis is read back as one line."""
     head = goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
-    out = []
+    lines: list[str] = []
     for line in head.split("\n"):
-        if line[:1].isspace() or line.startswith("case ") or " : " not in line:
+        if line[:1].isspace() and lines:
+            lines[-1] += " " + line.strip()
+        else:
+            lines.append(line)
+    out = []
+    for line in lines:
+        if line.startswith("case ") or " : " not in line:
             continue
         names, typ = line.split(" : ", 1)
         for n in names.split():
-            out.append((n, typ.strip()))
+            out.append((n, " ".join(typ.split())))
     return out
 
 
 def _target(goal_text: str) -> str:
-    return goal_text.rsplit("⊢", 1)[-1].strip() if "⊢" in goal_text else ""
+    return " ".join(goal_text.rsplit("⊢", 1)[-1].split()) if "⊢" in goal_text else ""
 
 
 def _bounds(hyps) -> list[tuple[str, str, str, int]]:

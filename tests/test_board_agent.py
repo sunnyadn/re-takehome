@@ -2100,3 +2100,18 @@ def test_the_closing_chain_normalises_membership_and_substitutes_before_it_tries
     assert chain.startswith("first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, "
                             "Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega")
     assert chain.index("(simp_all <;> omega)") < chain.index("nlinarith")
+
+
+def test_a_hypothesis_lean_prints_over_several_lines_is_still_read():
+    # Measured on rmo_2001_2 (v7.91, r3): the eight-way divisor fact was on the
+    # board as `h_cases :⏎  m - p - q = 1 ∨⏎    m - p - q = 5 ∨ ...` and the
+    # rcases leaf, which closes the goal in the image, was never generated.
+    from submission.leaves import _hyps, leaf_candidates
+    goal = ("p q : ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\nm : ℕ\n"
+            "h_factor : (m - p - q) * (m + p + q) = 5 * p * q\n"
+            "h_cases :\n  m - p - q = 1 ∨\n    m - p - q = 5 ∨\n"
+            "      m - p - q = p ∨ m - p - q = q ∨ m - p - q = 5 * p ∨ m - p - q = 5 * q ∨ m - p - q = p * q ∨ m - p - q = 5 * p * q\n"
+            "⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3")
+    assert dict(_hyps(goal))["h_cases"].startswith("m - p - q = 1 ∨ m - p - q = 5 ∨ m - p - q = p ∨")
+    assert any("rcases h_cases with hc | hc | hc | hc | hc | hc | hc | hc <;> (solve_sub;" in b
+               for b in leaf_candidates(goal))
