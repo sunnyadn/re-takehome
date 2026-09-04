@@ -1702,6 +1702,10 @@ class BoardAgent(FrameworkAgent):
                            "faults": faults[:5], "compile_ms": check.duration_ms,
                            "slow": check.duration_ms > SLOW_COMPILE_MS,
                            "techniques": "kept" if PREAMBLE_MARK in final else "dropped"})
+            if any("sorry" in f for f in faults):
+                shown = final.split("\n")
+                events.append({"stage": "sorry_left", "lines": [
+                    "\n".join(shown[max(i - 3, 0):i + 1]) for i, l in enumerate(shown) if "sorry" in l][:3]})
             if not check.accepted or faults:
                 return None
             offer(final, True)
@@ -1775,7 +1779,10 @@ class BoardAgent(FrameworkAgent):
                         events.append({"stage": "inline", "cell": sp.id, "why": "link"})
                         text = dissolve(text, sp.id)
                     return await look(text, base)
-            accepted = not check.timed_out and not errors and not placeholders(candidate)
+            # As the kit's: no error, no `sorry` anywhere (a `sorry` inside a line is
+            # no placeholder, and the grader rejects sorryAx; measured on p10: a
+            # board with none open delivered a file the comparator refused).
+            accepted = not check.timed_out and not errors and not re.search(r"\bsorry\b", candidate)
             found = read_board(candidate, messages, accepted)
             found.ms = check.duration_ms
             if rendered.region is not None and base is not None and old is not None:
