@@ -96,6 +96,13 @@ def enclosing(text: str, line: int) -> Span | None:
     return best
 
 
+def reset_cell(text: str, span: Span) -> str:
+    """The cell's block gone, its goal back as one placeholder."""
+
+    lines = text.split("\n")
+    return "\n".join(lines[:span.start - 1] + [" " * span.indent + "sorry"] + lines[span.end:])
+
+
 def dissolve(text: str, cell_id: int) -> str:
     """The marker gone: the block stays where it is, part of what encloses it."""
 

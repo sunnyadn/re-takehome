@@ -20,7 +20,7 @@ from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
 from submission.cells import (CELL_PROBE, Cells, dissolve, enclosing, marker, modular,
-                              remap, render_check, strip_markers)
+                              remap, render_check, reset_cell, strip_markers)
 from submission.conjecture import (families, fits, lemma_text, read_table, table_file,
                                    verified, verify_file)
 from submission.leaves import _hyps as leaf_hyps, _sum_variables, leaf_candidates
@@ -2740,6 +2740,26 @@ class BoardAgent(FrameworkAgent):
                                    "after the board made no progress for a while"):
                     prune()
                     return
+            # A goal inside a cell: that cell alone goes back to its `sorry`
+            # (its block was one step's answer), the rest of the proof stays.
+            held = enclosing(board.text, worst.line)
+            if held is not None:
+                if len(branches) < BEAM + 1:
+                    fork = Board(board.text, list(board.goals), list(board.messages),
+                                 board.accepted, next_bid)
+                    next_bid += 1
+                    sound[fork.bid] = sound.get(board.bid, board.text)
+                    branches.append(fork)
+                    focus(fork)
+                    events.append({"stage": "fork", "from": branches[0].bid if branches else 0,
+                                   "to": fork.bid, "why": "reset"})
+                events.append({"stage": "reset", "cell": held.id, "decl": worst.decl,
+                               "tries": tries.get(worst.key, 0)})
+                for table in (tries, said, plans):
+                    table.pop(worst.key, None)
+                await commit(await look(reset_cell(board.text, held)), progress=False)
+                prune()
+                return
             restated[worst.decl] = restated.get(worst.decl, 0) + 1
             fresh_text, _ = restate(board.text, worst.decl)
             events.append({"stage": "restate", "decl": worst.decl,

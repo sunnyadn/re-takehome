@@ -1,4 +1,4 @@
-from submission.cells import (Cells, CELL_PROBE, all_spans, dissolve, enclosing, marker,
+from submission.cells import (Cells, CELL_PROBE, all_spans, dissolve, enclosing, marker, reset_cell,
                               modular, remap, render_check, spans, strip_markers)
 
 FILE = """import Mathlib
@@ -86,3 +86,11 @@ def test_a_block_that_asks_for_a_budget_gets_it_on_its_own_declaration():
     at = lines.index("theorem vm_cell_1 (n : ℕ) (h : 0 < n) : n ≠ 0 := by")
     assert lines[at - 1] == "set_option maxHeartbeats 400000 in"
     assert lines[at + 1] == "  set_option maxHeartbeats 400000 in (omega)"
+
+
+def test_resetting_a_cell_puts_its_goal_back_as_one_placeholder():
+    from submission.cells import spans
+    cell = spans(FILE)[0].children[0]
+    text = reset_cell(FILE, cell)
+    assert "-- cell 2" not in text and "simp at hn" not in text
+    assert text.split("\n")[6] == "    sorry" and "-- cell 1" in text
