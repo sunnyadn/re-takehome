@@ -2531,3 +2531,21 @@ def test_a_bound_on_a_product_from_a_numeral_dividing_a_product_of_its_powers_ge
     assert not any("prime_to_bases" in c for c in leaf_candidates("a b : ℕ\nh : 8 ∣ a ^ 2 * b\n⊢ 4 ≤ a * b"))
     assert not any("prime_to_bases" in c for c in leaf_candidates("a b c : ℕ\nh : 6 ∣ a * c\n⊢ 6 ≤ a * b"))
     assert uses_techniques(preamble() + "\ntheorem t (a : ℕ) (h : 6 ∣ a ^ 2) : 2 ∣ a := by\n  prime_to_bases 2 h\n")
+
+
+def test_a_product_equation_over_the_integers_gets_a_divisor_leaf_that_linearises_each_case():
+    # Measured on putnam_2018_a1 (frame117, 0/2): with `h_factor : (3a-2018)(3b-2018)
+    # = 2018²` on the board the divisor leaf timed out at 400000 heartbeats; the
+    # per-case `hx` was a hygienic name nothing could rewrite by, and omega chewed
+    # on `h_eq : 2018 * (b + a) = a * b * 3`. Named hx, h_eq cleared: 3.6 s.
+    from submission.leaves import leaf_candidates
+    from submission.techniques import preamble
+    goal = ("a b : ℤ\nh : 0 < a ∧ 0 < b\nh_eq : 2018 * (b + a) = a * b * 3\n"
+            "h_factor : (3 * a - 2018) * (3 * b - 2018) = 2018 ^ 2\n⊢ a = 673 ∨ a = 674")
+    got = [c for c in leaf_candidates(goal) if "clear hm hdvd" in c]
+    assert got and "clear hm hdvd h_eq;" in got[0] and "rw [hx] at h_factor; norm_num at h_factor <;> omega" in got[0]
+    assert got[0].index("Dvd.intro _ h_factor") < got[0].index("clear hm")
+    # Over ℕ the natAbs route is not taken, so no such block.
+    nat = goal.replace("a b : ℤ", "a b : ℕ")
+    assert not any("clear hm" in c for c in leaf_candidates(nat))
+    assert "set_option hygiene false in\nmacro_rules\n  | `(tactic| divisor_cases $h for $x" in preamble()

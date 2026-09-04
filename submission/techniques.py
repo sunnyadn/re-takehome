@@ -33,6 +33,10 @@ macro_rules
       | (rw [show $l = $r by norm_num] at $h:ident; divisor_split $h : $r)
       | divisor_cases $h)
   | `(tactic| divisor_cases $h : $e) => `(tactic| first | divisor_split $h : $e | divisor_cases $h)
+-- Unhygienic so that each case's `hx : d = ±m` and `hm` can be named by what
+-- follows (measured: hygienic `hx✝` left h_factor unrewritten in every case).
+set_option hygiene false in
+macro_rules
   | `(tactic| divisor_cases $h for $x : $l = $r) => `(tactic| (
       have hn : ($x).natAbs ∣ $r := by
         have hh := Int.natAbs_dvd_natAbs.mpr $h

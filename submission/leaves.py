@@ -339,6 +339,21 @@ def _radical_bound(hyps: list[tuple[str, str]], rel: str, c: str, product: str) 
     return None
 
 
+def _over_int(hyps: list[tuple[str, str]], expr: str) -> bool:
+    """Whether a variable of the expression is declared `ℤ`."""
+    ints = {v for names, t in hyps if t == "ℤ" for v in names.split()}
+    return any(v in ints for v in re.findall(r"[A-Za-z_][\w']*", expr))
+
+
+def _nonlinear(hyps: list[tuple[str, str]], keep: str) -> list[str]:
+    """Hypotheses (other than `keep`) with a product of two non-numeral terms."""
+    out = []
+    for n, t in hyps:
+        if n != keep and re.search(r"[\w')]\s\*\s[A-Za-z_(]", t) and len(set(re.findall(r"\b[a-z]\w*\b", t))) >= 2:
+            out.append(n)
+    return out
+
+
 BLOCKS = re.compile(r"∑ \w+ ∈ Finset\.Ico \S+ \((\w+) \+ 1\), ∑ \w+ ∈ Finset\.Ico ")
 
 FACTOR = r"\((?:[^()]|\([^()]*\))+\)|[A-Za-z_][\w']*"
@@ -505,6 +520,15 @@ def leaf_candidates(goal_text: str) -> list[str]:
             continue
         for factor, intro in ((m.group(1), "Dvd.intro"), (m.group(2), "Dvd.intro_left")):
             factor = factor[1:-1] if factor.startswith("(") else factor
+            # Over ℤ each case has `hx : factor = ±d`: the product equation is
+            # rewritten by it and the other nonlinear facts cleared (measured on
+            # putnam_2018_a1: with `h_eq : 2018 * (b + a) = a * b * 3` in scope
+            # omega spent 400000 heartbeats; without it the 18 cases take 3.7 s).
+            if _over_int(hyps, factor):
+                clears = " ".join(_nonlinear(hyps, keep=n))
+                out.append(f"{primes}have hdvd : {factor} ∣ {m.group(3)} := {intro} _ {n}; "
+                           f"divisor_cases hdvd <;> (clear hm hdvd {clears}; "
+                           f"(try simp only [{MEMBERSHIP}] at *); rw [hx] at {n}; norm_num at {n} <;> omega)")
             out.append(f"{primes}have hdvd : {factor} ∣ {m.group(3)} := {intro} _ {n}; "
                        f"divisor_cases hdvd <;> (first | (solve_sub; {finish}) | ({finish}))")
     # A bound below on a variable and ℕ subtraction or a polynomial: substitute.
