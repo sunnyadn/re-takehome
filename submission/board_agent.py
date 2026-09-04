@@ -200,6 +200,8 @@ class RenewingLean:
         return getattr(self._inner, name)
 
     async def check_file(self, source: str, timeout_s: Any = None) -> Any:
+        if self.task is not None and not self.task.done():
+            await asyncio.gather(self.task, return_exceptions=True)
         check = await self._inner.check_file(source, timeout_s=timeout_s)
         self.checks = 1 if getattr(check, "container_restarted", False) else self.checks + 1
         name = getattr(self._inner, "_container_name", None)
@@ -220,7 +222,7 @@ class RenewingLean:
         return self.checks >= RENEW_AFTER_CHECKS
 
     def renew(self) -> None:
-        """Start the renewal in the background; the next check waits for it."""
+        """Start the renewal in the background; every check waits for it."""
         if not (hasattr(self._inner, "close") and hasattr(self._inner, "start")):
             return
         checks, memory = self.checks, self.memory

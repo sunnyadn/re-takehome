@@ -2200,3 +2200,42 @@ def test_an_open_helper_nothing_graded_uses_does_not_hold_a_finished_proof_back(
     assert result.metadata["solved_by"] == "board_loop"
     assert "sorry" not in result.solution and "stuck_helper" not in result.solution
     assert any(e.get("stage") == "shed" and e.get("name") == "stuck_helper" for e in result.metadata["events"])
+
+
+def test_a_check_issued_during_a_renewal_waits_for_the_new_container():
+    # Measured on v7.96 (win, reg96 p10 and p09a, h96 rmo_2001_2): the renewal
+    # swapped containers in a thread while another line's check went straight
+    # to the kernel, so that check ran on a REPL without Mathlib (unknown
+    # tactic, ℕ unbound) or raised LeanRuntimeError and the run aborted.
+    from types import SimpleNamespace
+    import submission.board_agent as ba
+
+    class SwappingLean:
+        def __init__(self):
+            self.alive = True
+            self.during_swap = 0
+            self._container_name = "re-takehome-repl-test"
+
+        def close(self):
+            self.alive = False
+
+        def start(self):
+            time.sleep(0.2)
+            self.alive = True
+
+        async def check_file(self, source, timeout_s=None):
+            await asyncio.sleep(0.05)
+            if not self.alive:
+                self.during_swap += 1
+            return SimpleNamespace(accepted=self.alive, messages=[], container_restarted=False)
+
+    async def scenario():
+        inner = SwappingLean()
+        lean = ba.RenewingLean(inner, [])
+        lean.renew()
+        check = await lean.check_file("theorem t : True := trivial")
+        return inner, check
+
+    inner, check = asyncio.run(scenario())
+    assert inner.during_swap == 0
+    assert check.accepted
