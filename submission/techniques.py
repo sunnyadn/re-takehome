@@ -423,8 +423,25 @@ macro_rules
                   "`prime_to_bases p h` (p a prime numeral, `h : m ∣ a ^ i * b ^ j` with p ∣ m): closes "
                   "`p ∣ a * b` (or `p ∣ a` from `h : m ∣ a ^ i`).")
 
+SUM_BLOCK = ("""-- `vm_sum_div_block`: a sum of x i / i over `Ico a b`, x positive and antitone, is at most
+-- the block's length times its first term (each term ≤ x a / a).
+theorem vm_sum_div_block (x : ℕ → ℝ) (hpos : ∀ n, 0 < x n) (hanti : Antitone x) (a b : ℕ) (ha : 0 < a) :
+    ∑ i ∈ Finset.Ico a b, x i / (i : ℝ) ≤ ((b - a : ℕ) : ℝ) * (x a / (a : ℝ)) := by
+  have hapos : (0 : ℝ) < a := by exact_mod_cast ha
+  have hstep : ∀ i ∈ Finset.Ico a b, x i / (i : ℝ) ≤ x a / (a : ℝ) := by
+    intro i hi
+    rw [Finset.mem_Ico] at hi
+    have hi' : (a : ℝ) ≤ i := by exact_mod_cast hi.1
+    calc x i / (i : ℝ) ≤ x a / (i : ℝ) := div_le_div_of_nonneg_right (hanti hi.1) (by linarith)
+      _ ≤ x a / (a : ℝ) := div_le_div_of_nonneg_left (hpos _).le hapos hi'
+  calc ∑ i ∈ Finset.Ico a b, x i / (i : ℝ) ≤ ∑ i ∈ Finset.Ico a b, x a / (a : ℝ) := Finset.sum_le_sum hstep
+    _ = ((b - a : ℕ) : ℝ) * (x a / (a : ℝ)) := by rw [Finset.sum_const, Nat.card_Ico, nsmul_eq_mul]""",
+             "`vm_sum_div_block x hpos hanti a b ha : ∑ i ∈ Finset.Ico a b, x i / (i : ℝ) ≤ ((b - a : ℕ) : ℝ) * "
+             "(x a / (a : ℝ))` for `hpos : ∀ n, 0 < x n`, `hanti : Antitone x`, `ha : 0 < a` (`Antitone x` from "
+             "`hmono : ∀ n, x n ≥ x (n + 1)` is `antitone_nat_of_succ_le (fun n => hmono n)`).")
+
 TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES, LEAF_TACTICS, POW_CYCLE, SUM_INDUCT, ICO_BLOCKS,
-                                           PRIME_TO_BASES)
+                                           PRIME_TO_BASES, SUM_BLOCK)
 
 PREAMBLE_MARK = "-- techniques defined for this file"
 PREAMBLE_END = "-- end of techniques"

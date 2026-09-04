@@ -2591,3 +2591,27 @@ def test_a_square_equal_to_a_symmetric_quadratic_in_two_variables_gets_the_diffe
     flipped = goal.replace("hm : p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2", "hm : m ^ 2 = p ^ 2 + 7 * p * q + q ^ 2")
     assert any("have hfac" in c for c in leaf_candidates(flipped))
     assert not any("have hfac" in c for c in leaf_candidates(goal.replace("7 * p * q", "2 * p * q")))
+
+
+def test_a_block_sum_of_an_antitone_sequence_over_its_index_gets_the_block_bound_leaf():
+    # Measured on rmo_2000_3 (0/2 on the cells build): the models state the block
+    # bound ∑_{i∈[j²,(j+1)²)} x i / i ≤ 3 x(j²)/j and withdraw it after 4 tries; the
+    # division inequality under monotonicity is the step neither lands. With the
+    # lemma vm_sum_div_block the block closes in the image in 0.4 s.
+    from submission.leaves import leaf_candidates
+    from submission.techniques import preamble
+    goal = ("x : ℕ → ℝ\nhpos : ∀ (n : ℕ), 0 < x n\nhmono : ∀ (n : ℕ), x n ≥ x (n + 1)\nj : ℕ\nhj : 1 ≤ j\n"
+            "⊢ ∑ i ∈ Finset.Ico (j * j) ((j + 1) * (j + 1)), x i / ↑i ≤ 3 * (x (j * j) / ↑j)")
+    got = [c for c in leaf_candidates(goal) if "vm_sum_div_block" in c]
+    assert got
+    block = got[0]
+    assert "have hanti : Antitone x := antitone_nat_of_succ_le (fun n => hmono n)" in block
+    assert "refine le_trans (vm_sum_div_block x hpos hanti (j * j) ((j + 1) * (j + 1)) (by first | positivity | omega | nlinarith)) ?_" in block
+    assert "rw [Nat.cast_sub hle]; push_cast" in block and "have hj0 : (j : ℝ) ≠ 0 := (by exact_mod_cast (by omega : j ≠ 0))" in block
+    assert "have hxp := hpos (j * j)" in block
+    # Antitone already in scope: used by name; no monotonicity fact at all: no leaf.
+    anti = goal.replace("hmono : ∀ (n : ℕ), x n ≥ x (n + 1)", "hanti : Antitone x")
+    got = [c for c in leaf_candidates(anti) if "vm_sum_div_block" in c]
+    assert got and "antitone_nat_of_succ_le" not in got[0] and "vm_sum_div_block x hpos hanti" in got[0]
+    assert not any("vm_sum_div_block" in c for c in leaf_candidates(goal.replace("hmono : ∀ (n : ℕ), x n ≥ x (n + 1)\n", "")))
+    assert "theorem vm_sum_div_block" in preamble()

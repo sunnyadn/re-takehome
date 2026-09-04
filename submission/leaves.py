@@ -411,6 +411,36 @@ def leaf_candidates(goal_text: str) -> list[str]:
         radical = _radical_bound(hyps, "∣", dv.group(1) or dv.group(2), dv.group(3))
         if radical:
             out.append(radical)
+    # ∑_{i ∈ Ico A B} x i / i ≤ R for x positive and antitone: the lemma bounds the
+    # block by its length times its first term, the rest is one division
+    # inequality. Measured on rmo_2000_3 (cells build, 0/2): the models stated
+    # this bound and withdrew it after 4 tries every time.
+    blk = re.match(r"^∑ (\w+) ∈ Finset\.Ico (\S+|\([^()]*\)) (\S+|\([^()]*(?:\([^()]*\)[^()]*)*\)), "
+                   r"([A-Za-z_][\w']*) \1 / (?:↑\1|\(\1 : ℝ\)) ≤ (.+)$", target)
+    if blk:
+        _, a, b, x, _ = blk.groups()
+        pos = next((n for n, t in hyps if re.match(rf"^∀ (?:\w+|\(\w+ : ℕ\)), 0 < {re.escape(x)} \w+$", t)), None)
+        anti = next((n for n, t in hyps if t == f"Antitone {x}"), None)
+        mono = next((n for n, t in hyps if re.match(rf"^∀ (?:\w+|\(\w+ : ℕ\)), (?:{re.escape(x)} \w+ ≥ {re.escape(x)} \(\w+ \+ 1\)"
+                                                     rf"|{re.escape(x)} \(\w+ \+ 1\) ≤ {re.escape(x)} \w+)$", t)), None)
+        if pos and (anti or mono):
+            lines = [] if anti else [f"have hanti : Antitone {x} := antitone_nat_of_succ_le (fun n => {mono} n)"]
+            anti = anti or "hanti"
+            lines.append(f"refine le_trans (vm_sum_div_block {x} {pos} {anti} {a} {b} "
+                         f"(by first | positivity | omega | nlinarith)) ?_")
+            lines.append(f"have hle : {a} ≤ {b} := (by first | omega | nlinarith)")
+            lines.append("rw [Nat.cast_sub hle]; push_cast")
+            nat_vars = {v for names, t in hyps if t == "ℕ" for v in names.split()}
+            for v in sorted(set(re.findall(r"[A-Za-z_][\w']*", a)) & nat_vars):
+                low = next((n for n, t in hyps if t in (f"1 ≤ {v}", f"0 < {v}", f"{v} ≥ 1", f"{v} > 0")), None)
+                if low:
+                    lines.append(f"have h{v}0 : ({v} : ℝ) ≠ 0 := (by exact_mod_cast (by omega : {v} ≠ 0))")
+                    lines.append(f"have h{v}r : (1 : ℝ) ≤ {v} := (by exact_mod_cast {low})")
+            lines.append(f"have hxp := {pos} {a}")
+            lines.append("first | (rw [div_le_div_iff₀ (by positivity) (by positivity)]; nlinarith) "
+                         "| (field_simp; rw [div_le_div_iff₀ (by positivity) (by positivity)]; nlinarith) "
+                         "| (field_simp; nlinarith)")
+            out.append("\n".join(lines))
     # Blocks [g j, g (j+1)) telescoping over j < m + 1: rmo_2000_3's decomposition
     # of ∑_{i<(m+1)²} into the sums over [j², (j+1)²).
     m = BLOCKS.search(target)
