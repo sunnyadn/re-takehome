@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from pathlib import Path
 import re
 import subprocess
 import time
@@ -315,6 +316,21 @@ class Board:
 # (measured on rmo_2000_6: every step for `⊢ 10 ≤ n` went to a dead line 34
 # lines above it, nine times over). `focus` fails there: "no goals to be solved".
 PROBE = "focus skip"
+
+
+def dump_check(text: str, focus: Any, check: Any) -> None:
+    """Every rendered file and its verdict, when VM_DUMP_DIR is set (debugging)."""
+    where = os.environ.get("VM_DUMP_DIR")
+    if not where:
+        return
+    os.makedirs(where, exist_ok=True)
+    n = len(os.listdir(where)) // 2
+    Path(where, f"{n:04d}.lean").write_text(text)
+    Path(where, f"{n:04d}.json").write_text(json.dumps({
+        "focus": focus, "ms": check.duration_ms, "accepted": check.accepted,
+        "timed_out": check.timed_out,
+        "messages": [{"severity": m.get("severity"), "line": (m.get("pos") or {}).get("line"),
+                      "data": str(m.get("data"))[:400]} for m in check.messages]}, ensure_ascii=False, indent=1))
 
 
 def is_root_goal(text: str, goal: Goal) -> bool:
@@ -1718,6 +1734,7 @@ class BoardAgent(FrameworkAgent):
                 blank_techniques(rendered.text), timeout_s=check_timeout_s((base or board).ms))
             messages = remap(check.messages, rendered.lines)
             errors = [m for m in messages if isinstance(m, dict) and m.get("severity") == "error"]
+            dump_check(rendered.text, focus, check)
             for m in check.messages:
                 if m.get("severity") == "error" and str(m.get("data", "")).startswith("unexpected"):
                     at = message_line(m) or 0
