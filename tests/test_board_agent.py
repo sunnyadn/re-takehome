@@ -2073,3 +2073,14 @@ def test_a_disjunction_of_subtraction_equations_is_split_and_each_case_solved():
                                 "have hge_hq := Nat.Prime.two_le hq; have hpos_d : 0 < m - p - q := by")
     assert "have hsolve : m = p + q + (m - p - q) := by" in blocks[0] and "rw [hc] at hsolve; subst hsolve;" in blocks[0]
     assert not any("0 < (1 ∨" in b for b in blocks)      # the disjunction is not read as one equation
+
+
+def test_a_disjunction_of_values_is_substituted_case_by_case():
+    # Measured on putnam_2018_a1 (v7.88): divisor_cases over ℤ left
+    # `a = 673 ∨ a = 674 ∨ ...` on the board with the membership goal open.
+    from submission.leaves import leaf_candidates
+    goal = ("a b : ℤ\nh_eq : (3 * a - 2018) * (3 * b - 2018) = 2018 ^ 2\n"
+            "ha : a = 673 ∨ a = 674 ∨ a = 1009\n⊢ (a, b) ∈ {(673, 1358114), (674, 340033), (1009, 2018)}")
+    blocks = leaf_candidates(goal)
+    assert blocks[0].startswith("rcases ha with rfl | rfl | rfl <;> (first | omega")
+    assert "norm_num [Set.mem_insert_iff" in blocks[0]

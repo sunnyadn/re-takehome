@@ -12,9 +12,11 @@ VAR = re.compile(r"^[A-Za-z_][\w']*$")
 # Every alternative must close the goal: `simp_all` alone can rewrite a
 # hypothesis, count as success, and leave the goal open (measured on the
 # rmo_2001_2 case leaves).
+MEMBERSHIP = ("Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, "
+              "Finset.mem_singleton")
 FINISH = ("first | omega | (norm_num at *; done) | nlinarith | (simp_all; done)"
-          " | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, "
-          "Finset.mem_insert, Finset.mem_singleton] at *; omega)")
+          f" | (simp only [{MEMBERSHIP}] at *; omega)"
+          f" | (norm_num [{MEMBERSHIP}] at *; done) | (norm_num [{MEMBERSHIP}] at *; omega)")
 LEAF_CAP = 6
 CASES_MAX = 40
 # One check's elaboration is bounded: a candidate that does not finish fast is not one.
@@ -252,7 +254,7 @@ def leaf_candidates(goal_text: str) -> list[str]:
     for hn, t in hyps:
         d = re.match(r"^([A-Za-z_][\w']*) = (.+)$", t)
         if d and not NUM.match(d.group(2).strip()) and re.search(r"[A-Za-z]", d.group(2)) \
-                and not re.search(r"[↔→∀∃∣]", goal_text):
+                and not re.search(r"[∨∧↔→∀∃∣]", t) and not re.search(r"[↔→∀∃∣]", goal_text):
             out.append(f"{primes}subst {hn}\n{'nat_sub_exact' + chr(10) if '-' in goal_text else ''}"
                        + finish)
             break
@@ -274,6 +276,13 @@ def leaf_candidates(goal_text: str) -> list[str]:
         cases = [c.strip() for c in t.split(" ∨ ")]
         if len(cases) < 2 or not re.search(r"[∨]", t) or re.search(r"[↔→∀∃]", target):
             continue
+        # `v = c₁ ∨ v = c₂ ∨ ...`, c closed: substitute each and finish. Measured
+        # on putnam_2018_a1 (v7.88): divisor_cases over ℤ left `a = 673 ∨ ...`
+        # and `b = 1358114 ∨ ...` with the membership goal open.
+        plain = [re.match(r"^([A-Za-z_][\w']*) = ([^A-Za-z_]+)$", c) for c in cases]
+        if all(plain) and len({h.group(1) for h in plain}) == 1:
+            out.append(f"rcases {hn} with {' | '.join(['rfl'] * len(cases))} <;> ({finish})")
+            break
         heads = [re.match(r"^([A-Za-z_][\w']*)((?: - [^-=()]+)+) = (.+)$", c) for c in cases]
         if not all(heads) or len({(h.group(1), h.group(2)) for h in heads}) != 1:
             continue
