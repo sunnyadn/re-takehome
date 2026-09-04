@@ -2464,3 +2464,45 @@ def test_closing_the_last_goal_of_a_theorem_in_its_own_cell_is_not_read_as_unrea
                                      FakeServices(lean, llm)))
     assert result.metadata["solved_by"] == "board_loop"
     assert not any("nothing can get back to" in e.get("why", "") for e in result.metadata["events"])
+
+
+def test_closing_a_cell_rechecks_its_parent_so_a_goal_without_a_placeholder_is_reopened():
+    # Measured on rmo_2000_6 (frame108): a `case` block took its sibling's goal,
+    # which Lean then reported on the theorem's header only; a step in a cell
+    # closed the last placeholder, the stale header report was dropped, the
+    # board read as finished and the comparator refused the file for sorryAx.
+    # Now the parent is checked again, the goal gets a placeholder, and the run goes on.
+    class HiddenGoalLean(CellLean):
+        async def check_file(self, source, timeout_s=None):
+            check = await super().check_file(source, timeout_s)
+            lines = source.split("\n")
+            head = next((i for i, l in enumerate(lines, start=1) if l.startswith("theorem demo ")), None)
+            full = head is not None and lines[head].strip() != "sorry"
+            done = "exact hidden_done" in source
+            messages = list(check.messages)
+            if done:
+                at = next(i for i, l in enumerate(lines, start=1) if "exact hidden_done" in l)
+                messages = [m for m in messages
+                            if not (str(m.get("data", "")).startswith("unsolved goals") and m["pos"]["line"] <= at <= m.get("endPos", m["pos"])["line"])]
+                if at < len(lines) and lines[at].strip() in ("skip", PROBE, CELL_PROBE):
+                    messages.append({"severity": "error", "pos": {"line": at + 1, "column": 2},
+                                     "endPos": {"line": at + 1, "column": 4}, "data": "No goals to be solved"})
+            elif full and "theorem vm_cell_" in source:
+                # Lean reports a declaration's leftover goal on its `by`, spanning the proof.
+                end = head
+                while end < len(lines) and (lines[end].startswith(" ") or not lines[end].strip()):
+                    end += 1
+                messages.append({"severity": "error", "pos": {"line": head, "column": 2},
+                                 "endPos": {"line": end, "column": 0},
+                                 "data": "unsolved goals\ncase refine_2\n⊢ hidden"})
+            errors = [m for m in messages if m["severity"] == "error"]
+            return LeanCheck(not errors, messages, check.has_sorry, False, 1)
+
+    lean, llm = HiddenGoalLean(), ScriptLLM({
+        "model-a": ["have h : True := by trivial", "exact h"] + ["exact hidden_done"] * 4})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0, audit=False))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert any(e.get("stage") == "reopen" for e in result.metadata["events"])
+    assert result.metadata["solved_by"] == "board_loop"
+    assert "exact hidden_done" in result.solution

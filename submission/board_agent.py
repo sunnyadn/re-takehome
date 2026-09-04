@@ -79,6 +79,7 @@ from submission.framework import (
     split_cursor,
     sweep_body,
     unreachable,
+    reopen,
 )
 from submission.framework_agent import (
     VACUOUS,
@@ -2017,7 +2018,18 @@ class BoardAgent(FrameworkAgent):
                 said_text = format_messages(own)[:FEEDBACK_CHARS]
                 names = await nearest_names(own, goal)
                 return None, f"{said_text}\n{names}\n{notes_for(said_text)}".strip()
-            if unreachable(nxt.messages, nxt.text, -1):
+            lost = unreachable(nxt.messages, nxt.text, -1)
+            if lost and lost[0] >= span[1]:
+                # A goal outside the step's own lines that no placeholder reaches
+                # (a `case` block took its sibling, the step closed the last hole
+                # under a header report): it gets a placeholder where Lean says it
+                # is, and the step stands. Measured on rmo_2000_6: the closing step
+                # was refused for a goal it had not touched.
+                reopened = await look(reopen(nxt.text, *lost), base)
+                if not classify(reopened.messages)[3] and not unreachable(reopened.messages, reopened.text, -1):
+                    events.append({"stage": "reopen", "line": lost[0], "decl": goal.decl})
+                    nxt, lost = reopened, None
+            if lost:
                 return None, ("that step left a goal open inside a branch nothing "
                               "can get back to. A step that splits the goal gives "
                               "every branch its own `sorry`, or closes it outright")
