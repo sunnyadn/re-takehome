@@ -2323,8 +2323,7 @@ class BoardAgent(FrameworkAgent):
             finally:
                 probe_spent["leaf"] += time.monotonic() - t0
 
-        conjectured: list[str] = []
-        generalised: set[str] = set()
+        conjectured: dict[tuple[str, str], str] = {}
 
         async def generalise_sweep(goal: Goal) -> bool:
             """A sum identity in one variable that its own induction did not
@@ -2334,7 +2333,7 @@ class BoardAgent(FrameworkAgent):
             goal rewrites by it. Measured: putnam_2020_a2, 0/32 model proposals."""
 
             target = target_of(goal.text)
-            if goal.decl.startswith("vm_conj_") or goal.decl in generalised or not affordable("leaf"):
+            if goal.decl.startswith("vm_conj_") or "h_gen" in hypotheses(goal.text) or not affordable("leaf"):
                 return False
             ks = _sum_variables(leaf_hyps(goal.text), target)
             halves = split_top(target, " = ")
@@ -2347,40 +2346,55 @@ class BoardAgent(FrameworkAgent):
             roots = root_names(board.text)
             first = proof_span(board.text, roots[0]) if roots else None
             prefix = board.text[:first[0]] if first else ""
-            found: list[tuple[str, str]] = []
-            t0 = time.monotonic()
-            for i, fam in enumerate(fams[:6]):
-                check = await services.lean.check_file(
-                    blank_techniques(table_file(prefix, fam, fresh, k, i)), timeout_s=60)
-                table = read_table(check.messages)
-                if not table:
-                    continue
-                for guess in fits(table, fresh, k, fam)[:2]:
+            found = [(f, g) for (f, g) in conjectured if f in fams]
+            if not found:
+                t0 = time.monotonic()
+                for i, fam in enumerate(fams[:6]):
                     check = await services.lean.check_file(
-                        blank_techniques(verify_file(prefix, fam, guess, fresh, k)), timeout_s=60)
-                    if verified(check.messages):
-                        found.append((fam, guess))
-            probe_spent["leaf"] += time.monotonic() - t0
-            events.append({"stage": "conjecture", "goal": target[:100], "families": len(fams),
-                           "fits": [g for _, g in found][:3]})
+                        blank_techniques(table_file(prefix, fam, fresh, k, i)), timeout_s=60)
+                    table = read_table(check.messages)
+                    if not table:
+                        continue
+                    for guess in fits(table, fresh, k, fam)[:2]:
+                        check = await services.lean.check_file(
+                            blank_techniques(verify_file(prefix, fam, guess, fresh, k)), timeout_s=60)
+                        if verified(check.messages):
+                            found.append((fam, guess))
+                probe_spent["leaf"] += time.monotonic() - t0
+                events.append({"stage": "conjecture", "goal": target[:100], "families": len(fams),
+                               "fits": [g for _, g in found][:3]})
             if not found:
                 return False
             fam, guess = found[0]
-            name = f"vm_conj_{len(conjectured) + 1}"
-            conjectured.append(name)
-            generalised.add(goal.decl)
-            staged = await look(insert_preamble(board.text, lemma_text(name, fresh, k, fam, guess)))
+            name = conjectured.setdefault((fam, guess), f"vm_conj_{len(conjectured) + 1}")
+            text = board.text
+            if name not in root_names(text):
+                text = insert_preamble(text, lemma_text(name, fresh, k, fam, guess))
+            staged = await look(text) if text != board.text else board
             moved = staged.find(goal.key)
             if moved is None or classify(staged.messages)[3]:
                 return False
             sub = lambda t: re.sub(rf"(?<![\w'.]){fresh}(?![\w'])", k, t)
-            fact = f"have h_gen : {sub(fam)} = {sub(guess)} := {name} {k} {k}"
-            nxt, _ = await judge(staged, moved, f"{fact}\nrw [h_gen]")
-            if nxt is None:
-                nxt, _ = await judge(staged, moved, fact)
+            # `k + k` reads as `2 * k` (the form Mathlib's lemmas are stated in).
+            spec = re.sub(rf"(?<![\w'.]){k} \+ {k}(?![\w'])", f"2 * {k}", sub(guess))
+            facts = [f"have h_gen : {sub(fam)} = {spec} := by simpa only [← two_mul] using {name} {k} {k}"] \
+                if spec != sub(guess) else []
+            facts.append(f"have h_gen : {sub(fam)} = {sub(guess)} := {name} {k} {k}")
+            nxt = None
+            for fact in facts:
+                nxt, _ = await judge(staged, moved, f"{fact}\nrw [h_gen]")
+                if nxt is None:
+                    nxt, _ = await judge(staged, moved, fact)
+                if nxt is not None:
+                    break
             events.append({"stage": "generalise", "lemma": name, "guess": guess,
                            "rewritten": nxt is not None})
             await commit(nxt if nxt is not None else staged)
+            left = next((g for g in board.goals if g.decl == goal.decl and "h_gen" in hypotheses(g.text)), None)
+            if left is not None and left.key not in searched:
+                # Mathlib may state the rewritten goal outright (Nat.sum_range_choose_halfway).
+                searched.add(left.key)
+                await library_sweep(left)
             return True
 
         async def library_sweep(goal: Goal) -> bool:

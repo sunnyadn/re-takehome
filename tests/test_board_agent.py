@@ -2442,5 +2442,8 @@ def test_a_sum_identity_its_own_induction_misses_is_generalised_tabulated_fitted
     assert any(e.get("stage") == "generalise" and e["lemma"] == "vm_conj_1" for e in events)
     posted = [s for s in lean.sources if "theorem vm_conj_1 (n k : ℕ)" in s and "have h_gen" in s]
     assert posted and ("have h_gen : ∑ j ∈ Finset.Icc 0 k, 2 ^ (k - j) * Nat.choose (k + j) j = "
-                       "∑ i ∈ Finset.range (k + 1), Nat.choose (k + k + 1) i := vm_conj_1 k k") in posted[0]
+                       "∑ i ∈ Finset.range (k + 1), Nat.choose (2 * k + 1) i := by simpa only [← two_mul] "
+                       "using vm_conj_1 k k") in posted[0]
+    # The rewritten goal is put to Mathlib at once (Nat.sum_range_choose_halfway states it).
+    assert any("apply?" in s and "rw [h_gen]" in s for s in lean.sources)
     assert result.metadata["solved_by"] == "board_loop"
