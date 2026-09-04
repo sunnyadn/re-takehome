@@ -176,7 +176,10 @@ def check_timeout_s(base_ms: int) -> int:
 # check), and one `exact?` takes the container to 2.7 GB for good (its index),
 # which a renew only makes it load again (27 s). So the threshold sits near
 # the 5 GB limit and the count is a backstop.
-RENEW_AT_BYTES = int(4.2 * 2 ** 30)
+# Measured again with cells (p10, win): at 3.1-3.4 GB a check of three bare
+# probes took 118 s and `intro n hn` 108 s (the container thrashing), so the
+# threshold sits below that and above one search's residue (2.7 GB).
+RENEW_AT_BYTES = int(3.0 * 2 ** 30)
 RENEW_AFTER_CHECKS = 200
 MEMORY_SAMPLE_EVERY = 4
 UNITS = {"B": 1, "KiB": 2 ** 10, "MiB": 2 ** 20, "GiB": 2 ** 30, "KB": 10 ** 3, "MB": 10 ** 6, "GB": 10 ** 9}
@@ -2208,8 +2211,12 @@ class BoardAgent(FrameworkAgent):
                         break
                     order = order[len(order) // 2 + 1:] if len(order) > 1 else []
                 retry = hand_to_search(block)
-                if nxt is None and retry != block:
+                if nxt is None and retry != block and affordable("scan"):
+                    # `exact?` costs ~27 s a call here and leaves 2 GB of index in
+                    # the container (measured, p10): it draws on the scan share.
+                    t0 = time.monotonic()
                     nxt, _ = await judge(base, goal, retry)
+                    probe_spent["scan"] += time.monotonic() - t0
                     events.append({"kind": "search-retry", "by": author,
                                    "accepted": nxt is not None})
                 if nxt is None:
@@ -2317,6 +2324,7 @@ class BoardAgent(FrameworkAgent):
                 probe_spent["leaf"] += time.monotonic() - t0
 
         conjectured: list[str] = []
+        generalised: set[str] = set()
 
         async def generalise_sweep(goal: Goal) -> bool:
             """A sum identity in one variable that its own induction did not
@@ -2326,7 +2334,7 @@ class BoardAgent(FrameworkAgent):
             goal rewrites by it. Measured: putnam_2020_a2, 0/32 model proposals."""
 
             target = target_of(goal.text)
-            if goal.decl.startswith("vm_conj_") or not affordable("leaf"):
+            if goal.decl.startswith("vm_conj_") or goal.decl in generalised or not affordable("leaf"):
                 return False
             ks = _sum_variables(leaf_hyps(goal.text), target)
             halves = split_top(target, " = ")
@@ -2360,6 +2368,7 @@ class BoardAgent(FrameworkAgent):
             fam, guess = found[0]
             name = f"vm_conj_{len(conjectured) + 1}"
             conjectured.append(name)
+            generalised.add(goal.decl)
             staged = await look(insert_preamble(board.text, lemma_text(name, fresh, k, fam, guess)))
             moved = staged.find(goal.key)
             if moved is None or classify(staged.messages)[3]:
