@@ -74,7 +74,8 @@ class BoardLean:
                                                len(rows[j]) - len(rows[j].lstrip()) < depth):
                         break
                     if len(rows[j]) - len(rows[j].lstrip()) == depth and \
-                            any(rows[j].strip() == f"exact {h}" for h in haves):
+                            any(rows[j].strip() == f"exact {h}" for h in haves) and \
+                            not decl.startswith("stuck"):      # a `stuck_*` declaration never closes
                         closed = True
                         break
                 if closed:
@@ -1359,7 +1360,9 @@ def test_a_hoisted_lemma_whose_goal_keeps_failing_is_dropped_like_a_have():
                    + [f"linarith [x{i}]" for i in range(1, 9)],
     }, lines=("model-a",))
     events = result.metadata["events"]
-    assert any(e.get("kind") == "withdraw" and e.get("decl") == "part1" for e in events)
+    # Taken back by the withdrawal, or shed at the finish as an open helper nothing uses (v7.97).
+    assert any((e.get("kind") == "withdraw" and e.get("decl") == "part1")
+               or (e.get("stage") == "shed" and e.get("name") == "part1") for e in events)
     assert "lemma part1" not in result.solution
     assert result.metadata["accepted_by_repl"] is True
 
@@ -2183,3 +2186,17 @@ def test_a_product_equation_gives_the_divisor_leaf_without_a_divisibility_hypoth
            "h_factor : (m - p - q) * (m + p + q) = 5 * p * q\n⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3")
     assert any("prime_facts; have hdvd : m - p - q ∣ 5 * p * q := Dvd.intro _ h_factor; divisor_cases hdvd" in b
                for b in leaf_candidates(rmo))
+
+
+def test_an_open_helper_nothing_graded_uses_does_not_hold_a_finished_proof_back():
+    # Measured on p09 (v7.95, reg95 p09c): both graded theorems closed by the
+    # pow_cycle leaf at 4 s each, but a shared lemma a model had proposed
+    # (`mod7_pow2_cases`, never referenced) still carried a sorry, so the run
+    # kept working that lemma for 10 more minutes and delivered best_effort.
+    result, lean, llm, _ = run(ONE, {
+        "model-a": ["no", "lemma stuck_helper (n : ℕ) : n = n := by\n  rfl"]
+                   + ["have key : True := by trivial", "exact key"] * 4,
+        "model-b": ["no"] + ["have key : True := by trivial", "exact key"] * 4}, time_limit=60.0)
+    assert result.metadata["solved_by"] == "board_loop"
+    assert "sorry" not in result.solution and "stuck_helper" not in result.solution
+    assert any(e.get("stage") == "shed" and e.get("name") == "stuck_helper" for e in result.metadata["events"])

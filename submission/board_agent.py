@@ -763,6 +763,29 @@ def drop_declaration(text: str, decl: str) -> str:
     return text[:start] + text[span[1]:]
 
 
+def shed_unreferenced(text: str, graded: Sequence[str]) -> tuple[str, list[str]]:
+    """The file without the open declarations nothing else uses: a helper a
+    model proposed and never called must not hold a finished proof back.
+    Measured on p09 (v7.95): both graded theorems closed, a shared lemma with
+    a sorry stayed, and the run worked it for 10 more minutes."""
+    shed: list[str] = []
+    while True:
+        open_decls = {owner(text, line_of(text, m.start())) for m in placeholders(text)}
+        for decl in root_names(text):
+            span = proof_span(text, decl)
+            if decl in graded or decl not in open_decls or not span:
+                continue
+            head = text.rfind("\n\n", 0, span[0])
+            rest = strip_techniques(text[:max(head, 0)] + text[span[1]:])
+            if re.search(rf"\b{re.escape(decl)}\b", rest):
+                continue
+            text = drop_declaration(text, decl)
+            shed.append(decl)
+            break
+        else:
+            return text, shed
+
+
 def is_stated(lines: Sequence[str], goal: Goal) -> bool:
     """Whether the goal is the body of a statement the model wrote."""
     i = goal.line - 1
@@ -1540,6 +1563,25 @@ class BoardAgent(FrameworkAgent):
                 best = candidate
                 services.checkpoint(best, {"accepted": accepted})
 
+        shed_named: set[str] = set()
+
+        def done_text(b: Board) -> str | None:
+            """The finished file: accepted with nothing open, or sound (no
+            failure beyond its open goals) with every open goal inside a helper
+            nothing graded uses, which is removed. `deliver` checks it again."""
+            if b.accepted and is_done(b.text):
+                return b.text
+            if classify(b.messages)[3]:
+                return None
+            text, shed = shed_unreferenced(b.text, graded)
+            if not shed or not is_done(text) or any(g.decl not in shed for g in b.goals):
+                return None
+            for name in shed:
+                if name not in shed_named:
+                    shed_named.add(name)
+                    events.append({"stage": "shed", "name": name})
+            return text
+
         def result(source: str, how: str, accepted: bool) -> AgentResult:
             # Every event, so a run's accounting (who wrote, who audited, what
             # closed without a model) can be read off result.json. A 500-turn
@@ -1631,7 +1673,8 @@ class BoardAgent(FrameworkAgent):
                     break
             else:
                 branches.append(fresh)
-            offer(board.text, board.accepted and is_done(board.text))
+            finished_text = done_text(board)
+            offer(finished_text or board.text, finished_text is not None)
             changed.set()
             changed.clear()
 
@@ -2488,7 +2531,7 @@ class BoardAgent(FrameworkAgent):
             nonlocal finished, next_bid
             if True:
                 async with lock:
-                    if any(b.accepted and is_done(b.text) for b in branches):
+                    if any(done_text(b) is not None for b in branches):
                         finished = True
                         return True
                     if all_last_in_line() or stalled():
@@ -2680,9 +2723,9 @@ class BoardAgent(FrameworkAgent):
                 finished = True
                 await asyncio.wait(tasks, timeout=LOOSE_DRAIN_S)
 
-            done = [b for b in branches if b.accepted and is_done(b.text)]
+            done = [t for t in (done_text(b) for b in branches) if t is not None]
             if done:
-                won = await deliver(done[0].text, "board_loop")
+                won = await deliver(done[0], "board_loop")
                 if won:
                     return won
             if branches:
