@@ -1,322 +1,124 @@
 {
   "metadata": {
     "strategy": "board",
-    "solved_by": "best_effort",
-    "accepted_by_repl": false,
-    "spend_usd": 0.077822,
-    "wall_s": 2704.7,
-    "turns": 540,
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.01231,
+    "wall_s": 1282.1,
+    "turns": 158,
     "events": [
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.lt_of_pow_lt_pow_left"
-        ],
-        "ms": 1836,
-        "found": true
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "le_of_lt_succ"
-        ],
-        "ms": 23622,
-        "found": true
-      },
-      {
-        "stage": "route",
-        "from": 0,
-        "to": 2,
-        "by": "openai/gpt-oss-120b"
-      },
-      {
-        "stage": "split",
-        "goals": 2
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.pow_le_pow_of_le_left"
-        ],
-        "ms": 22519,
-        "found": true
-      },
-      {
-        "stage": "fork",
-        "from": 0,
-        "to": 3,
-        "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 "
-      },
-      {
-        "stage": "prune",
-        "bid": 0,
-        "goals": 8
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.pow_lt_pow_iff_left.mpr"
-        ],
-        "ms": 23725,
-        "found": true
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.mul_pos_iff"
-        ],
-        "ms": 39793,
-        "found": true
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.pow_le_pow_left.mpr"
-        ],
-        "ms": 30543,
-        "found": true
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "lt_or_le"
-        ],
-        "ms": 41048,
-        "found": true
-      },
-      {
-        "stage": "route",
-        "from": 2,
-        "to": 5,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "stage": "prune",
-        "bid": 5,
-        "goals": 4
-      },
-      {
-        "stage": "repair",
-        "bid": 2,
-        "why": "cost",
-        "said": "error at {'line': 41, 'column': 4}: maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information"
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.lt_of_pow_lt_pow"
-        ],
-        "ms": 45717,
-        "found": true
-      },
-      {
-        "stage": "split",
-        "goals": 2
-      },
-      {
-        "stage": "route",
-        "from": 2,
-        "to": 6,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "stage": "prune",
-        "bid": 6,
-        "goals": 4
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "le_or_lt"
-        ],
-        "ms": 74318,
-        "found": true
-      },
-      {
-        "stage": "split",
-        "goals": 2
-      },
-      {
-        "stage": "route",
-        "from": 3,
-        "to": 8,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "stage": "prune",
-        "bid": 2,
-        "goals": 5
-      },
-      {
-        "stage": "route",
-        "from": 3,
-        "to": 10,
-        "by": "openai/gpt-oss-120b"
-      },
-      {
-        "stage": "prune",
-        "bid": 10,
-        "goals": 4
-      },
-      {
-        "stage": "route",
-        "from": 8,
-        "to": 11,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "stage": "prune",
-        "bid": 11,
-        "goals": 5
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.zero_le_of_lt",
-          "gt_of_not_le"
-        ],
-        "ms": 90755,
-        "found": false
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.lt_of_sub_pos_right"
-        ],
-        "ms": 35155,
-        "found": true
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.sub_lt_iff_lt_add.mpr",
-          "Nat.mul_neg_of_pos_of_neg"
-        ],
-        "ms": 42423,
-        "found": true
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.le.mp"
-        ],
-        "ms": 70268,
-        "found": true
-      },
-      {
-        "stage": "route",
-        "from": 3,
-        "to": 17,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "stage": "prune",
-        "bid": 17,
-        "goals": 4
-      },
-      {
-        "stage": "route",
-        "from": 3,
-        "to": 20,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "stage": "prune",
-        "bid": 20,
-        "goals": 4
-      },
-      {
-        "stage": "route",
-        "from": 8,
-        "to": 22,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "stage": "prune",
-        "bid": 22,
-        "goals": 4
-      },
-      {
-        "stage": "route",
-        "from": 8,
-        "to": 23,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "stage": "prune",
-        "bid": 23,
-        "goals": 3
-      },
       {
         "kind": "closers",
         "by": "harness",
-        "accepted": true
+        "accepted": false,
+        "ms": 1985
       },
       {
-        "kind": "collapse",
-        "tactic": "omega",
-        "accepted": true
+        "kind": "leaf",
+        "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ x = 9 ∧ y = 11",
+        "accepted": false,
+        "tried": 1,
+        "ms": 1580
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "Nat.pow_lt_pow_iff_left.mp"
+        ],
+        "ms": 1763,
+        "found": true
       },
       {
         "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
         "by": "qwen/qwen3.5-flash-02-23",
         "accepted": false
       },
       {
         "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "x ≥ 9 → (x + 2) ^ 3 < y ^ 3",
-        "verdict": "unstated",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) < y ^ (3 : ℕ)",
+        "verdict": "refuted",
+        "values": {
+          "x": "9",
+          "y": "11"
+        }
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "verdict": "holds",
         "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x + (2 : ℕ) < y",
+        "verdict": "refuted",
+        "values": {
+          "x": "9",
+          "y": "11"
+        }
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
       },
       {
         "kind": "step",
         "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": true
-      },
-      {
-        "kind": "collapse",
-        "tactic": "omega <;> norm_num",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
         "accepted": false
       },
       {
-        "kind": "plan",
-        "by": "openai/gpt-oss-120b",
-        "chars": 562
+        "kind": "library",
+        "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ x = 9 ∧ y = 11",
+        "found": 58,
+        "accepted": false,
+        "ms": 2738
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "pow",
+          "nat",
+          "lt"
+        ],
+        "lines": 0,
+        "ms": 90423
       },
       {
         "kind": "plan",
         "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 471
+        "chars": 1054
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 2898
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 923
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 521
       },
       {
         "kind": "skeleton",
         "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
       },
       {
         "kind": "route",
@@ -324,47 +126,39 @@
         "to": "rmo_2000_2"
       },
       {
-        "kind": "prefix",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "lines": 46
-      },
-      {
         "kind": "step",
         "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": true
+        "accepted": false
       },
       {
-        "stage": "route",
-        "from": 8,
-        "to": 24,
-        "by": "qwen/qwen3.5-flash-02-23"
+        "kind": "restated",
+        "by": "openai/gpt-oss-120b"
       },
       {
-        "stage": "prune",
-        "bid": 24,
-        "goals": 2
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "0 < 2 * x * (x - 9)",
-        "verdict": "unstated",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "x ≥ 9",
-        "verdict": "unstated",
-        "values": {}
-      },
-      {
-        "kind": "lifted",
+        "kind": "prefix",
         "by": "qwen/qwen3.5-flash-02-23",
-        "facts": 3,
-        "dup": 1,
-        "from_depth": 1,
-        "to_depth": 1
+        "lines": 8
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) = x ^ (3 : ℕ) + (6 : ℕ) * x ^ (2 : ℕ) + (12 : ℕ) * x + (8 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (3 : ℕ)) ^ (3 : ℕ) = x ^ (3 : ℕ) + (9 : ℕ) * x ^ (2 : ℕ) + (27 : ℕ) * x + (27 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ≤ (9 : ℕ) ∨ x ≥ (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
       },
       {
         "kind": "step",
@@ -374,22 +168,44 @@
       {
         "kind": "closers",
         "by": "harness",
-        "accepted": false
+        "accepted": true,
+        "ms": 2936
+      },
+      {
+        "kind": "collapse",
+        "tactic": "ring",
+        "accepted": true
       },
       {
         "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
+        "by": "openai/gpt-oss-120b",
         "accepted": false
       },
       {
         "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
+        "by": "openai/gpt-oss-120b",
         "accepted": false
+      },
+      {
+        "kind": "stale",
+        "by": "openai/gpt-oss-120b"
       },
       {
         "kind": "closers",
         "by": "harness",
+        "accepted": true,
+        "ms": 3840
+      },
+      {
+        "kind": "collapse",
+        "tactic": "ring",
         "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 3573
       },
       {
         "kind": "collapse",
@@ -399,7 +215,8 @@
       {
         "kind": "closers",
         "by": "harness",
-        "accepted": true
+        "accepted": true,
+        "ms": 3161
       },
       {
         "kind": "collapse",
@@ -407,34 +224,117 @@
         "accepted": true
       },
       {
-        "kind": "step",
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 3557
+      },
+      {
+        "kind": "leaf",
+        "goal": " * x + 8\nh2 : (x + 3) ^ 3 = x ^ 3 + 9 * x ^ 2 + 27 * x + 27\nh3 : y ^ 3 < (x + 3) ^ 3\nh4 : x ≤ 9 ∨ x ≥ 9\n⊢ x = 9 ∧ y = 11",
+        "accepted": false,
+        "tried": 2,
+        "ms": 3521
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 95,
+        "elapsed_s": 279
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 95,
+        "elapsed_s": 279
+      },
+      {
+        "kind": "restated",
         "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
+        "of": [
+          "h3"
+        ]
+      },
+      {
+        "kind": "leaf_restart",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "goal": "1 : (x + 2) ^ 3 = x ^ 3 + 6 * x ^ 2 + 12 * x + 8\nh2 : (x + 3) ^ 3 = x ^ 3 + 9 * x ^ 2 + 27 * x + 27\nh3 : y ^ 3 < (x + 3) ^ 3\nh4 : x ≤ 9 ∨ x ≥ 9\n⊢ x = 9 ∧ y = 11",
+        "settled": 4
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
       },
       {
         "kind": "plan",
         "by": "openai/gpt-oss-120b",
-        "chars": 805
+        "chars": 1232
       },
       {
         "kind": "plan",
         "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 1046
+        "chars": 1087
       },
       {
         "kind": "skeleton",
         "by": "qwen/qwen3.5-flash-02-23"
       },
       {
-        "kind": "prefix",
+        "kind": "route",
         "by": "qwen/qwen3.5-flash-02-23",
-        "lines": 2
+        "to": "rmo_2000_2"
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) ≤ y ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
       },
       {
         "kind": "audit",
         "by": "openai/gpt-oss-120b",
-        "goal": "(x + 2) ^ 3 < y ^ 3",
-        "verdict": "unstated",
+        "goal": "x ≥ (3 : ℕ) → y = x + (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x = (1 : ℕ) ∨ x = (2 : ℕ) ∨ x ≥ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x ≠ (1 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x ≠ (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x = (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "y = (11 : ℕ)",
+        "verdict": "holds",
         "values": {}
       },
       {
@@ -444,33 +344,273 @@
       },
       {
         "stage": "route",
-        "from": 8,
-        "to": 25,
+        "from": 0,
+        "to": 4,
         "by": "qwen/qwen3.5-flash-02-23"
       },
       {
-        "stage": "prune",
-        "bid": 25,
-        "goals": 3
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
       },
       {
-        "stage": "names",
-        "asked": [
-          "Nat.le.elim"
-        ],
-        "ms": 1761,
-        "found": true
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 3379
+      },
+      {
+        "kind": "leaf",
+        "goal": "+ 8\nh2 : (x + 3) ^ 3 = x ^ 3 + 9 * x ^ 2 + 27 * x + 27\nh3 : y ^ 3 < (x + 3) ^ 3\nh4 : x ≤ 9 ∨ x ≥ 9\n⊢ (x + 2) ^ 3 ≤ y ^ 3",
+        "block": "  first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)",
+        "accepted": true,
+        "ms": 12759
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 7776
+      },
+      {
+        "kind": "leaf",
+        "goal": " + 3) ^ 3 = x ^ 3 + 9 * x ^ 2 + 27 * x + 27\nh3 : y ^ 3 < (x + 3) ^ 3\nh4 : x ≤ 9 ∨ x ≥ 9\nh5 : (x + 2) ^ 3 ≤ y ^ 3\n⊢ x = 9",
+        "accepted": false,
+        "tried": 1,
+        "ms": 5957
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2432
+      },
+      {
+        "kind": "leaf",
+        "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ (x + 2) ^ 3 ≤ y ^ 3",
+        "block": "  first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)",
+        "accepted": true,
+        "ms": 7890
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6947
+      },
+      {
+        "kind": "leaf",
+        "goal": "x ^ 3 + 9 * x ^ 2 + 27 * x + 27\nh3 : y ^ 3 < (x + 3) ^ 3\nh4 : x ≤ 9 ∨ x ≥ 9\nh5 : (x + 2) ^ 3 ≤ y ^ 3\nh6 : x = 9\n⊢ y = 11",
+        "block": "pow_bounds y 3",
+        "accepted": true,
+        "ms": 11869
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 95,
+        "elapsed_s": 430
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 95,
+        "elapsed_s": 430
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 10890
+      },
+      {
+        "kind": "collapse",
+        "tactic": "ring_nf; omega",
+        "accepted": true
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 95,
+        "elapsed_s": 451
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 95,
+        "elapsed_s": 457
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 7615
+      },
+      {
+        "stage": "slow",
+        "ms": 22591,
+        "was": 4170
+      },
+      {
+        "kind": "leaf",
+        "goal": " : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\nh5 : (x + 2) ^ 3 ≤ y ^ 3\nh6 : y ^ 3 < (x + 3) ^ 3\n⊢ x ≥ 3 → y = x + 2",
+        "accepted": false,
+        "tried": 1,
+        "ms": 28888
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 1487
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1528
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 8202
+      },
+      {
+        "kind": "collapse",
+        "tactic": "omega",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 9289
+      },
+      {
+        "kind": "collapse",
+        "tactic": "aesop",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 10010
+      },
+      {
+        "kind": "collapse",
+        "tactic": "aesop",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 7186
+      },
+      {
+        "kind": "leaf",
+        "goal": "2) ^ 3 ≤ y ^ 3\nh6 : y ^ 3 < (x + 3) ^ 3\nh7 : x ≥ 3 → y = x + 2\nh8 : x = 1 ∨ x = 2 ∨ x ≥ 3\nh9 : x ≠ 1\nh10 : x ≠ 2\n⊢ x = 9",
+        "accepted": false,
+        "tried": 1,
+        "ms": 5536
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y ^ (3 : ℕ) - (x + (2 : ℕ)) ^ (3 : ℕ) = (2 : ℕ) * x * (x - (9 : ℕ))",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(9 : ℕ) ≤ x",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ≤ (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "lifted",
+        "by": "openai/gpt-oss-120b",
+        "facts": 3,
+        "dup": 0,
+        "from_depth": 1,
+        "to_depth": 1
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
       },
       {
         "kind": "prefix",
         "by": "qwen/qwen3.5-flash-02-23",
-        "lines": 1
+        "lines": 6
       },
       {
         "kind": "audit",
         "by": "openai/gpt-oss-120b",
-        "goal": "(x + 2) ^ 3 < y ^ 3",
+        "goal": "y = x + (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x ≥ 3",
         "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x = (9 : ℕ)",
+        "verdict": "holds",
         "values": {}
       },
       {
@@ -481,40 +621,297 @@
       {
         "kind": "closers",
         "by": "harness",
+        "accepted": false,
+        "ms": 9899
+      },
+      {
+        "kind": "leaf",
+        "goal": "27 * x + 27\nh3 : y ^ 3 < (x + 3) ^ 3\nh4 : x ≤ 9 ∨ x ≥ 9\nh5 : (x + 2) ^ 3 ≤ y ^ 3\n⊢ y ^ 3 - (x + 2) ^ 3 = 2 * x * (x - 9)",
+        "accepted": false,
+        "tried": 2,
+        "ms": 12793
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6237
+      },
+      {
+        "kind": "leaf",
+        "goal": " ≥ 3\nh9 : x ≠ 1\nh10 : x ≠ 2\nh13 : y = x + 2\nh5 : 8 + x * 12 + x ^ 2 * 6 + x ^ 3 ≤ 8 + x * 12 + x ^ 2 * 6 + x ^ 3\n⊢ x = 9",
+        "accepted": false,
+        "tried": 1,
+        "ms": 5156
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(8 : ℕ) + (x ^ (2 : ℕ) * (8 : ℕ) + x ^ (3 : ℕ) - x * (6 : ℕ)) - ((8 : ℕ) + x * (12 : ℕ) + x ^ (2 : ℕ",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h13"
+        ]
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 11092
+      },
+      {
+        "kind": "leaf",
+        "goal": " ∨ x ≥ 9\nh5 : (x + 2) ^ 3 ≤ y ^ 3\n⊢ 8 + (x ^ 2 * 8 + x ^ 3 - x * 6) - (8 + x * 12 + x ^ 2 * 6 + x ^ 3) = x * (x - 9) * 2",
+        "accepted": false,
+        "tried": 1,
+        "ms": 7128
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 10218
+      },
+      {
+        "kind": "collapse",
+        "tactic": "omega",
+        "accepted": true
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
         "accepted": false
+      },
+      {
+        "kind": "library",
+        "goal": " : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\nh5 : (x + 2) ^ 3 ≤ y ^ 3\nh6 : y ^ 3 < (x + 3) ^ 3\n⊢ x ≥ 3 → y = x + 2",
+        "found": 243,
+        "accepted": false,
+        "ms": 40123
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 135,
+        "elapsed_s": 794
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 11256
+      },
+      {
+        "kind": "leaf",
+        "goal": " : y ^ 3 < (x + 3) ^ 3\nh4 : x ≤ 9 ∨ x ≥ 9\nh5 : (x + 2) ^ 3 ≤ y ^ 3\nhdiff : y ^ 3 - (x + 2) ^ 3 = 2 * x * (x - 9)\n⊢ 9 ≤ x",
+        "accepted": false,
+        "tried": 1,
+        "ms": 7120
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 135,
+        "elapsed_s": 817
       },
       {
         "kind": "prefix",
         "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y = x + (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 8503
+      },
+      {
+        "kind": "leaf",
+        "goal": " < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\nh5 : (x + 2) ^ 3 ≤ y ^ 3\nh6 : y ^ 3 < (x + 3) ^ 3\nhge : x ≥ 3\n⊢ y = x + 2",
+        "block": "pow_bounds y 3",
+        "accepted": true,
+        "ms": 18647
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 135,
+        "elapsed_s": 858
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 135,
+        "elapsed_s": 858
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 16574
+      },
+      {
+        "kind": "leaf",
+        "goal": "+ 3) ^ 3\nh4 : x ≤ 9 ∨ x ≥ 9\nh5 : (x + 2) ^ 3 ≤ y ^ 3\nhdiff : y ^ 3 - (x + 2) ^ 3 = 2 * x * (x - 9)\nhxge9 : 9 ≤ x\n⊢ x ≤ 9",
+        "accepted": false,
+        "tried": 1,
+        "ms": 37455
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1062
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 837
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "leaf_restart",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "goal": "x ≥ 3 → y = x + 2\nh8 : x = 1 ∨ x = 2 ∨ x ≥ 3\nh9 : x ≠ 1\nh10 : x ≠ 2\nh13 : y = x + 2\nh5 : 8 + x * 12 + x ^ 2 * 6 + x ^ 3 ≤ 8 + x * 12 + x ^ 2 * 6 + x ^ 3\n⊢ x = 9",
+        "settled": 2
+      },
+      {
+        "kind": "library",
+        "goal": " ∨ x ≥ 9\nh5 : (x + 2) ^ 3 ≤ y ^ 3\n⊢ 8 + (x ^ 2 * 8 + x ^ 3 - x * 6) - (8 + x * 12 + x ^ 2 * 6 + x ^ 3) = x * (x - 9) * 2",
+        "found": 61,
+        "accepted": false,
+        "ms": 11505
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "pow",
+          "nat",
+          "le",
+          "lt"
+        ],
+        "lines": 0,
+        "ms": 90452
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 237,
+        "elapsed_s": 1190
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 237,
+        "elapsed_s": 1190
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 237,
+        "elapsed_s": 1215
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
         "lines": 2
       },
       {
         "kind": "audit",
         "by": "openai/gpt-oss-120b",
-        "goal": "(x + 2) ^ 3 < y ^ 3",
-        "verdict": "unstated",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) = x ^ (3 : ℕ) + (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ)",
+        "verdict": "holds",
         "values": {}
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false
-      },
-      {
-        "kind": "prefix",
-        "by": "openai/gpt-oss-120b",
-        "lines": 1
       },
       {
         "kind": "audit",
         "by": "openai/gpt-oss-120b",
-        "goal": "(x + 2) ^ 3 < y ^ 3",
-        "verdict": "unstated",
+        "goal": "x = (9 : ℕ)",
+        "verdict": "holds",
         "values": {}
       },
       {
@@ -523,51 +920,25 @@
         "accepted": true
       },
       {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
         "kind": "closers",
         "by": "harness",
-        "accepted": false
+        "accepted": false,
+        "ms": 6881
       },
       {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
+        "kind": "leaf",
+        "goal": "+ x * 12 + x ^ 2 * 6 + x ^ 3 ≤ 8 + x * 12 + x ^ 2 * 6 + x ^ 3\nh_eq : (x + 2) ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ x = 9",
+        "block": "first | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (simp onl",
+        "accepted": true,
+        "ms": 11265
       },
       {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "withdraw",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "have": "have hgt : (x + 2) ^ 3 < y ^ 3",
-        "tries": 4,
-        "whole_block": true
-      },
-      {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "cut",
-        "by": "openai/gpt-oss-120b",
-        "kept": 0
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 5621,
+        "slow": false,
+        "techniques": "kept"
       }
     ]
   }
