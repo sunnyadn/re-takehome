@@ -258,6 +258,8 @@ def _sum_variables(hyps: list[tuple[str, str]], target: str) -> list[str]:
     return out
 
 
+BLOCKS = re.compile(r"∑ \w+ ∈ Finset\.Ico \S+ \((\w+) \+ 1\), ∑ \w+ ∈ Finset\.Ico ")
+
 FACTOR = r"\((?:[^()]|\([^()]*\))+\)|[A-Za-z_][\w']*"
 
 
@@ -286,6 +288,11 @@ def leaf_candidates(goal_text: str) -> list[str]:
     # both models withdrew the Pascal step; the recipe closes it in 0.5 s.
     for k in _sum_variables(hyps, target):
         out.append(f"sum_induct {k}")
+    # Blocks [g j, g (j+1)) telescoping over j < m + 1: rmo_2000_3's decomposition
+    # of ∑_{i<(m+1)²} into the sums over [j², (j+1)²).
+    m = BLOCKS.search(target)
+    if m and m.group(1) in {n for name, t in hyps if t.strip() == "ℕ" for n in name.split()}:
+        out.append(f"ico_blocks {m.group(1)}")
 
     # v ^ n bounded by powers in the context (on v ^ n itself, or through
     # `v ^ n = P`), the goal about v: the bounds move to v, then omega. Measured

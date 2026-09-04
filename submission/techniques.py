@@ -381,7 +381,27 @@ macro_rules
               "as facts, powers rescaled under the binder, Pascal's rule, omega). Works when the identity "
               "is closed under the induction, e.g. a two-parameter generalisation with the other parameter fixed.")
 
-TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES, LEAF_TACTICS, POW_CYCLE, SUM_INDUCT)
+ICO_BLOCKS = ("""-- `ico_blocks m`: a sum over `Ico a (g (m + 1))` equals the sum over j < m + 1 of the
+-- block sums over `Ico (g j) (g (j + 1))`, for g monotone with a ≤ g 1 (omega/nlinarith side
+-- goals): induction on m, the last block peeled off and joined by `sum_Ico_consecutive`.
+syntax "ico_blocks" ident : tactic
+macro_rules
+  | `(tactic| ico_blocks $m) => `(tactic| (
+      induction $m:ident with
+      | zero => simp
+      | succ k ih =>
+        first
+          | (rw [Finset.sum_Ico_succ_top (by omega), ← ih]
+             rw [Finset.sum_Ico_consecutive _ (by nlinarith) (by nlinarith)])
+          | (rw [Finset.sum_Ico_succ_top (by omega), ← ih]
+             rw [Finset.sum_Ico_consecutive _ (by omega) (by omega)])
+          | (symm; rw [Finset.sum_Ico_succ_top (by omega), ih]
+             rw [Finset.sum_Ico_consecutive _ (by nlinarith) (by nlinarith)])))""",
+              "`ico_blocks m` (m : ℕ a variable): `∑ i ∈ Finset.Ico a (g (m + 1)), f i = ∑ j ∈ Finset.Ico a (m + 1), "
+              "∑ i ∈ Finset.Ico (g j) (g (j + 1)), f i` (either way round) by induction on m, for g monotone with "
+              "a ≤ g 1 (e.g. g j = j * j, a = 1); the side conditions go to omega/nlinarith.")
+
+TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES, LEAF_TACTICS, POW_CYCLE, SUM_INDUCT, ICO_BLOCKS)
 
 PREAMBLE_MARK = "-- techniques defined for this file"
 PREAMBLE_END = "-- end of techniques"
