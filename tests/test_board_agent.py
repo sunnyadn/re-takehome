@@ -2164,3 +2164,22 @@ def test_a_power_with_a_literal_base_under_a_modulus_gets_the_cycle_leaf():
     assert not any("pow_cycle" in b for b in leaf_candidates("n : ℕ\n⊢ 2 ^ n % 8 = 0"))   # no cycle
     assert not any("pow_cycle" in b for b in leaf_candidates("n : ℤ\n⊢ 2 ^ n % 7 = 1"))   # ℕ only
     assert uses_techniques(preamble() + "\ntheorem t (n : ℕ) : 2 ^ n % 7 = 1 := by\n  pow_cycle 2 7 3 n\n")
+
+
+def test_a_product_equation_gives_the_divisor_leaf_without_a_divisibility_hypothesis():
+    # Measured on the v7.93 repeats (r1): putnam_2018_a1 0 with h_factored on
+    # the board and no `∣` step (the model bounded a instead, 15 leaf tries on
+    # the membership goal, none fired), rmo_2001_2 likewise; in the image the
+    # divisor block closes both from the product equation alone.
+    from submission.leaves import leaf_candidates
+    goal = ("a b : ℤ\nh_factorized : (3 * a - 2018) * (3 * b - 2018) = 2018 ^ 2\n"
+            "h_x_pos : 3 * a - 2018 > 0\n⊢ (a, b) ∈ {(673, 1358114), (674, 340033)}")
+    blocks = leaf_candidates(goal)
+    assert any("have hdvd : 3 * a - 2018 ∣ 2018 ^ 2 := Dvd.intro _ h_factorized; divisor_cases hdvd <;>" in b
+               for b in blocks)
+    assert any("have hdvd : 3 * b - 2018 ∣ 2018 ^ 2 := Dvd.intro_left _ h_factorized; divisor_cases hdvd <;>" in b
+               for b in blocks)
+    rmo = ("p q m : ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\n"
+           "h_factor : (m - p - q) * (m + p + q) = 5 * p * q\n⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3")
+    assert any("prime_facts; have hdvd : m - p - q ∣ 5 * p * q := Dvd.intro _ h_factor; divisor_cases hdvd" in b
+               for b in leaf_candidates(rmo))

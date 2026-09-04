@@ -352,6 +352,17 @@ def leaf_candidates(goal_text: str) -> list[str]:
     for n, t in hyps:
         if re.match(r"^.+ ∣ .+$", t) and re.search(r"\d", t):
             out.append(f"{primes}divisor_cases {n} <;> (first | (solve_sub; {finish}) | ({finish}))")
+    # A * B = N gives A ∣ N and B ∣ N without a model step. Measured on the
+    # v7.93 repeats: the pass on each problem had the model write the `∣`
+    # fact, the failure had only the product on the board.
+    for n, t in hyps:
+        m = re.match(r"^(\([^()]+\)|[A-Za-z_][\w']*) \* (\([^()]+\)|[A-Za-z_][\w']*) = (.+)$", t)
+        if not m or not re.search(r"\d", m.group(3)) or re.search(r"[∨∧↔→∀∃]", t):
+            continue
+        for factor, intro in ((m.group(1), "Dvd.intro"), (m.group(2), "Dvd.intro_left")):
+            factor = factor[1:-1] if factor.startswith("(") else factor
+            out.append(f"{primes}have hdvd : {factor} ∣ {m.group(3)} := {intro} _ {n}; "
+                       f"divisor_cases hdvd <;> (first | (solve_sub; {finish}) | ({finish}))")
     # A bound below on a variable and ℕ subtraction or a polynomial: substitute.
     if lowers and ("-" in goal_text or "^" in goal_text):
         for hn, _, _ in lowers[:2]:
