@@ -1718,6 +1718,13 @@ class BoardAgent(FrameworkAgent):
                 blank_techniques(rendered.text), timeout_s=check_timeout_s((base or board).ms))
             messages = remap(check.messages, rendered.lines)
             errors = [m for m in messages if isinstance(m, dict) and m.get("severity") == "error"]
+            for m in check.messages:
+                if m.get("severity") == "error" and str(m.get("data", "")).startswith("unexpected"):
+                    at = message_line(m) or 0
+                    shown = rendered.text.split("\n")
+                    events.append({"stage": "render_fault", "said": str(m.get("data"))[:80],
+                                   "lines": shown[max(at - 2, 0):at + 1]})
+                    break
             if focus is None:
                 # An error on a marker line is the cell's own header or its link
                 # failing, not the proof: that cell goes back inline.
@@ -2309,7 +2316,7 @@ class BoardAgent(FrameworkAgent):
                 hints[goal.key] = ("Mathlib's `apply?` on this goal suggested: " + "; ".join(
                     f"`{how} {term}`" for how, term in found[:3]) + ". Those unify with the goal; the ?_ holes are what is left to prove.")
             events.append({"kind": "library", "goal": goal.text[-120:], "found": len(found),
-                           "accepted": accepted, "ms": check.duration_ms})
+                           "accepted": accepted, "ms": took})
             return accepted
 
         async def take_back(author: str, goal: Goal, why: str = "") -> bool:
