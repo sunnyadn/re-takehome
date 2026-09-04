@@ -4,23 +4,23 @@
   "problems": [
     {
       "problem_id": "rmo_2001_2",
-      "status": "failed",
-      "passed": false,
-      "points": 0,
-      "actual_cost_usd": 0.111001485,
-      "wall_s": 2754.863,
+      "status": "passed",
+      "passed": true,
+      "points": 1,
+      "actual_cost_usd": 0.024110898999999998,
+      "wall_s": 1731.729,
       "models_used": [
         "openai/gpt-oss-120b",
         "qwen/qwen3.5-flash-02-23"
       ],
-      "failure_reason": "WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Challenge\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Challenge -- rmo_2001_2 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Solution\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Solution -- rmo_2001_2 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nuncaught exception: Illegal axiom detected: 'sorryAx'\n"
+      "failure_reason": null
     }
   ],
-  "total_points": 0,
+  "total_points": 1,
   "max_points": 1,
-  "actual_cost_usd": 0.111001485,
-  "wall_s_sum": 2754.863,
-  "run_id": "a73b7f85585a4664adb5f60d18ac678c",
-  "wall_s": 2755.224,
-  "finished_at": "2026-09-03T10:36:02.069248+00:00"
+  "actual_cost_usd": 0.024110899,
+  "wall_s_sum": 1731.729,
+  "run_id": "d65bd484899542b0908eda4cf5c960b3",
+  "wall_s": 1731.979,
+  "finished_at": "2026-09-04T04:29:31.874559+00:00"
 }
