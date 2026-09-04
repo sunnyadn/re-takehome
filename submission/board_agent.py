@@ -169,10 +169,13 @@ def check_timeout_s(base_ms: int) -> int:
 # hours across the lanes on one machine). Renewed on our terms instead: when
 # its memory is up (sampled) or, without a reading, after this many checks,
 # while a model reply is awaited so the import overlaps that wait. Measured on
-# p10 (win): 787 MB at check 9, 2980 MB at check 16, so a heavy board adds
-# ~300 MB per check and the sample must be frequent and the threshold low.
-RENEW_AT_BYTES = int(2.5 * 2 ** 30)
-RENEW_AFTER_CHECKS = 40
+# p10 (win): 787 MB at check 9, 2980 MB at check 16 on one theorem; with
+# cells a check retains almost nothing (682 MB after import, +2 MB per small
+# check), and one `exact?` takes the container to 2.7 GB for good (its index),
+# which a renew only makes it load again (27 s). So the threshold sits near
+# the 5 GB limit and the count is a backstop.
+RENEW_AT_BYTES = int(4.2 * 2 ** 30)
+RENEW_AFTER_CHECKS = 200
 MEMORY_SAMPLE_EVERY = 4
 UNITS = {"B": 1, "KiB": 2 ** 10, "MiB": 2 ** 20, "GiB": 2 ** 30, "KB": 10 ** 3, "MB": 10 ** 6, "GB": 10 ** 9}
 
