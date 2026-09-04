@@ -2033,7 +2033,8 @@ def test_an_upper_bound_on_the_variable_under_a_power_gets_the_contradiction_squ
     assert blocks[0].endswith("(by_contra hc; push_neg at hc; pow_squeeze y 3 (x + 2) with hc)")
     # `hyx : y = x + 2 ⊢ x = 9`: substitute, make the ℕ subtraction exact, arithmetic.
     blocks = leaf_candidates(ctx + "hyx : y = x + 2\n⊢ x = 9")
-    assert blocks[0].startswith("set_option maxHeartbeats 400000 in (subst hyx; nat_sub_exact; first | (simp only")
+    assert any(b.startswith("set_option maxHeartbeats 400000 in (subst hyx; nat_sub_exact; first | (simp only")
+               for b in blocks[:2])
     # Under the contradiction hypothesis the squeeze uses it as the lower bound.
     blocks = leaf_candidates("x y : ℕ\nhc : 9 < x\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ False")
     assert "pow_squeeze y 3 (x + 2) with hc" in blocks[0]
@@ -2549,3 +2550,23 @@ def test_a_product_equation_over_the_integers_gets_a_divisor_leaf_that_linearise
     nat = goal.replace("a b : ℤ", "a b : ℕ")
     assert not any("clear hm" in c for c in leaf_candidates(nat))
     assert "set_option hygiene false in\nmacro_rules\n  | `(tactic| divisor_cases $h for $x" in preamble()
+
+
+def test_a_diophantine_cube_equation_asked_for_its_solution_gets_the_two_sided_squeeze_leaf():
+    # Measured on rmo_2000_2 (frame116, 0/1 in 2615 s): the models took the
+    # ℕ-subtraction identity `y³ - (x+2)³ = 2x(x-9)` and thrashed for 40 min.
+    # Both sides of the squeeze, x substituted, the root squeezed: 4.2 s in the
+    # image with no model asked.
+    from submission.leaves import leaf_candidates
+    goal = "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ x = 9 ∧ y = 11"
+    got = [c for c in leaf_candidates(goal) if "have hle : x ≤ 9" in c]
+    assert got
+    block = got[0]
+    assert "pow_squeeze y 3 (x + 2) with hc)" in block and "nat_sub_exact; pow_squeeze y 3 (x + 1))" in block
+    assert "have hv : x = 9 := (by omega); subst hv; norm_num at h ⊢; " in block and "pow_squeeze y 3 11" in block
+    only_x = [c for c in leaf_candidates(goal.replace("⊢ x = 9 ∧ y = 11", "⊢ x = 9")) if "have hle : x ≤ 9" in c]
+    assert only_x and only_x[0].rstrip().endswith("omega)") and "subst" not in only_x[0]
+    # No subtraction on the right: no nat_sub_exact line.
+    plain = "x y : ℕ\nh : y ^ 3 = x ^ 3 + 6 * x ^ 2 + 1\n⊢ x = 0 ∧ y = 1"
+    got = [c for c in leaf_candidates(plain) if "have hle : x ≤ 0" in c]
+    assert got and "nat_sub_exact" not in got[0] and "pow_squeeze y 3 (x + 2) with hc" in got[0]

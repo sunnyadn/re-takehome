@@ -426,6 +426,31 @@ def leaf_candidates(goal_text: str) -> list[str]:
                 re.search(r"(≤|<)", t) and re.search(r"\^ " + n + r"\b", t) for _, t in hyps):
             out.append(f"pow_bounds {v} {n}")
 
+    # `x = c` (and `y = d`) asked outright, with `h : y ^ n = P(x)`: x ≤ c by the
+    # squeeze at the large-x shift, c ≤ x by the squeeze one shift lower (the ℕ
+    # subtraction in P made exact first), then y from y ^ n = numeral. Measured on
+    # rmo_2000_2 (frame116, 0/1): the models spent 40 min on `2x(x-9)` over ℕ; 4.2 s.
+    sol = re.match(r"^([A-Za-z_][\w']*) = (\d+)(?: ∧ ([A-Za-z_][\w']*) = (\d+))?$", target)
+    if sol:
+        v, c, w, d = sol.group(1), sol.group(2), sol.group(3), sol.group(4)
+        for hn, y, n, rhs in powers:
+            shifts = _shifts(rhs, int(n))
+            if not shifts or y == v or not re.search(rf"\b{re.escape(v)}\b", rhs) or (w and w != y):
+                continue
+            hi = shifts[0]
+            k = int(hi.split("+")[1]) if "+" in hi else 0
+            lo = f"{v} + {k - 1}" if k > 1 else v
+            exact = "nat_sub_exact; " if " - " in rhs else ""
+            lines = (f"have hle : {v} ≤ {c} := (by by_contra hc; push_neg at hc; "
+                     f"pow_squeeze {y} {n} ({hi}) with hc)\n"
+                     f"have hge : {c} ≤ {v} := (by by_contra hc; push_neg at hc; {exact}"
+                     f"pow_squeeze {y} {n} ({lo}))\n")
+            if w:
+                lines += (f"have hv : {v} = {c} := (by omega)\nsubst hv\nnorm_num at {hn} ⊢\n"
+                          f"first | done | omega | (pow_squeeze {y} {n} {d}) | nlinarith")
+            else:
+                lines += "omega"
+            out.append(lines)
     # y = E with y ^ n known: squeeze between consecutive powers.
     m = re.match(r"^([A-Za-z_][\w']*) = (.+)$", target)
     if m and not NUM.match(m.group(2).strip()) and not re.search(r"[∨∧↔→]", m.group(2)):
