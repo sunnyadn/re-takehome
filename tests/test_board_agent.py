@@ -2614,4 +2614,4 @@ def test_a_block_sum_of_an_antitone_sequence_over_its_index_gets_the_block_bound
     got = [c for c in leaf_candidates(anti) if "vm_sum_div_block" in c]
     assert got and "antitone_nat_of_succ_le" not in got[0] and "vm_sum_div_block x hpos hanti" in got[0]
     assert not any("vm_sum_div_block" in c for c in leaf_candidates(goal.replace("hmono : ∀ (n : ℕ), x n ≥ x (n + 1)\n", "")))
-    assert "theorem vm_sum_div_block" in preamble()
+    assert "private theorem vm_sum_div_block" in preamble()

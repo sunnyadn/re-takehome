@@ -425,7 +425,7 @@ macro_rules
 
 SUM_BLOCK = ("""-- `vm_sum_div_block`: a sum of x i / i over `Ico a b`, x positive and antitone, is at most
 -- the block's length times its first term (each term ≤ x a / a).
-theorem vm_sum_div_block (x : ℕ → ℝ) (hpos : ∀ n, 0 < x n) (hanti : Antitone x) (a b : ℕ) (ha : 0 < a) :
+private theorem vm_sum_div_block (x : ℕ → ℝ) (hpos : ∀ n, 0 < x n) (hanti : Antitone x) (a b : ℕ) (ha : 0 < a) :
     ∑ i ∈ Finset.Ico a b, x i / (i : ℝ) ≤ ((b - a : ℕ) : ℝ) * (x a / (a : ℝ)) := by
   have hapos : (0 : ℝ) < a := by exact_mod_cast ha
   have hstep : ∀ i ∈ Finset.Ico a b, x i / (i : ℝ) ≤ x a / (a : ℝ) := by
