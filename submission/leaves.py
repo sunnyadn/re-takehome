@@ -258,6 +258,33 @@ def _sum_variables(hyps: list[tuple[str, str]], target: str) -> list[str]:
     return out
 
 
+from math import gcd as _gcd
+
+
+def _dvd_bounds(hyps: list[tuple[str, str]]) -> str:
+    """`have` lines: k ≤ v for every `h : k ∣ v` (k a numeral, v an identifier with
+    a positivity fact in scope), and k₁k₂ ∣ v, k₁k₂ ≤ v for coprime pairs."""
+    positive = {t.split("<", 1)[1].strip() for _, t in hyps if re.match(r"^0 < [A-Za-z_][\w']*$", t.strip())}
+    positive |= {t.split(">", 1)[0].strip() for _, t in hyps if re.match(r"^[A-Za-z_][\w']* > 0$", t.strip())}
+    divs: dict[str, list[tuple[int, str]]] = {}
+    for n, t in hyps:
+        m = re.match(r"^(\d+) ∣ ([A-Za-z_][\w']*)$", t.strip())
+        if m and m.group(2) in positive:
+            divs.setdefault(m.group(2), []).append((int(m.group(1)), n))
+    lines: list[str] = []
+    for v, ks in divs.items():
+        for k, n in ks:
+            lines.append(f"have hle_{n} : {k} ≤ {v} := Nat.le_of_dvd (by omega) {n}")
+        for i in range(len(ks)):
+            for j in range(i + 1, len(ks)):
+                (k1, n1), (k2, n2) = ks[i], ks[j]
+                if _gcd(k1, k2) == 1:
+                    lines.append(f"have hdvd_{n1}_{n2} : {k1 * k2} ∣ {v} := "
+                                 f"Nat.Coprime.mul_dvd_of_dvd_of_dvd (by norm_num) {n1} {n2}")
+                    lines.append(f"have hle_{n1}_{n2} : {k1 * k2} ≤ {v} := Nat.le_of_dvd (by omega) hdvd_{n1}_{n2}")
+    return "\n".join(lines)
+
+
 BLOCKS = re.compile(r"∑ \w+ ∈ Finset\.Ico \S+ \((\w+) \+ 1\), ∑ \w+ ∈ Finset\.Ico ")
 
 FACTOR = r"\((?:[^()]|\([^()]*\))+\)|[A-Za-z_][\w']*"
@@ -299,6 +326,12 @@ def leaf_candidates(goal_text: str) -> list[str]:
                 out.append(f"exact Nat.le_of_dvd (by positivity) {n}")
                 out.append(f"exact Nat.le_of_dvd (by omega) {n}")
                 out.append(f"exact Nat.le_of_dvd (Nat.mul_pos (by omega) (by omega)) {n}")
+        # Bounds from divisibility by numerals: `k ∣ v` gives `k ≤ v`, two coprime
+        # divisors give their product, then nlinarith over the products. Measured
+        # on rmo_2000_6: `⊢ 10 ≤ a * b` under `2 ∣ a`, `5 ∣ a` (or `5 ∣ b`).
+        facts = _dvd_bounds(hyps)
+        if facts and NUM.match(lo.strip()):
+            out.append(facts + "\nfirst | omega | nlinarith")
     # Blocks [g j, g (j+1)) telescoping over j < m + 1: rmo_2000_3's decomposition
     # of ∑_{i<(m+1)²} into the sums over [j², (j+1)²).
     m = BLOCKS.search(target)
