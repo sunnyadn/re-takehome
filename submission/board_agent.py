@@ -1651,7 +1651,8 @@ class BoardAgent(FrameworkAgent):
             if classify(b.messages)[3]:
                 return None
             text, shed = shed_unreferenced(b.text, graded)
-            if not shed or not is_done(text) or any(g.decl not in shed for g in b.goals):
+            if not shed or not is_done(text) or re.search(r"\bsorry\b", text) \
+                    or any(g.decl not in shed for g in b.goals):
                 return None
             for name in shed:
                 if name not in shed_named:
