@@ -1,19 +1,19 @@
 {
   "schema_version": 1,
   "problem_id": "putnam_2018_a1",
-  "status": "failed",
-  "passed": false,
-  "points": 0,
+  "status": "passed",
+  "passed": true,
+  "points": 1,
   "comparator": {
-    "passed": false,
-    "exit_code": 1,
+    "passed": true,
+    "exit_code": 0,
     "timed_out": false,
-    "duration_ms": 72288,
+    "duration_ms": 69578,
     "output": {
-      "passed": false,
-      "exit_code": 1,
-      "stdout": "Building Challenge\n⚠ [8655/8656] Built Challenge (34s)\nwarning: Challenge.lean:3:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[putnam_2018_a1, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge\nBuilding Solution\n⚠ [8655/8656] Built Solution (10s)\nwarning: Solution.lean:3:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[putnam_2018_a1, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution\n",
-      "stderr": "WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Challenge\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Challenge -- putnam_2018_a1 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Solution\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Solution -- putnam_2018_a1 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nuncaught exception: Illegal axiom detected: 'sorryAx'\n"
+      "passed": true,
+      "exit_code": 0,
+      "stdout": "Building Challenge\n⚠ [8655/8656] Built Challenge (31s)\nwarning: Challenge.lean:3:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[putnam_2018_a1, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge\nBuilding Solution\n⚠ [8655/8656] Built Solution (9.7s)\nwarning: Solution.lean:300:648: This simp argument is unused:\n  Finset.mem_insert\n\nHint: Omit it from the simp argument list.\n  simp only [Set.mem_insert_iff,\n  ̲  ̲ ̲ ̲ ̲ ̲ ̲ ̲Set.mem_singleton_iff, Prod.mk.injEq, F̵i̵n̵s̵e̵t̵.̵m̵e̵m̵_̵i̵n̵s̵e̵r̵t̵,̵ ̵Finset.mem_singleton] at *\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:300:667: This simp argument is unused:\n  Finset.mem_singleton\n\nHint: Omit it from the simp argument list.\n  simp only [Set.mem_insert_iff,\n  ̲  ̲ ̲ ̲ ̲ ̲ ̲ ̲Set.mem_singleton_iff, Prod.mk.injEq, F̵i̵n̵s̵e̵t̵.̵m̵e̵m̵_̵i̵n̵s̵e̵r̵t̵,̵ ̵F̵i̵n̵s̵e̵t̵.̵m̵e̵m̵_̵s̵i̵n̵g̵l̵e̵t̵o̵n̵]̵F̲i̲n̲s̲e̲t̲.̲m̲e̲m̲_̲i̲n̲s̲e̲r̲t̲]̲ at *\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:300:91: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:300:735: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:300:743: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:300:767: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:300:779: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:300:798: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:300:842: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:300:721: Used `tac1 <;> tac2` where `(tac1; tac2)` would suffice\n\nNote: This linter can be disabled with `set_option linter.unnecessarySeqFocus false`\nwarning: Solution.lean:300:80: 'solve_sub' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:300:91: 'first\n|\n  (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *;\n    first\n    | omega\n    | (simp_all <;> omega))\n| omega\n| (norm_num at *; done)\n| nlinarith\n| (simp_all; done)\n|\n  (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *;\n    done)\n|\n  (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *;\n    omega)' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:300:735: 'omega' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:300:743: '(norm_num at *; done)' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:300:767: 'nlinarith' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:300:779: '(simp_all; done)' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:300:798: '(norm_num [Finset.mem_insert] at *; done)' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:300:842: '(norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *;\n  omega)' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nBuild completed successfully (8656 jobs).\nExporting #[putnam_2018_a1, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution\nRunning Lean default kernel on solution.\nLean default kernel accepts the solution\nYour solution is okay!\n",
+      "stderr": "WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Challenge\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Challenge -- putnam_2018_a1 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Solution\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Solution -- putnam_2018_a1 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\n"
     }
   },
   "answer_shape": {
@@ -22,13 +22,13 @@
   },
   "budget": {
     "limit_usd": 1.0,
-    "spent_usd": 0.07281405900000001,
+    "spent_usd": 0.01024033,
     "reserved_usd": 0,
     "unbilled_usd": 0.0,
     "accounting_complete": true
   },
   "within_time": true,
-  "wall_s": 2802.19,
+  "wall_s": 468.127,
   "models_used": [
     "openai/gpt-oss-120b",
     "qwen/qwen3.5-flash-02-23"
@@ -37,278 +37,69 @@
   "agent_error": null,
   "agent_metadata": {
     "strategy": "board",
-    "solved_by": "best_effort",
-    "accepted_by_repl": false,
-    "spend_usd": 0.072814,
-    "wall_s": 2726.3,
-    "turns": 312,
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.01024,
+    "wall_s": 394.8,
+    "turns": 55,
     "events": [
       {
-        "stage": "split",
-        "goals": 2
-      },
-      {
-        "stage": "fork",
-        "from": 0,
-        "to": 1,
-        "goal": "a b : ℤ\nh : 0 < a ∧ 0 < b\n⊢ 1 / ↑a + 1 / ↑b = 3 / 2018 ↔\n   "
-      },
-      {
-        "stage": "split",
-        "goals": 2
-      },
-      {
-        "stage": "route",
-        "from": 0,
-        "to": 2,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "stage": "prune",
-        "bid": 2,
-        "goals": 9
-      },
-      {
-        "stage": "slow",
-        "ms": 30997,
-        "was": 0
-      },
-      {
-        "stage": "route",
-        "from": 0,
-        "to": 5,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "stage": "prune",
-        "bid": 5,
-        "goals": 9
-      },
-      {
-        "stage": "split",
-        "goals": 8
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "le_of_dvd"
-        ],
-        "ms": 90439,
-        "found": false
-      },
-      {
-        "stage": "slow",
-        "ms": 49369,
-        "was": 1639
-      },
-      {
-        "stage": "split",
-        "goals": 9
-      },
-      {
-        "stage": "route",
-        "from": 0,
-        "to": 7,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "stage": "prune",
-        "bid": 7,
-        "goals": 11
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.natAbs",
-          "Nat.factorization_prime_pow",
-          "Nat.support"
-        ],
-        "ms": 90502,
-        "found": false
-      },
-      {
-        "stage": "slow",
-        "ms": 27311,
-        "was": 4364
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "plan",
-        "by": "openai/gpt-oss-120b",
-        "chars": 1256
-      },
-      {
-        "kind": "plan",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 1972
-      },
-      {
-        "kind": "skeleton",
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "Nat.Prime (1009 : ℕ)",
-        "verdict": "unverified",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "(2018 : ℤ) ^ (2 : ℕ) = (2 : ℤ) ^ (2 : ℕ) * (1009 : ℤ) ^ (2 : ℕ)",
-        "verdict": "unverified",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "(3 : ℤ) * a - (2018 : ℤ) = (1 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) = (2 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) =",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "(3 : ℤ) * a - (2018 : ℤ) = (1 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) = (2 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) =",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "lifted",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "facts": 3,
-        "dup": 0,
-        "from_depth": 1,
-        "to_depth": 1
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": true
-      },
-      {
-        "stage": "repair",
-        "bid": 1,
-        "why": "cost",
-        "said": "error at {'line': 67, 'column': 13}: maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information"
-      },
-      {
-        "kind": "plan",
-        "by": "openai/gpt-oss-120b",
-        "chars": 2046
-      },
-      {
-        "kind": "plan",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 2091
-      },
-      {
-        "kind": "skeleton",
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1423
       },
       {
         "kind": "prefix",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "lines": 4
-      },
-      {
-        "kind": "audit",
         "by": "openai/gpt-oss-120b",
-        "goal": "(3 : ℤ) * a - (2018 : ℤ) ∈ {(1 : ℤ), (4 : ℤ), (1009 : ℤ), (4036 : ℤ)}",
-        "verdict": "holds",
-        "values": {}
+        "lines": 1
       },
       {
         "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 2
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1152
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
         "accepted": true
       },
       {
         "kind": "closers",
         "by": "harness",
-        "accepted": true
+        "accepted": false,
+        "ms": 888
       },
       {
-        "kind": "collapse",
-        "tactic": "norm_num",
-        "accepted": true
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 0
       },
       {
         "kind": "closers",
         "by": "harness",
-        "accepted": true
-      },
-      {
-        "kind": "collapse",
-        "tactic": "simp; omega",
-        "accepted": true
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": false
-      },
-      {
-        "kind": "plan",
-        "by": "openai/gpt-oss-120b",
-        "chars": 499
-      },
-      {
-        "kind": "plan",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 1327
-      },
-      {
-        "kind": "skeleton",
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "prefix",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "lines": 8
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "a = (1009 : ℤ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "False",
-        "verdict": "refuted",
-        "values": {
-          "a": "1009",
-          "b": "2018",
-          "c": "4036"
-        }
+        "accepted": false,
+        "ms": 1352
       },
       {
         "kind": "step",
         "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
+        "accepted": true
       },
       {
         "kind": "cut",
@@ -316,121 +107,91 @@
         "kept": 0
       },
       {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
+        "kind": "library",
+        "goal": " 1 / ↑b = 3 / 2018\n⊢ (a, b) ∈ {(673, 1358114), (674, 340033), (1009, 2018), (2018, 1009), (340033, 674), (1358114, 673)}",
+        "found": 71,
+        "accepted": false,
+        "ms": 15510
       },
       {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "leaf_restart",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "goal": " - 2018 ≤ 2018 ^ 2\nh_bound : 2018 < 3 * a ∧ 3 * a - 2018 ≤ 2018 ^ 2\nc : ℤ\nhc : 2018 ^ 2 = (3 * a - 2018) * c\nh_d : 3 * a - 2018 = 1009\n⊢ (a, b) = (673, 1358114)",
-        "settled": 25
-      },
-      {
-        "kind": "plan",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 748
-      },
-      {
-        "kind": "plan",
-        "by": "openai/gpt-oss-120b",
-        "chars": 1523
-      },
-      {
-        "kind": "skeleton",
-        "by": "openai/gpt-oss-120b"
-      },
-      {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "restated",
-        "by": "openai/gpt-oss-120b",
-        "of": [
-          "h_d_pos",
-          "h_d_mod"
-        ]
-      },
-      {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "withdraw",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "have": "have h_cases : (3 * a - 2018) = 1 ∨ (3 * a - 2018) = 4 ∨ (3 * a - 2018) = 1009 ∨ (3 * a - 2018) = 4036 ∨ (3 * a - 2018) ",
-        "tries": 4,
-        "whole_block": true
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": true
-      },
-      {
-        "kind": "plan",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 1019
-      },
-      {
-        "kind": "plan",
-        "by": "openai/gpt-oss-120b",
-        "chars": 0
-      },
-      {
-        "kind": "skeleton",
-        "by": "openai/gpt-oss-120b"
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Int.coe_nat_dvd_left.mp"
+        "stage": "library",
+        "tokens": [
+          "int",
+          "lt"
         ],
-        "ms": 90608,
-        "found": false
+        "lines": 12,
+        "ms": 23573
       },
       {
-        "kind": "prefix",
+        "kind": "search-retry",
         "by": "qwen/qwen3.5-flash-02-23",
-        "lines": 1
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1461
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 1071
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
       },
       {
         "kind": "audit",
         "by": "openai/gpt-oss-120b",
-        "goal": "(3 : ℤ) * a - (2018 : ℤ) = (1 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) = (4 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) =",
+        "goal": "↑a ≠ (0 : ℚ) ∧ ↑b ≠ (0 : ℚ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a * b = (2018 : ℤ) * (a + b)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) > (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * b - (2018 : ℤ) > (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(a, b) ∈ {((673 : ℤ), (1358114 : ℤ)), ((674 : ℤ), (340033 : ℤ)), ((1009 : ℤ), (2018 : ℤ)), ((2018 : ",
         "verdict": "holds",
         "values": {}
       },
@@ -440,40 +201,15 @@
         "accepted": true
       },
       {
-        "kind": "prefix",
-        "by": "openai/gpt-oss-120b",
-        "lines": 8
+        "stage": "route",
+        "from": 0,
+        "to": 1,
+        "by": "qwen/qwen3.5-flash-02-23"
       },
       {
         "kind": "audit",
         "by": "openai/gpt-oss-120b",
-        "goal": "b = ((2018 : ℤ) ^ (2 : ℕ) + (2018 : ℤ)) / (3 : ℤ)",
-        "verdict": "unverified",
-        "values": {
-          "a": "1009",
-          "b": "2018",
-          "c": "4036",
-          "h": "by decide",
-          "ha0": "by decide",
-          "hb0": "by decide",
-          "h_eq": "by decide",
-          "h_eq_int": "by decide",
-          "h_factor": "by decide",
-          "ha_pos": "by decide",
-          "hb_pos": "by decide",
-          "h_dvd": "by decide",
-          "h_a_bound": "by decide",
-          "h_bound": "by decide",
-          "hc": "by decide",
-          "h_d": "by decide",
-          "h_a_val": "by decide",
-          "h_a": "by decide"
-        }
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "a = ((2018 : ℤ) + (1009 : ℤ)) / (3 : ℤ)",
+        "goal": "((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)",
         "verdict": "holds",
         "values": {}
       },
@@ -481,6 +217,153 @@
         "kind": "step",
         "by": "openai/gpt-oss-120b",
         "accepted": true
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a * b - (2018 : ℤ) * a - (2018 : ℤ) * b = (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(0 : ℤ) < (3 : ℤ) * a - (2018 : ℤ) ∧ (0 : ℤ) < (3 : ℤ) * b - (2018 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (673 : ℤ) ∨ a = (674 : ℤ) ∨ a = (1009 : ℤ) ∨ a = (2018 : ℤ) ∨ a = (340033 : ℤ) ∨ a = (1358114 : ",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "fork",
+        "from": 0,
+        "to": 2,
+        "goal": "a b : ℤ\nh : 0 < a ∧ 0 < b\nh_eq : 1 / ↑a + 1 / ↑b = 3 / 2018\n"
+      },
+      {
+        "stage": "prune",
+        "bid": 2,
+        "goals": 7
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1290
+      },
+      {
+        "kind": "leaf",
+        "goal": "a b : ℤ\nh : 0 < a ∧ 0 < b\nh_eq : 1 / ↑a + 1 / ↑b = 3 / 2018\n⊢ (3 * a - 2018) * (3 * b - 2018) = 2018 ^ 2",
+        "accepted": false,
+        "tried": 1,
+        "ms": 1765
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 565
+      },
+      {
+        "kind": "collapse",
+        "tactic": "simp; omega",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 856
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 1326
+      },
+      {
+        "kind": "collapse",
+        "tactic": "linarith",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 1441
+      },
+      {
+        "kind": "collapse",
+        "tactic": "nlinarith",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 1634
+      },
+      {
+        "kind": "collapse",
+        "tactic": "nlinarith",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1524
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2403
+      },
+      {
+        "kind": "leaf",
+        "goal": " - 2018 ∣ 2018 ^ 2\n⊢ (a, b) ∈ {(673, 1358114), (674, 340033), (1009, 2018), (2018, 1009), (340033, 674), (1358114, 673)}",
+        "block": "set_option maxHeartbeats 60000 in (divisor_cases h_divisors <;> (first | (solve_",
+        "accepted": true,
+        "ms": 10044
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 3866,
+        "slow": false,
+        "techniques": "kept"
       }
     ]
   }
