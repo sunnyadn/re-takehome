@@ -21,7 +21,9 @@ from re_harness.lean import LeanRuntimeError
 
 from submission.cells import (CELL_PROBE, Cells, dissolve, enclosing, marker, modular,
                               remap, render_check, strip_markers)
-from submission.leaves import leaf_candidates
+from submission.conjecture import (families, fits, lemma_text, read_table, table_file,
+                                   verified, verify_file)
+from submission.leaves import _hyps as leaf_hyps, _sum_variables, leaf_candidates
 from submission.techniques import (PREAMBLE_MARK, blank_techniques, strip_techniques,
                                    uses_techniques, without_techniques)
 from submission.agent import (
@@ -2314,6 +2316,64 @@ class BoardAgent(FrameworkAgent):
             finally:
                 probe_spent["leaf"] += time.monotonic() - t0
 
+        conjectured: list[str] = []
+
+        async def generalise_sweep(goal: Goal) -> bool:
+            """A sum identity in one variable that its own induction did not
+            close: the variable's other occurrences are generalised, each family
+            tabulated in Lean and fitted to a shape, a fit that holds below
+            VERIFY is posted as a lemma (the induction leaf proves it) and the
+            goal rewrites by it. Measured: putnam_2020_a2, 0/32 model proposals."""
+
+            target = target_of(goal.text)
+            if goal.decl.startswith("vm_conj_") or not affordable("leaf"):
+                return False
+            ks = _sum_variables(leaf_hyps(goal.text), target)
+            halves = split_top(target, " = ")
+            if not ks or halves is None or "=" in halves[0] or "=" in halves[1]:
+                return False
+            k, lhs = ks[0], halves[0].strip()
+            taken = set(hypotheses(goal.text)) | set(re.findall(r"[A-Za-z_][\w']*", target))
+            fresh = next((c for c in ("n", "m", "t", "a", "b") if c not in taken), "vm_n")
+            fams = families(lhs, k, fresh)
+            roots = root_names(board.text)
+            first = proof_span(board.text, roots[0]) if roots else None
+            prefix = board.text[:first[0]] if first else ""
+            found: list[tuple[str, str]] = []
+            t0 = time.monotonic()
+            for i, fam in enumerate(fams[:6]):
+                check = await services.lean.check_file(
+                    blank_techniques(table_file(prefix, fam, fresh, k, i)), timeout_s=60)
+                table = read_table(check.messages)
+                if not table:
+                    continue
+                for guess in fits(table, fresh, k, fam)[:2]:
+                    check = await services.lean.check_file(
+                        blank_techniques(verify_file(prefix, fam, guess, fresh, k)), timeout_s=60)
+                    if verified(check.messages):
+                        found.append((fam, guess))
+            probe_spent["leaf"] += time.monotonic() - t0
+            events.append({"stage": "conjecture", "goal": target[:100], "families": len(fams),
+                           "fits": [g for _, g in found][:3]})
+            if not found:
+                return False
+            fam, guess = found[0]
+            name = f"vm_conj_{len(conjectured) + 1}"
+            conjectured.append(name)
+            staged = await look(insert_preamble(board.text, lemma_text(name, fresh, k, fam, guess)))
+            moved = staged.find(goal.key)
+            if moved is None or classify(staged.messages)[3]:
+                return False
+            sub = lambda t: re.sub(rf"(?<![\w'.]){fresh}(?![\w'])", k, t)
+            fact = f"have h_gen : {sub(fam)} = {sub(guess)} := {name} {k} {k}"
+            nxt, _ = await judge(staged, moved, f"{fact}\nrw [h_gen]")
+            if nxt is None:
+                nxt, _ = await judge(staged, moved, fact)
+            events.append({"stage": "generalise", "lemma": name, "guess": guess,
+                           "rewritten": nxt is not None})
+            await commit(nxt if nxt is not None else staged)
+            return True
+
         async def library_sweep(goal: Goal) -> bool:
             """Mathlib asked what unifies with the goal (`apply?`), after the
             closers failed. An `exact` answer is written, no model asked; the
@@ -2730,7 +2790,8 @@ class BoardAgent(FrameworkAgent):
                     base = board
                     if goal is not None and goal.key not in swept:
                         swept.add(goal.key)
-                        if await sweep(goal) or await leaf_sweep(goal) or await witness_sweep(goal):
+                        if await sweep(goal) or await leaf_sweep(goal) or await witness_sweep(goal) \
+                                or await generalise_sweep(goal):
                             return True
                     if goal is not None and goal.key not in searched \
                             and tries.get(goal.key, 0) >= SEARCH_AFTER:

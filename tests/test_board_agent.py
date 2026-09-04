@@ -2393,3 +2393,54 @@ def test_an_identity_between_sums_ending_at_a_variable_gets_the_induction_leaf()
     assert not any("sum_induct" in c for c in leaf_candidates("n : ℕ\nh : n < 5\n⊢ n ≤ 4"))
     assert not any("sum_induct" in c for c in leaf_candidates("x : ℝ\n⊢ ∑ i ∈ Finset.range (3 + 1), x = 4 * x"))
     assert uses_techniques(preamble() + "\ntheorem t (n : ℕ) : ∑ i ∈ Finset.range (n + 1), i * 2 = n * (n + 1) := by\n  sum_induct n\n")
+
+
+def test_a_sum_identity_its_own_induction_misses_is_generalised_tabulated_fitted_and_posted():
+    # Measured on putnam_2020_a2: 0 of 32 model proposals for a generalisation
+    # were both true and new; the shape library fits the tabulated family
+    # exactly (∑_{i≤k} C(n+k+1, i)) and the induction leaf proves that lemma.
+    from math import comb
+    PUTNAM = ("import Mathlib\n\ntheorem demo (k : ℕ) :\n    (∑ j ∈ Finset.Icc 0 k, 2 ^ (k - j) * "
+              "Nat.choose (k + j) j) = 4 ^ k := by\n  sorry\n")
+    TARGET = "∑ j ∈ Finset.Icc 0 k, 2 ^ (k - j) * Nat.choose (k + j) j = 4 ^ k"
+
+    class ConjLean(CellLean):
+        async def check_file(self, source, timeout_s=None):
+            self.sources.append(source)
+            if "def vm_table_" in source:
+                fam = source.split(": ℕ := ", 1)[1].split("\n", 1)[0]
+                if fam == "∑ j ∈ Finset.Icc 0 k, 2 ^ (k - j) * Nat.choose (n + j) j":
+                    table = [[sum(2 ** (k - j) * comb(n + j, j) for j in range(k + 1)) for k in range(7)]
+                             for n in range(6)]
+                    return LeanCheck(True, [{"severity": "info", "pos": {"line": 2}, "data": str(table)}], False, False, 1)
+                return LeanCheck(True, [], False, False, 1)
+            if "decide ((" in source:
+                ok = "Nat.choose (n + k + 1) i" in source and "Nat.choose (n + j) j" in source
+                return LeanCheck(True, [{"severity": "info", "pos": {"line": 1}, "data": "true" if ok else "false"}], False, False, 1)
+            probes = [i for i, l in enumerate(source.split("\n"), start=1) if l.strip() in ("skip", PROBE, CELL_PROBE)]
+            body = source.split("-- end of techniques")[-1]
+            lemma_at = body.find("theorem vm_conj_1")
+            if "sum_induct" in body and lemma_at >= 0 and "sum_induct" in body[lemma_at:]:
+                # The induction leaf closes the generalisation, not the theorem itself.
+                return LeanCheck(not probes, [{"severity": "error", "pos": {"line": at}, "endPos": {"line": at},
+                                               "data": "No goals to be solved"} for at in probes], False, False, 1)
+            check = await super().check_file(source, timeout_s)
+            for m in check.messages:
+                if str(m.get("data", "")).startswith("unsolved goals") and "⊢ demo" in m["data"]:
+                    m["data"] = m["data"].replace("⊢ demo", "⊢ " + TARGET).replace("unsolved goals\n", "unsolved goals\nk : ℕ\n")
+                if str(m.get("data", "")).startswith("theorem") and ": demo :=" in m["data"]:
+                    m["data"] = m["data"].replace(": demo :=", "(k : ℕ) : " + TARGET + " :=")
+            return check
+
+    lean, llm = ConjLean(), ScriptLLM({"model-a": ["no", "exact h_gen", "exact h_gen", "exact h_gen"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0, audit=False))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=PUTNAM),
+                                     FakeServices(lean, llm)))
+    events = result.metadata["events"]
+    conj = [e for e in events if e.get("stage") == "conjecture"]
+    assert conj and conj[0]["families"] == 3 and "∑ i ∈ Finset.range (k + 1), Nat.choose (n + k + 1) i" in conj[0]["fits"]
+    assert any(e.get("stage") == "generalise" and e["lemma"] == "vm_conj_1" for e in events)
+    posted = [s for s in lean.sources if "theorem vm_conj_1 (n k : ℕ)" in s and "have h_gen" in s]
+    assert posted and ("have h_gen : ∑ j ∈ Finset.Icc 0 k, 2 ^ (k - j) * Nat.choose (k + j) j = "
+                       "∑ i ∈ Finset.range (k + 1), Nat.choose (k + k + 1) i := vm_conj_1 k k") in posted[0]
+    assert result.metadata["solved_by"] == "board_loop"
