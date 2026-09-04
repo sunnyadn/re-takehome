@@ -289,7 +289,24 @@ macro_rules
                 "`bounded_cases x N`: proves x ≤ N (omega, nlinarith, or from x ^ 2 or x ^ 3 equal to a "
                 "numeral) and finishes every value.")
 
-TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES, LEAF_TACTICS)
+POW_CYCLE = ("""-- `pow_cycle a m k n` (numerals a m k with a ^ k % m = 1): a ^ n % m cycles with period k;
+-- every case of n % k is finished by norm_num and omega (a ^ n generalised to an atom).
+syntax "pow_cycle" num num num ident : tactic
+macro_rules
+  | `(tactic| pow_cycle $a $m $k $n) => `(tactic| (
+      have hcyc : $a ^ $k % $m = 1 := by norm_num
+      have hpow : $a ^ $n % $m = $a ^ ($n % $k) % $m := by
+        conv_lhs => rw [← Nat.div_add_mod $n $k, pow_add, pow_mul]
+        rw [Nat.mul_mod, Nat.pow_mod, hcyc, one_pow, ← Nat.mul_mod, one_mul]
+      have hlt : $n % $k < $k := Nat.mod_lt _ (by norm_num)
+      generalize hr : $n % $k = r at hpow hlt
+      interval_cases r <;> norm_num at hpow <;> (try simp only [Nat.ModEq] at *) <;>
+        first | omega | (generalize $a ^ $n = x at *; omega)))""",
+             "`pow_cycle a m k n` (a, m, k numerals with a ^ k % m = 1, n : ℕ a variable): a ^ n % m "
+             "has period k in n, so it splits n % k into its k values and finishes each by omega; closes "
+             "`a ^ n % m = r`, `m ∣ a ^ n - 1`, `¬ m ∣ a ^ n + 1`, `a ^ n ≡ r [MOD m]` and their converses.")
+
+TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES, LEAF_TACTICS, POW_CYCLE)
 
 PREAMBLE_MARK = "-- techniques defined for this file"
 PREAMBLE_END = "-- end of techniques"

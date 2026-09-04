@@ -2148,3 +2148,19 @@ def test_an_old_lean_container_is_renewed_while_a_model_is_being_waited_on(monke
     assert result.metadata["solved_by"] == "board_loop"
     assert lean.starts >= 1
     assert any(e.get("stage") == "renew" for e in result.metadata["events"])
+
+
+def test_a_power_with_a_literal_base_under_a_modulus_gets_the_cycle_leaf():
+    # Measured on p09 (v7.91–v7.93, five failing runs): `2 ^ n % 7 = 1` or
+    # `3 ∣ n` was withdrawn after four tries and the run restarted from the
+    # skeleton each time; the periodicity is one lemma and a case split.
+    from submission.leaves import leaf_candidates
+    from submission.techniques import uses_techniques, preamble
+    goal = "n : ℕ\nhn : 0 < n\nh3 : 3 ∣ n\n⊢ 2 ^ n % 7 = 1"
+    assert leaf_candidates(goal)[0] == "set_option maxHeartbeats 60000 in (pow_cycle 2 7 3 n)"
+    both = leaf_candidates("n : ℕ\nhn : 0 < n\n⊢ 7 ∣ 2 ^ n - 1 ↔ 3 ∣ n")
+    assert any("pow_cycle 2 7 3 n" in b for b in both)
+    assert any("pow_cycle 3 10 4 n" in b for b in leaf_candidates("n : ℕ\n⊢ 3 ^ n % 10 = 1 ∨ 3 ^ n % 10 = 3"))
+    assert not any("pow_cycle" in b for b in leaf_candidates("n : ℕ\n⊢ 2 ^ n % 8 = 0"))   # no cycle
+    assert not any("pow_cycle" in b for b in leaf_candidates("n : ℤ\n⊢ 2 ^ n % 7 = 1"))   # ℕ only
+    assert uses_techniques(preamble() + "\ntheorem t (n : ℕ) : 2 ^ n % 7 = 1 := by\n  pow_cycle 2 7 3 n\n")

@@ -5,6 +5,7 @@ on leaves of these shapes (ℕ subtraction under a bound, a perfect power betwee
 consecutive powers, a bounded variable, the divisors of a product)."""
 from __future__ import annotations
 
+import math
 import re
 
 NUM = re.compile(r"^\d+$")
@@ -22,6 +23,7 @@ FINISH = (f"first | (simp only [{MEMBERSHIP}] at *; first | omega | (simp_all <;
           f" | (norm_num [{MEMBERSHIP}] at *; done) | (norm_num [{MEMBERSHIP}] at *; omega)")
 LEAF_CAP = 6
 CASES_MAX = 40
+CYCLE_MAX = 24
 # One check's elaboration is bounded: a candidate that does not finish fast is not one.
 BUDGET = "set_option maxHeartbeats 60000 in"
 
@@ -211,6 +213,34 @@ def _claims_about(target: str, y: str, n: str) -> list[tuple[str, str]]:
     return out
 
 
+def _order(a: int, m: int) -> int | None:
+    """The multiplicative order of a modulo m, or None when there is none or it is long."""
+    if m < 2 or math.gcd(a, m) != 1:
+        return None
+    x, k = a % m, 1
+    while x != 1 and k <= CYCLE_MAX:
+        x, k = (x * a) % m, k + 1
+    return k if x == 1 else None
+
+
+def _cycles(goal_text: str) -> list[tuple[int, int, int, str]]:
+    """(a, m, k, n) for every `a ^ n` with a literal base and a variable exponent
+    over ℕ, m a modulus the goal mentions (`% m`, `m ∣`, `[MOD m]`), k the order."""
+    nats = {n for n, t in _hyps(goal_text) if t == "ℕ"}
+    mods = {int(m) for m in re.findall(r"% (\d+)\b|\b(\d+) ∣|\[MOD (\d+)\]", goal_text) for m in m if m}
+    out = []
+    for a, n in re.findall(r"\b(\d+) \^ ([A-Za-z_][\w']*)\b", goal_text):
+        if n not in nats:
+            continue
+        # The modulus written against this power first (`a ^ n % m`, `m ∣ ... a ^ n`, `[MOD m]`).
+        near = lambda m: not re.search(rf"{a} \^ {n}\b[^\n]*(% {m}\b|\[MOD {m}\])|\b{m} ∣ [^\n]*{a} \^ {n}\b", goal_text)
+        for m in sorted(mods, key=lambda m: (near(m), m)):
+            k = _order(int(a), m)
+            if k and (int(a), m, k, n) not in out:
+                out.append((int(a), m, k, n))
+    return out
+
+
 def leaf_candidates(goal_text: str) -> list[str]:
     hyps = _hyps(goal_text)
     target = _target(goal_text)
@@ -223,6 +253,12 @@ def leaf_candidates(goal_text: str) -> list[str]:
     lowers = sorted(((n, v, c) for n, v, kind, c in bounds if kind == "lower" and c >= 2),
                     key=lambda b: -b[2])
     out: list[str] = []
+
+    # a ^ n under a modulus, a and the modulus numerals: the residue cycles with
+    # period k, so n % k decides every claim. Measured on p09 (v7.91–v7.93):
+    # `2 ^ n % 7 = 1` was the step withdrawn after four tries in every failing run.
+    for a, m, k, n in _cycles(goal_text):
+        out.append(f"pow_cycle {a} {m} {k} {n}")
 
     # v ^ n bounded by powers in the context (on v ^ n itself, or through
     # `v ^ n = P`), the goal about v: the bounds move to v, then omega. Measured
