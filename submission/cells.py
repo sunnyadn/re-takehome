@@ -113,9 +113,8 @@ def dissolve(text: str, cell_id: int) -> str:
 BINDER_GROUP = re.compile(r"\(([^():]+?) : ")
 
 
-def explicit_names(statement: str) -> list[str]:
-    """The explicit binder names of a statement, in order (instance and
-    implicit binders are inferred and not passed)."""
+def explicit_binders(statement: str) -> list[tuple[str, str]]:
+    """(name, type) for every explicit binder of a statement, in order."""
 
     depth, groups, cur = 0, [], ""
     for ch in statement:
@@ -133,21 +132,37 @@ def explicit_names(statement: str) -> list[str]:
                 continue
         if depth >= 1:
             cur += ch
-    names: list[str] = []
+    out: list[tuple[str, str]] = []
     for g in groups:
         if " : " in g:
-            names += g.split(" : ", 1)[0].split()
-    return names
+            names, typ = g.split(" : ", 1)
+            out += [(n, typ.strip()) for n in names.split()]
+    return out
+
+
+def explicit_names(statement: str) -> list[str]:
+    return [n for n, _ in explicit_binders(statement)]
+
+
+DATA_TYPE = re.compile(r"^(?:ℕ|ℤ|ℚ|ℝ|ℂ|Prop|Type\b.*|Sort\b.*|Fin\b.*|Finset\b.*|Set\b.*|List\b.*|Multiset\b.*"
+                       r"|[ℕℤℚℝℂ] → .*|.* × .*)$")
+PROP_TOKEN = re.compile(r"[∀∃=<≤>≥≠∣∈¬∧∨↔→]|\bPrime\b|\bAntitone\b|\bMonotone\b|\bIs[A-Z]")
 
 
 def link(cell_id: int, statement: str) -> str:
-    """The parent's call of a cell: by name when every binder is a name in
-    scope, `apply … <;> assumption` otherwise (measured on rmo_2000_6: apply
-    unified a symmetric conclusion the wrong way round 356 times)."""
+    """The parent's call of a cell: data binders by name and hypotheses by
+    their type (`‹_›`, which cannot pick the wrong one once the data is
+    fixed), then all by name, then apply/assumption. Measured on rmo_2000_6:
+    apply/assumption alone assigned `?a := b` from `hb : 0 < b` 356 times."""
 
-    names = explicit_names(statement)
-    by_name = f"exact {LEMMA}{cell_id} {' '.join(names)}" if names else f"exact {LEMMA}{cell_id}"
-    return f"first | ({by_name}) | (apply {LEMMA}{cell_id} <;> assumption)"
+    binders = explicit_binders(statement)
+    if not binders:
+        return f"exact {LEMMA}{cell_id}"
+    typed = " ".join(n if DATA_TYPE.match(t) and not PROP_TOKEN.search(t.replace("ℕ → ℝ", "")) else "‹_›"
+                     for n, t in binders)
+    named = " ".join(n for n, _ in binders)
+    return (f"first | (exact {LEMMA}{cell_id} {typed}) | (exact {LEMMA}{cell_id} {named}) "
+            f"| (apply {LEMMA}{cell_id} <;> assumption)")
 
 
 class Cells:

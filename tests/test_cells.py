@@ -42,9 +42,9 @@ def test_a_full_render_puts_children_before_parents_and_links_them():
     main = lines.index("theorem demo (n : ℕ) (h : 0 < n) : n ≠ 0 := by")
     assert c2 < c1 < main
     assert lines[c2 + 1:c2 + 3] == ["  simp at hn", "  " + CELL_PROBE]
-    assert lines[c1 + 1] == "  have k : n = 0 := by" and lines[c1 + 2] == "    first | (exact vm_cell_2 n hn) | (apply vm_cell_2 <;> assumption)"
+    assert lines[c1 + 1] == "  have k : n = 0 := by" and lines[c1 + 2] == "    first | (exact vm_cell_2 n ‹_›) | (exact vm_cell_2 n hn) | (apply vm_cell_2 <;> assumption)"
     assert lines[c1 + 3] == "  " + CELL_PROBE
-    assert lines[main + 1:main + 3] == ["  intro hn", "  first | (exact vm_cell_1 n h hn) | (apply vm_cell_1 <;> assumption)"]
+    assert lines[main + 1:main + 3] == ["  intro hn", "  first | (exact vm_cell_1 n ‹_› ‹_›) | (exact vm_cell_1 n h hn) | (apply vm_cell_1 <;> assumption)"]
     assert got.lines[c2] == 7 and got.lines[c2 + 2] == 9 and got.lines[c1 + 2] == 7 and got.lines[main + 2] == 5
     assert "-- cell" not in got.text and got.region is None
     back = remap([{"severity": "error", "pos": {"line": c2 + 3, "column": 2}, "endPos": {"line": c2 + 3, "column": 4}}], got.lines)
@@ -106,3 +106,17 @@ def test_a_set_literal_after_a_membership_is_ascribed_from_the_binder_types():
     assert ascribe_literals("(n : ℕ) : n ∈ {(1 : ℕ), (2 : ℕ)} ∨ (4 : ℕ) ≤ n") == "(n : ℕ) : n ∈ ({(1 : ℕ), (2 : ℕ)} : Set ℕ) ∨ (4 : ℕ) ≤ n"
     same = "(S : Set ℕ) (hS : S = {n | (3 : ℕ) ∣ n}) : (6 : ℕ) ∈ S"
     assert ascribe_literals(same) == same
+
+
+def test_a_cell_is_called_with_data_by_name_and_hypotheses_by_type():
+    # Measured in the image: with `hb : 0 < b` the most recent hypothesis and a
+    # conclusion that fixes neither variable, `apply … <;> assumption` set
+    # `?a := b`; `exact … a b ‹_› ‹_›` cannot, and the by-name and
+    # apply forms stay as fallbacks for renamed and inaccessible names.
+    from submission.cells import link
+    got = link(7, "(a b : ℕ) (ha : (0 : ℕ) < a) (hdiv : (2000 : ℕ) ∣ a ^ (2 : ℕ)) : (10 : ℕ) ≤ a * b")
+    assert got == ("first | (exact vm_cell_7 a b ‹_› ‹_›) | (exact vm_cell_7 a b ha hdiv) "
+                   "| (apply vm_cell_7 <;> assumption)")
+    assert link(8, "(x : ℕ → ℝ) (hpos : ∀ (n : ℕ), (0 : ℝ) < x n) (S : Set ℕ) : True").startswith(
+        "first | (exact vm_cell_8 x ‹_› S)")
+    assert link(9, ": IsGreatest {n | n < (3 : ℕ)} (2 : ℕ)") == "exact vm_cell_9"
