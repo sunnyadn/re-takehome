@@ -73,3 +73,16 @@ def test_the_delivered_form_keeps_sorry_and_has_no_probes():
     text = modular(FILE, cells)
     assert "extract_goal" not in text and "-- cell" not in text and text.count("sorry") == 3
     assert marker("  ", 7) == "  -- cell 7"
+
+
+def test_a_block_that_asks_for_a_budget_gets_it_on_its_own_declaration():
+    # Measured on rmo_2001_2: the product leaf needs more than 200000
+    # heartbeats with the fuller context (fails at 200000 in 10 s, closes at
+    # 400000 in 14 s); a tactic-level set_option never bound anything.
+    text = ("import Mathlib\n\ntheorem demo (n : ℕ) (h : 0 < n) : n ≠ 0 := by\n  -- cell 1\n"
+            "  set_option maxHeartbeats 400000 in (omega)\n")
+    cells = cells_for("(n : ℕ) (h : 0 < n) : n ≠ 0")
+    lines = render_check(text, cells, focus=None).text.split("\n")
+    at = lines.index("theorem vm_cell_1 (n : ℕ) (h : 0 < n) : n ≠ 0 := by")
+    assert lines[at - 1] == "set_option maxHeartbeats 400000 in"
+    assert lines[at + 1] == "  set_option maxHeartbeats 400000 in (omega)"

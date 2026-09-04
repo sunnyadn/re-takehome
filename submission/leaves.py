@@ -25,7 +25,7 @@ LEAF_CAP = 6
 CASES_MAX = 40
 CYCLE_MAX = 24
 # One check's elaboration is bounded: a candidate that does not finish fast is not one.
-BUDGET = "set_option maxHeartbeats 60000 in"
+BUDGET = "set_option maxHeartbeats 400000 in"
 
 
 def _hyps(goal_text: str) -> list[tuple[str, str]]:
@@ -258,6 +258,9 @@ def _sum_variables(hyps: list[tuple[str, str]], target: str) -> list[str]:
     return out
 
 
+FACTOR = r"\((?:[^()]|\([^()]*\))+\)|[A-Za-z_][\w']*"
+
+
 def leaf_candidates(goal_text: str) -> list[str]:
     hyps = _hyps(goal_text)
     target = _target(goal_text)
@@ -380,7 +383,9 @@ def leaf_candidates(goal_text: str) -> list[str]:
     # v7.93 repeats: the pass on each problem had the model write the `∣`
     # fact, the failure had only the product on the board.
     for n, t in hyps:
-        m = re.match(r"^(\([^()]+\)|[A-Za-z_][\w']*) \* (\([^()]+\)|[A-Za-z_][\w']*) = (.+)$", t)
+        # A factor may hold one level of brackets: `(m - (p + q))` was how the
+        # models wrote it on rmo_2001_2 (measured, cells build: the leaf never fired).
+        m = re.match(rf"^({FACTOR}) \* ({FACTOR}) = (.+)$", t)
         if not m or not re.search(r"\d", m.group(3)) or re.search(r"[∨∧↔→∀∃]", t):
             continue
         for factor, intro in ((m.group(1), "Dvd.intro"), (m.group(2), "Dvd.intro_left")):

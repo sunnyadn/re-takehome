@@ -11,6 +11,7 @@ from submission.framework import (DECL_HEAD, PLACEHOLDER, PROOF_HEAD, proof_span
                                   line_of)
 
 MARK = re.compile(r"^([ \t]*)-- cell (\d+)[ \t]*$")
+BUDGET_ASK = re.compile(r"^set_option maxHeartbeats (\d+) in\b")
 # One placeholder asks Lean two things: state this goal (info) and report it
 # as open (error). `*` keeps every hypothesis (measured: plain extract_goal
 # dropped `h_mem : 6 < 7`, and steps using it failed); numerals are typed.
@@ -165,6 +166,11 @@ def render_check(text: str, cells: Cells, focus: int | str | None = None,
     def emit_cell(s: Span, focused: bool) -> None:
         stmt = cells.statements.get(s.id, "")
         head = f"theorem {LEMMA}{s.id} {stmt} := by"
+        # A block that asks for a heartbeat budget gets it on its own declaration
+        # (the tactic-level option never bound anything; measured in v4.32).
+        asked = BUDGET_ASK.match(lines[s.start].strip()) if s.start < len(lines) else None
+        if asked:
+            out.append((f"set_option maxHeartbeats {asked.group(1)} in", s.start))
         out.append((head, s.start))
         if focused:
             out.extend(body_lines(s.start + 1, s.end, s.children, s.indent - 2))
