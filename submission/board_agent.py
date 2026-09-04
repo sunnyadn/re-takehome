@@ -2506,16 +2506,16 @@ class BoardAgent(FrameworkAgent):
             if left is not None and left.key not in searched:
                 # Mathlib may state the rewritten goal outright (Nat.sum_range_choose_halfway).
                 searched.add(left.key)
-                await library_sweep(left)
+                await library_sweep(left, force=True)
             return True
 
-        async def library_sweep(goal: Goal) -> bool:
+        async def library_sweep(goal: Goal, force: bool = False) -> bool:
             """Mathlib asked what unifies with the goal (`apply?`), after the
             closers failed. An `exact` answer is written, no model asked; the
             rest go into the prompt as the names that fit. Measured in the
             image: 4 of 4 leaf goals closed by exact, about 8 s each."""
 
-            if not affordable("scan"):
+            if not force and not affordable("scan"):
                 return False
             # The file's own check time plus the heartbeat-capped search.
             answered, took = await probe(apply_file(board.text, goal), goal.line, check_timeout_s(board.ms) + 30)
