@@ -241,6 +241,23 @@ def _cycles(goal_text: str) -> list[tuple[int, int, int, str]]:
     return out
 
 
+SUM_BOUND = re.compile(r"∑ [^,]*∈ Finset\.(?:range \((\w+) \+ 1\)|Icc 0 (\w+))")
+
+
+def _sum_variables(hyps: list[tuple[str, str]], target: str) -> list[str]:
+    """ℕ variables at which the target's sums end, when the target is an
+    equation between two sums (the shape `sum_induct` handles)."""
+    if " = " not in target or "∑" not in target or re.search(r"[∨∧↔→]", target):
+        return []
+    nat = {n for name, t in hyps if t.strip() == "ℕ" for n in name.split()}
+    out: list[str] = []
+    for m in SUM_BOUND.finditer(target):
+        k = m.group(1) or m.group(2)
+        if k in nat and k not in out:
+            out.append(k)
+    return out
+
+
 def leaf_candidates(goal_text: str) -> list[str]:
     hyps = _hyps(goal_text)
     target = _target(goal_text)
@@ -259,6 +276,13 @@ def leaf_candidates(goal_text: str) -> list[str]:
     # `2 ^ n % 7 = 1` was the step withdrawn after four tries in every failing run.
     for a, m, k, n in _cycles(goal_text):
         out.append(f"pow_cycle {a} {m} {k} {n}")
+
+    # An identity between sums whose ranges end at a variable: induction on it,
+    # the step mechanical (peels, rescaling, Pascal, omega). Measured on
+    # putnam_2020_a2's generalisation ∑_{j≤m} 2^(m-j) C(n+j,j) = ∑_{i≤m} C(n+m+1,i):
+    # both models withdrew the Pascal step; the recipe closes it in 0.5 s.
+    for k in _sum_variables(hyps, target):
+        out.append(f"sum_induct {k}")
 
     # v ^ n bounded by powers in the context (on v ^ n itself, or through
     # `v ^ n = P`), the goal about v: the bounds move to v, then omega. Measured

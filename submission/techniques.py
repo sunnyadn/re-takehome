@@ -306,7 +306,82 @@ macro_rules
              "has period k in n, so it splits n % k into its k values and finishes each by omega; closes "
              "`a ^ n % m = r`, `m ∣ a ^ n - 1`, `¬ m ∣ a ^ n + 1`, `a ^ n ≡ r [MOD m]`, an if-then-else on n % k, and their converses.")
 
-TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES, LEAF_TACTICS, POW_CYCLE)
+SUM_INDUCT = ("""-- `sum_induct k`: an identity between sums over `range (k + 1)` (or `Icc 0 k`) by induction
+-- on k. The step is mechanical: every sum over `range (j + 1)` in sight is peeled at both
+-- ends as facts, `2 ^ (k + 1 - x)` under a binder becomes `2 ^ (k - x) * 2` and the factor
+-- leaves the sum, Pascal splits `choose (a + 1) (x + 1)`, the new sums are peeled once more,
+-- and omega closes the linear system over the sums.
+section SumInduct
+open Lean Elab Tactic Meta
+
+elab "sum_peel_facts" : tactic => withMainContext do
+  let g ← getMainGoal
+  let mut targets : Array Expr := #[← instantiateMVars (← g.getType)]
+  for d in (← getLCtx) do
+    if !d.isImplementationDetail then
+      targets := targets.push (← instantiateMVars d.type)
+  let rec visit (e : Expr) (acc : Array (Expr × Expr)) : MetaM (Array (Expr × Expr)) := do
+    let mut acc := acc
+    if e.isAppOfArity ``Finset.sum 5 then
+      let args := e.getAppArgs
+      let s := args[3]!
+      let f := args[4]!
+      if s.isAppOfArity ``Finset.range 1 then
+        let n := s.appArg!
+        if n.isAppOfArity ``HAdd.hAdd 6 then
+          let k := n.getAppArgs[4]!
+          let one := n.getAppArgs[5]!
+          if one.nat? == some 1 || one.rawNatLit? == some 1 then
+            if !(acc.any fun p => p.1 == f && p.2 == k) then
+              acc := acc.push (f, k)
+    match e with
+    | .app a b => acc ← visit a acc; acc ← visit b acc
+    | .lam _ t b _ => acc ← visit t acc; acc ← visit b acc
+    | .forallE _ t b _ => acc ← visit t acc; acc ← visit b acc
+    | .letE _ t v b _ => acc ← visit t acc; acc ← visit v acc; acc ← visit b acc
+    | .mdata _ b => acc ← visit b acc
+    | .proj _ _ b => acc ← visit b acc
+    | _ => pure ()
+    return acc
+  let mut found : Array (Expr × Expr) := #[]
+  for t in targets do
+    found ← visit t found
+  let mut hyps : Array Hypothesis := #[]
+  for (f, k) in found do
+    if f.hasLooseBVars || k.hasLooseBVars then continue
+    try
+      let v1 ← mkAppM ``Finset.sum_range_succ #[f, k]
+      let v2 ← mkAppM ``Finset.sum_range_succ' #[f, k]
+      hyps := hyps.push { userName := `peel, type := ← inferType v1, value := v1 }
+      hyps := hyps.push { userName := `peel, type := ← inferType v2, value := v2 }
+    catch _ => pure ()
+  let (_, g') ← g.assertHypotheses hyps
+  replaceMainGoal [g']
+end SumInduct
+
+syntax "sum_induct" ident : tactic
+macro_rules
+  | `(tactic| sum_induct $k) => `(tactic| (
+      (try simp only [← Nat.range_succ_eq_Icc_zero] at *)
+      induction $k:ident with
+      | zero => first | simp | (simp; omega) | decide | norm_num
+      | succ k ih =>
+        sum_peel_facts
+        (try simp (disch := simp only [Finset.mem_range] at *; omega) only [Nat.succ_sub, pow_succ] at *)
+        (try simp only [mul_right_comm, ← Finset.sum_mul] at *)
+        (try simp only [← Nat.add_assoc, Nat.succ_eq_add_one, Nat.sub_self, Nat.add_sub_cancel_left,
+                        Nat.add_sub_cancel, pow_zero, pow_one, one_mul, mul_one, Nat.choose_zero_right] at *)
+        (try simp only [Nat.choose_succ_succ, Finset.sum_add_distrib] at *)
+        (try simp only [Nat.succ_eq_add_one, ← Nat.add_assoc] at *)
+        sum_peel_facts
+        (try simp only [Nat.choose_succ_succ, Finset.sum_add_distrib, Nat.succ_eq_add_one, ← Nat.add_assoc] at *)
+        first | omega | linarith | (ring_nf at *; omega)))""",
+              "`sum_induct k` (k : ℕ a variable, the goal an identity between sums over `Finset.range (k + 1)` "
+              "or `Finset.Icc 0 k`): induction on k with the step done mechanically (both peels of every sum "
+              "as facts, powers rescaled under the binder, Pascal's rule, omega). Works when the identity "
+              "is closed under the induction, e.g. a two-parameter generalisation with the other parameter fixed.")
+
+TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES, LEAF_TACTICS, POW_CYCLE, SUM_INDUCT)
 
 PREAMBLE_MARK = "-- techniques defined for this file"
 PREAMBLE_END = "-- end of techniques"

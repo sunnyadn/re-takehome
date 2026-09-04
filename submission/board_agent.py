@@ -1620,7 +1620,10 @@ class BoardAgent(FrameworkAgent):
             nonlocal best
             if accepted or not scoring_faults(candidate, names, problem.challenge):
                 best = candidate
-                services.checkpoint(best, {"accepted": accepted})
+                # The checkpoint is what a killed run is graded on: cells as
+                # declarations, each within its own budget.
+                services.checkpoint(modular(best, cells) if "-- cell " in best else best,
+                                    {"accepted": accepted})
 
         shed_named: set[str] = set()
 
@@ -2423,7 +2426,7 @@ class BoardAgent(FrameworkAgent):
                 lifted = [reindent(f, head.group(1)) for f, _ in fresh]
                 text = "\n".join(lines[:outer] + lifted + lines[outer:])
                 shift = sum(f.count("\n") + 1 for f in lifted)
-                moved = Goal(goal.line + shift, goal.indent, goal.decl, goal.text)
+                moved = Goal(goal.line + shift, goal.indent, goal.decl, goal.text, goal.stmt, goal.cell)
                 staged = Board(text, base.goals, base.messages, base.accepted, base.bid, base.ms)
                 if rest:
                     nxt, why = await advance(staged, moved, rest, author)

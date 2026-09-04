@@ -2376,3 +2376,20 @@ def test_a_leaf_that_only_fits_a_budget_of_its_own_passes_in_its_cell():
     cell = checked[-1][checked[-1].index("theorem vm_cell_"):checked[-1].index("theorem demo")]
     assert "divisor_cases" in cell and "expensive" not in cell.split(":= by", 1)[1]
     assert "apply vm_cell_" in text
+
+
+def test_an_identity_between_sums_ending_at_a_variable_gets_the_induction_leaf():
+    # Measured on putnam_2020_a2's two-parameter generalisation (x98, v7.98):
+    # given the statement, both models withdrew the Pascal step twice; the
+    # mechanical step (peels as facts, rescaling, Pascal, omega) closes it in
+    # the image in 0.5 s, and hockey-stick, Gauss and the geometric sum too.
+    from submission.leaves import leaf_candidates
+    from submission.techniques import uses_techniques, preamble
+    goal = ("n m : ℕ\n⊢ ∑ j ∈ Finset.range (m + 1), 2 ^ (m - j) * (n + j).choose j = "
+            "∑ i ∈ Finset.range (m + 1), (n + m + 1).choose i")
+    assert leaf_candidates(goal)[0] == "set_option maxHeartbeats 60000 in (sum_induct m)"
+    icc = "k : ℕ\n⊢ ∑ j ∈ Finset.Icc 0 k, 2 ^ (k - j) * (k + j).choose j = 4 ^ k"
+    assert any("sum_induct k" in c for c in leaf_candidates(icc))
+    assert not any("sum_induct" in c for c in leaf_candidates("n : ℕ\nh : n < 5\n⊢ n ≤ 4"))
+    assert not any("sum_induct" in c for c in leaf_candidates("x : ℝ\n⊢ ∑ i ∈ Finset.range (3 + 1), x = 4 * x"))
+    assert uses_techniques(preamble() + "\ntheorem t (n : ℕ) : ∑ i ∈ Finset.range (n + 1), i * 2 = n * (n + 1) := by\n  sum_induct n\n")
