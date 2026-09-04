@@ -131,6 +131,7 @@ SEARCH_AFTER = 1
 # (rmo_2000_6, v7.85): 425 checks, Lean 2443 s of 2642 s, of which names 689 s,
 # apply? and the scan 478 s, leaves 466 s; 91 model calls in 44 minutes.
 PROBE_SHARE = 0.15
+RETRY_SHARE = 0.05
 PROBE_GRACE_S = 60.0
 # A goal this many rejections deep is still open, only last in line. Time and
 # money are the exits; a goal is never declared hopeless by count alone.
@@ -1633,12 +1634,13 @@ class BoardAgent(FrameworkAgent):
         plans: dict[tuple[str, str], str] = {}
         swept: set[tuple[str, str]] = set()
         searched: set[tuple[str, str]] = set()
-        probe_spent: dict[str, float] = {"scan": 0.0, "leaf": 0.0}
+        probe_spent: dict[str, float] = {"scan": 0.0, "leaf": 0.0, "retry": 0.0}
 
         def affordable(kind: str) -> bool:
             """Whether this probe kind is still inside its share of the clock."""
             elapsed = time.monotonic() - started
-            if probe_spent[kind] <= PROBE_GRACE_S or probe_spent[kind] <= PROBE_SHARE * elapsed:
+            share = RETRY_SHARE if kind == "retry" else PROBE_SHARE
+            if probe_spent[kind] <= PROBE_GRACE_S or probe_spent[kind] <= share * elapsed:
                 return True
             events.append({"stage": "probe_skipped", "kind": kind,
                            "spent_s": round(probe_spent[kind]), "elapsed_s": round(elapsed)})
@@ -2320,12 +2322,15 @@ class BoardAgent(FrameworkAgent):
                         break
                     order = order[len(order) // 2 + 1:] if len(order) > 1 else []
                 retry = hand_to_search(block)
-                if nxt is None and retry != block and affordable("scan"):
+                if nxt is None and retry != block and affordable("retry"):
                     # `exact?` costs ~27 s a call here and leaves 2 GB of index in
-                    # the container (measured, p10): it draws on the scan share.
+                    # the container (measured, p10); it has a share of its own so
+                    # it cannot starve `apply?` on a stuck goal (measured on
+                    # rmo_2000_6: 9 retries used the scan share by 250 s and
+                    # `10 ≤ a * b` then waited 40 minutes for Nat.le_of_dvd).
                     t0 = time.monotonic()
                     nxt, _ = await judge(base, goal, retry)
-                    probe_spent["scan"] += time.monotonic() - t0
+                    probe_spent["retry"] += time.monotonic() - t0
                     events.append({"kind": "search-retry", "by": author,
                                    "accepted": nxt is not None})
                 if nxt is None:

@@ -288,6 +288,17 @@ def leaf_candidates(goal_text: str) -> list[str]:
     # both models withdrew the Pascal step; the recipe closes it in 0.5 s.
     for k in _sum_variables(hyps, target):
         out.append(f"sum_induct {k}")
+    # `c ≤ E` from `h : c ∣ E` and E > 0. Measured on rmo_2000_6 (frame117):
+    # `⊢ 10 ≤ a * b` under `h10 : 10 ∣ a * b` was reported 333 times in one run.
+    le = re.match(r"^(.+?) ≤ (.+)$", target)
+    ge = re.match(r"^(.+?) ≥ (.+)$", target)
+    lo, hi = (le.group(1), le.group(2)) if le else ((ge.group(2), ge.group(1)) if ge else (None, None))
+    if lo is not None:
+        for n, t in hyps:
+            if t.strip() == f"{lo} ∣ {hi}".strip():
+                out.append(f"exact Nat.le_of_dvd (by positivity) {n}")
+                out.append(f"exact Nat.le_of_dvd (by omega) {n}")
+                out.append(f"exact Nat.le_of_dvd (Nat.mul_pos (by omega) (by omega)) {n}")
     # Blocks [g j, g (j+1)) telescoping over j < m + 1: rmo_2000_3's decomposition
     # of ∑_{i<(m+1)²} into the sums over [j², (j+1)²).
     m = BLOCKS.search(target)
