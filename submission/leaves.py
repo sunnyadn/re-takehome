@@ -285,6 +285,60 @@ def _dvd_bounds(hyps: list[tuple[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def _factorise(n: int) -> list[int]:
+    """The distinct primes of n, ascending."""
+    out, d = [], 2
+    while d * d <= n:
+        if n % d == 0:
+            out.append(d)
+            while n % d == 0:
+                n //= d
+        d += 1
+    if n > 1:
+        out.append(n)
+    return out
+
+
+def _radical_bound(hyps: list[tuple[str, str]], rel: str, c: str, product: str) -> str | None:
+    """`c ≤ P` (or `c ∣ P`), P a product of at most two atoms, from `h : m ∣ E`, E a
+    product of powers of the same atoms: every prime of m to the bases, coprime
+    product, `Nat.le_of_dvd`. Needs rad(m) ≥ c (or c ∣ rad(m))."""
+    atoms = [t.strip() for t in product.split(" * ")]
+    c = re.sub(r"^\((\d+) : ℕ\)$", r"\1", c)
+    if not (1 <= len(atoms) <= 2 and all(VAR.match(a) for a in atoms) and NUM.match(c)):
+        return None
+    factor = r"([A-Za-z_][\w']*)(?: \^ (?:\d+|\(\d+ : ℕ\)))?"
+    for name, t in hyps:
+        m = re.match(rf"^(?:\((\d+) : ℕ\)|(\d+)) ∣ ((?:{factor})(?: \* (?:{factor}))*)$", t)
+        if not m:
+            continue
+        bases = [b for b in re.findall(rf"(?:^| \* ){factor}", m.group(3))]
+        if sorted(bases) != sorted(atoms):
+            continue
+        primes = _factorise(int(m.group(1) or m.group(2)))
+        radical = 1
+        for q in primes:
+            radical *= q
+        if rel == "∣" and radical % int(c) != 0 or rel == "≤" and radical < int(c):
+            continue
+        if rel == "∣":
+            primes = [q for q in primes if int(c) % q == 0]
+            radical = int(c)
+        lines = [f"have hp{q} : {q} ∣ {product} := (by prime_to_bases {q} {name})" for q in primes]
+        acc, last = primes[0], f"hp{primes[0]}"
+        for q in primes[1:]:
+            acc *= q
+            nxt = f"hp{acc}" if acc != radical else "hrad"
+            lines.append(f"have {nxt} : {acc} ∣ {product} := Nat.Coprime.mul_dvd_of_dvd_of_dvd (by norm_num) {last} hp{q}")
+            last = nxt
+        if last != "hrad":
+            lines.append(f"have hrad : {radical} ∣ {product} := {last}")
+        lines.append("exact hrad" if rel == "∣"
+                     else "exact le_trans (by norm_num) (Nat.le_of_dvd (by positivity) hrad)")
+        return "\n".join(lines)
+    return None
+
+
 BLOCKS = re.compile(r"∑ \w+ ∈ Finset\.Ico \S+ \((\w+) \+ 1\), ∑ \w+ ∈ Finset\.Ico ")
 
 FACTOR = r"\((?:[^()]|\([^()]*\))+\)|[A-Za-z_][\w']*"
@@ -332,6 +386,16 @@ def leaf_candidates(goal_text: str) -> list[str]:
         facts = _dvd_bounds(hyps)
         if facts and NUM.match(lo.strip()):
             out.append(facts + "\nfirst | omega | nlinarith")
+        # `c ≤ a * b` from `m ∣ a ^ i * b ^ j`, rad(m) ≥ c. Measured on rmo_2000_6
+        # (frame117/119): the leaf every failing run died on, 6 model tries each.
+        radical = _radical_bound(hyps, "≤", lo.strip(), hi.strip())
+        if radical:
+            out.append(radical)
+    dv = re.match(r"^(?:\((\d+) : ℕ\)|(\d+)) ∣ (.+)$", target)
+    if dv:
+        radical = _radical_bound(hyps, "∣", dv.group(1) or dv.group(2), dv.group(3))
+        if radical:
+            out.append(radical)
     # Blocks [g j, g (j+1)) telescoping over j < m + 1: rmo_2000_3's decomposition
     # of ∑_{i<(m+1)²} into the sums over [j², (j+1)²).
     m = BLOCKS.search(target)

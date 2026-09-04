@@ -401,7 +401,26 @@ macro_rules
               "∑ i ∈ Finset.Ico (g j) (g (j + 1)), f i` (either way round) by induction on m, for g monotone with "
               "a ≤ g 1 (e.g. g j = j * j, a = 1); the side conditions go to omega/nlinarith.")
 
-TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES, LEAF_TACTICS, POW_CYCLE, SUM_INDUCT, ICO_BLOCKS)
+PRIME_TO_BASES = ("""-- `prime_to_bases p h`: from `h : m ∣ E` (m a numeral p divides, E a product of powers
+-- of at most two atoms) prove `p ∣ <the atoms' product>` or `p ∣ <the atom>`: Euclid's lemma
+-- down the product, `Nat.Prime.dvd_of_dvd_pow` at each base.
+syntax "prime_to_bases " num ppSpace term : tactic
+macro_rules
+  | `(tactic| prime_to_bases $p $h) => `(tactic| (
+      have vm_h : $p ∣ _ := Nat.dvd_trans (by norm_num) $h
+      repeat' (rcases (Nat.Prime.dvd_mul (by norm_num)).1 vm_h with vm_h | vm_h)
+      all_goals first
+        | exact vm_h
+        | exact Nat.Prime.dvd_of_dvd_pow (by norm_num) vm_h
+        | exact Dvd.dvd.mul_right vm_h _
+        | exact Dvd.dvd.mul_left vm_h _
+        | exact Dvd.dvd.mul_right (Nat.Prime.dvd_of_dvd_pow (by norm_num) vm_h) _
+        | exact Dvd.dvd.mul_left (Nat.Prime.dvd_of_dvd_pow (by norm_num) vm_h) _))""",
+                  "`prime_to_bases p h` (p a prime numeral, `h : m ∣ a ^ i * b ^ j` with p ∣ m): closes "
+                  "`p ∣ a * b` (or `p ∣ a` from `h : m ∣ a ^ i`).")
+
+TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES, LEAF_TACTICS, POW_CYCLE, SUM_INDUCT, ICO_BLOCKS,
+                                           PRIME_TO_BASES)
 
 PREAMBLE_MARK = "-- techniques defined for this file"
 PREAMBLE_END = "-- end of techniques"
@@ -425,7 +444,7 @@ ELIDED = "-- tactics defined for this file (see the system prompt): " + ", ".joi
 def technique_names() -> list[str]:
     """Every tactic the preamble declares (`syntax "name" ...`)."""
     import re
-    return sorted(set(re.findall(r'^(?:syntax|elab) "(\w+)"', "\n".join(src for src, _ in TECHNIQUES), re.M)))
+    return sorted(set(re.findall(r'^(?:syntax|elab) "(\w+) ?"', "\n".join(src for src, _ in TECHNIQUES), re.M)))
 
 
 def uses_techniques(text: str) -> bool:

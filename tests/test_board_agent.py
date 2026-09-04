@@ -2506,3 +2506,28 @@ def test_closing_a_cell_rechecks_its_parent_so_a_goal_without_a_placeholder_is_r
     assert any(e.get("stage") == "reopen" for e in result.metadata["events"])
     assert result.metadata["solved_by"] == "board_loop"
     assert "exact hidden_done" in result.solution
+
+
+def test_a_bound_on_a_product_from_a_numeral_dividing_a_product_of_its_powers_gets_the_radical_leaf():
+    # Measured on rmo_2000_6 (frame117/119, 5 runs): `⊢ 10 ≤ a * b` under
+    # `hdiv : 2000 ∣ a ^ 2 * b ^ 5` was the leaf every failing run died on
+    # (6 model tries each); the pass took the same chain by hand: each prime
+    # of 2000 to the bases, coprime product, Nat.le_of_dvd. 1.2 s in the image.
+    from submission.leaves import leaf_candidates
+    from submission.techniques import uses_techniques, preamble
+    goal = ("a b : ℕ\nha : 0 < a\nhb : 0 < b\nhdiv : 2000 ∣ a ^ 2 * b ^ 5\n⊢ 10 ≤ a * b")
+    got = [c for c in leaf_candidates(goal) if "prime_to_bases" in c]
+    assert got and "prime_to_bases 2 hdiv" in got[0] and "prime_to_bases 5 hdiv" in got[0]
+    assert "Nat.Coprime.mul_dvd_of_dvd_of_dvd (by norm_num) hp2 hp5" in got[0]
+    assert "exact le_trans (by norm_num) (Nat.le_of_dvd (by positivity) hrad))" in got[0]
+    # Typed numerals, the other order of the bases, a bare base, a ∣ target.
+    typed = ("a b : ℕ\nha : (0 : ℕ) < a\nhdiv : (2000 : ℕ) ∣ a ^ (3 : ℕ) * b ^ (4 : ℕ)\n⊢ (10 : ℕ) ≤ b * a")
+    assert any("prime_to_bases 5 hdiv" in c for c in leaf_candidates(typed))
+    bare = "a b : ℕ\nh : 360 ∣ a * b ^ 3\n⊢ 30 ≤ a * b"
+    assert any("prime_to_bases 3 h" in c for c in leaf_candidates(bare))
+    dvd = "a b : ℕ\nh : 2000 ∣ a ^ 2 * b ^ 5\n⊢ 10 ∣ a * b"
+    assert any("; exact hrad)" in c for c in leaf_candidates(dvd) if "prime_to_bases" in c)
+    # Too weak (the radical is below the bound) or the wrong atoms: nothing.
+    assert not any("prime_to_bases" in c for c in leaf_candidates("a b : ℕ\nh : 8 ∣ a ^ 2 * b\n⊢ 4 ≤ a * b"))
+    assert not any("prime_to_bases" in c for c in leaf_candidates("a b c : ℕ\nh : 6 ∣ a * c\n⊢ 6 ≤ a * b"))
+    assert uses_techniques(preamble() + "\ntheorem t (a : ℕ) (h : 6 ∣ a ^ 2) : 2 ∣ a := by\n  prime_to_bases 2 h\n")
