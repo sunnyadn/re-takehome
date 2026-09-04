@@ -2570,7 +2570,8 @@ class BoardAgent(FrameworkAgent):
                     nxt, why = await lift_and_advance(board, here, edit.body, author)
                     if nxt is None:
                         refused.add((here.key, edit.body))
-                    events.append({"kind": "step", "by": author, "accepted": nxt is not None})
+                    events.append({"kind": "step", "by": author, "accepted": nxt is not None,
+                                   **({} if nxt is not None else {"why": str(why)[:160]})})
                     if nxt is None:
                         said[goal.key] = Feedback(author, why)
                         tries[goal.key] = tries.get(goal.key, 0) + 1
@@ -2597,7 +2598,8 @@ class BoardAgent(FrameworkAgent):
                     fresh = next((g for g in board.goals if g.decl == edit.name), None)
                     if fresh and edit.body.strip():
                         nxt, why = await advance(board, fresh, edit.body, author)
-                        events.append({"kind": "step", "by": author, "accepted": nxt is not None})
+                        events.append({"kind": "step", "by": author, "accepted": nxt is not None,
+                                   **({} if nxt is not None else {"why": str(why)[:160]})})
                         if nxt is not None:
                             await commit(nxt)
                         else:
@@ -2619,7 +2621,8 @@ class BoardAgent(FrameworkAgent):
                     if nxt is None and here is not None and edit.name == here.decl:
                         # The header was an echo and the body continues from here.
                         nxt, why = await advance(board, here, edit.body, author)
-                    events.append({"kind": "step", "by": author, "accepted": nxt is not None})
+                    events.append({"kind": "step", "by": author, "accepted": nxt is not None,
+                                   **({} if nxt is not None else {"why": str(why)[:160]})})
                     if nxt is None:
                         said[goal.key] = Feedback(author, why)
                         tries[goal.key] = tries.get(goal.key, 0) + 1
