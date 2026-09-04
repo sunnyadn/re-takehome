@@ -164,10 +164,12 @@ def check_timeout_s(base_ms: int) -> int:
 # mid-check, and the next check paid a cold Mathlib import (28 kills in three
 # hours across the lanes on one machine). Renewed on our terms instead: when
 # its memory is up (sampled) or, without a reading, after this many checks,
-# while a model reply is awaited so the import overlaps that wait.
-RENEW_AT_BYTES = int(3.6 * 2 ** 30)
-RENEW_AFTER_CHECKS = 50
-MEMORY_SAMPLE_EVERY = 8
+# while a model reply is awaited so the import overlaps that wait. Measured on
+# p10 (win): 787 MB at check 9, 2980 MB at check 16, so a heavy board adds
+# ~300 MB per check and the sample must be frequent and the threshold low.
+RENEW_AT_BYTES = int(2.5 * 2 ** 30)
+RENEW_AFTER_CHECKS = 40
+MEMORY_SAMPLE_EVERY = 4
 UNITS = {"B": 1, "KiB": 2 ** 10, "MiB": 2 ** 20, "GiB": 2 ** 30, "KB": 10 ** 3, "MB": 10 ** 6, "GB": 10 ** 9}
 
 
@@ -207,6 +209,8 @@ class RenewingLean:
 
     async def _sample(self, name: str) -> None:
         self.memory = await asyncio.to_thread(container_memory_bytes, name)
+        self._events.append({"stage": "memory", "checks": self.checks,
+                             "mb": None if self.memory is None else self.memory // 2 ** 20})
 
     def due(self) -> bool:
         if self.task is not None and not self.task.done():
