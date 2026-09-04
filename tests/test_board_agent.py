@@ -1790,7 +1790,7 @@ def test_leaf_candidates_are_built_from_the_goal_s_shape_and_tried_before_any_mo
     assert got[0].endswith("(pow_squeeze y 3 (x + 2) with hxge)") and any("Nat.exists_eq_add_of_le hxge" in c for c in got)
     assert not any(c.endswith("with hx") or c.endswith("with hy") for c in got)
     dvd = "m p q : ℕ\nhp : Nat.Prime p\nhA_dvd : m - (p + q) ∣ 5 * p * q\n⊢ m - (p + q) = 1 ∨ m - (p + q) = 5"
-    assert any(c.startswith("set_option maxHeartbeats 60000 in (prime_facts; divisor_cases hA_dvd <;> (first | (solve_sub; first | omega")
+    assert any(c.startswith("set_option maxHeartbeats 60000 in (prime_facts; divisor_cases hA_dvd <;> (first | (solve_sub; first | (simp only")
                for c in leaf_candidates(dvd))
     assert leaf_candidates("⊢ True") == []
     small = "x : ℕ\nhb : x ≤ 3\nh : x ^ 2 = 4\n⊢ x = 2"
@@ -2012,7 +2012,7 @@ def test_an_upper_bound_on_the_variable_under_a_power_gets_the_contradiction_squ
     assert blocks[0].endswith("(by_contra hc; push_neg at hc; pow_squeeze y 3 (x + 2) with hc)")
     # `hyx : y = x + 2 ⊢ x = 9`: substitute, make the ℕ subtraction exact, arithmetic.
     blocks = leaf_candidates(ctx + "hyx : y = x + 2\n⊢ x = 9")
-    assert blocks[0].startswith("set_option maxHeartbeats 60000 in (subst hyx; nat_sub_exact; first | omega")
+    assert blocks[0].startswith("set_option maxHeartbeats 60000 in (subst hyx; nat_sub_exact; first | (simp only")
     # Under the contradiction hypothesis the squeeze uses it as the lower bound.
     blocks = leaf_candidates("x y : ℕ\nhc : 9 < x\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ False")
     assert "pow_squeeze y 3 (x + 2) with hc" in blocks[0]
@@ -2069,7 +2069,7 @@ def test_a_disjunction_of_subtraction_equations_is_split_and_each_case_solved():
             "hA : m - p - q = 1 ∨ m - p - q = 5 ∨ m - p - q = p ∨ m - p - q = p * q\n"
             "⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3")
     blocks = leaf_candidates(goal)
-    assert blocks[0].startswith("set_option maxHeartbeats 60000 in (prime_facts; rcases hA with hc | hc | hc | hc <;> (solve_sub; first | omega")
+    assert blocks[0].startswith("set_option maxHeartbeats 60000 in (prime_facts; rcases hA with hc | hc | hc | hc <;> (solve_sub; first | (simp only")
     assert "interval_cases p <;> interval_cases q" in blocks[0]      # (p-2)(q-2) = 9 needs the pair search
     assert not any("0 < (1 ∨" in b for b in blocks)      # the disjunction is not read as one equation
 
@@ -2081,5 +2081,22 @@ def test_a_disjunction_of_values_is_substituted_case_by_case():
     goal = ("a b : ℤ\nh_eq : (3 * a - 2018) * (3 * b - 2018) = 2018 ^ 2\n"
             "ha : a = 673 ∨ a = 674 ∨ a = 1009\n⊢ (a, b) ∈ {(673, 1358114), (674, 340033), (1009, 2018)}")
     blocks = leaf_candidates(goal)
-    assert blocks[0].startswith("set_option maxHeartbeats 60000 in (rcases ha with rfl | rfl | rfl <;> (first | omega")
+    assert blocks[0].startswith("set_option maxHeartbeats 60000 in (rcases ha with rfl | rfl | rfl <;> (first | (simp only")
     assert "norm_num [Set.mem_insert_iff" in blocks[0]
+
+
+def test_the_closing_chain_normalises_membership_and_substitutes_before_it_tries_nlinarith():
+    # Measured on putnam_2018_a1 (v7.90, image): after `divisor_cases h_dvd`
+    # the pair-membership case closes only once `simp_all` has rewritten
+    # `h_factorized` with the case value (then omega finds b); the old chain
+    # reached neither, and its failing `omega`/`nlinarith` tries ahead of the
+    # membership simp burned the theorem's 200000 heartbeats.
+    from submission.leaves import leaf_candidates
+    goal = ("a b : ℤ\nh_factorized : (3 * a - 2018) * (3 * b - 2018) = 2018 ^ 2\n"
+            "h_x_pos : 3 * a - 2018 > 0\nh_dvd : 3 * a - 2018 ∣ 2018 ^ 2\n"
+            "⊢ (a, b) ∈ {(673, 1358114), (674, 340033), (1009, 2018)}")
+    block = next(b for b in leaf_candidates(goal) if "divisor_cases h_dvd" in b)
+    chain = block.split("divisor_cases h_dvd <;> (first | (solve_sub; ", 1)[1]
+    assert chain.startswith("first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, "
+                            "Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega")
+    assert chain.index("(simp_all <;> omega)") < chain.index("nlinarith")

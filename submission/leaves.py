@@ -11,11 +11,14 @@ NUM = re.compile(r"^\d+$")
 VAR = re.compile(r"^[A-Za-z_][\w']*$")
 # Every alternative must close the goal: `simp_all` alone can rewrite a
 # hypothesis, count as success, and leave the goal open (measured on the
-# rmo_2001_2 case leaves).
+# rmo_2001_2 case leaves). Cheap and specific first: the theorem's heartbeats
+# are one budget, and a failing `nlinarith` ahead of the membership route spent
+# it (putnam_2018_a1, v7.90); `simp_all <;> omega` is what closes a case whose
+# second unknown is only linear after the case value is substituted.
 MEMBERSHIP = ("Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, "
               "Finset.mem_singleton")
-FINISH = ("first | omega | (norm_num at *; done) | nlinarith | (simp_all; done)"
-          f" | (simp only [{MEMBERSHIP}] at *; omega)"
+FINISH = (f"first | (simp only [{MEMBERSHIP}] at *; first | omega | (simp_all <;> omega))"
+          " | omega | (norm_num at *; done) | nlinarith | (simp_all; done)"
           f" | (norm_num [{MEMBERSHIP}] at *; done) | (norm_num [{MEMBERSHIP}] at *; omega)")
 LEAF_CAP = 6
 CASES_MAX = 40
