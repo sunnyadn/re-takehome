@@ -17,8 +17,8 @@ from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
 from submission.leaves import leaf_candidates
-from submission.techniques import (PREAMBLE_MARK, strip_techniques, uses_techniques,
-                                   without_techniques)
+from submission.techniques import (PREAMBLE_MARK, blank_techniques, strip_techniques,
+                                   uses_techniques, without_techniques)
 from submission.agent import (
     BUDGET_HEADROOM,
     technique_card,
@@ -325,7 +325,7 @@ def step_tokens(model: str) -> int:
 
 def extract_file(text: str, goals: Sequence[Goal]) -> str:
     """The file with these goals' placeholders asking Lean to state them."""
-    lines = render_all(text).split("\n")
+    lines = blank_techniques(render_all(text)).split("\n")
     for g in goals:
         lines[g.line - 1] = g.indent + EXTRACT
     return "\n".join(lines)
@@ -337,7 +337,7 @@ TRY_THIS = re.compile(r"Try this:\s*(?:\[apply\]\s*)?(exact|refine)\s+(.+)", re.
 
 def apply_file(text: str, goal: Goal) -> str:
     """The file with this goal asking Mathlib what unifies with it."""
-    lines = render_all(text).split("\n")
+    lines = blank_techniques(render_all(text)).split("\n")
     lines[goal.line - 1] = goal.indent + APPLY_PROBE
     return "\n".join(lines)
 
@@ -1507,7 +1507,7 @@ class BoardAgent(FrameworkAgent):
 
         async def look(candidate: str, base: Board | None = None) -> Board:
             check = await services.lean.check_file(
-                render_all(candidate), timeout_s=check_timeout_s((base or board).ms))
+                blank_techniques(render_all(candidate)), timeout_s=check_timeout_s((base or board).ms))
             found = read_board(candidate, check.messages, check.accepted)
             found.ms = check.duration_ms
             return found

@@ -1868,12 +1868,18 @@ def test_the_technique_preamble_sits_after_the_header_and_the_models_are_told_ab
     assert len(text) > TIDY_ABOVE_BYTES // 2 and len(below_header(text)) < 200
     result, lean, llm, _ = run(ONE, {"model-a": ["have key : True := by trivial\nexact key"] * 2},
                                lines=("model-a",))
-    # Every check during the search carries the block; the delivered file of
-    # a proof that calls no technique does not (the last check verifies that).
+    # A check carries the block only when the proof calls a technique (measured
+    # on a 4-core pod: 1.5 s a check with it, 0.05 s without), its lines blanked
+    # otherwise so Lean's line numbers still map; the delivered file of a proof
+    # that calls none drops it.
     checks = [src for src in lean.sources if "have key" in src]
-    assert all("divisor_cases" in src for src in checks[:-1]) and "divisor_cases" not in checks[-1]
+    assert checks and not any("divisor_cases" in src for src in checks)
     assert "divisor_cases" not in result.solution
     assert any("`divisor_cases h`" in s for s in llm.systems)
+    from submission.techniques import blank_techniques
+    kept = blank_techniques(text.replace("sorry", "divisor_cases h"))
+    assert "elab_rules" in kept and blank_techniques(text).count("\n") == text.count("\n")
+    assert "elab_rules" not in blank_techniques(text)
     # Lean sees the block; a model sees one comment line in its place. Measured:
     # 4.6 KB of elab code sat in every step and audit prompt of three runs.
     assert not any("elab_rules" in p or "macro_rules" in p for _, p in llm.calls)

@@ -273,6 +273,18 @@ def strip_techniques(text: str) -> str:
     return text[:a] + text[b:]
 
 
+def blank_techniques(text: str) -> str:
+    """The text Lean checks: the technique block replaced by as many empty
+    lines when nothing outside it calls a technique. Measured on a 4-core pod
+    (r1, 2 cpus): a check costs 1.5 s with the block and 0.05 s without, and a
+    run made 574 checks (860 s of its 2275 s in Lean)."""
+    a, b = text.find(PREAMBLE_MARK), text.find(PREAMBLE_END)
+    if a < 0 or b < 0 or uses_techniques(text):
+        return text
+    b += len(PREAMBLE_END)
+    return text[:a] + "\n" * text[a:b].count("\n") + text[b:]
+
+
 def without_techniques(text: str) -> tuple[str, int]:
     """The file with the technique block replaced by one comment line, and how
     many lines went: what a model reads is the proof, not Lean metaprogramming
