@@ -2052,3 +2052,18 @@ def test_environment_scans_stop_when_they_have_had_their_share_of_the_clock():
     scans = [s for s in lean.sources if "apply?" in s or "Library for this goal" in s]
     skipped = [e for e in result.metadata["events"] if e.get("stage") == "probe_skipped"]
     assert len(scans) == 1 and skipped and skipped[0]["kind"] == "scan"
+
+
+def test_a_disjunction_of_subtraction_equations_is_split_and_each_case_solved():
+    # Measured on rmo_2001_2 (v7.87): divisor_cases put the eight-way fact on
+    # the board four times and the models never split it inside the clock.
+    from submission.leaves import leaf_candidates
+    goal = ("p q m : ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\n"
+            "h_factor : (m - p - q) * (m + p + q) = 5 * p * q\n"
+            "hA : m - p - q = 1 ∨ m - p - q = 5 ∨ m - p - q = p ∨ m - p - q = p * q\n"
+            "⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3")
+    blocks = leaf_candidates(goal)
+    assert blocks[0].startswith("rcases hA with hc | hc | hc | hc <;> (have hge_hp := Nat.Prime.two_le hp; "
+                                "have hge_hq := Nat.Prime.two_le hq; have hpos_d : 0 < m - p - q := by")
+    assert "have hsolve : m = p + q + (m - p - q) := by" in blocks[0] and "rw [hc] at hsolve; subst hsolve;" in blocks[0]
+    assert not any("0 < (1 ∨" in b for b in blocks)      # the disjunction is not read as one equation

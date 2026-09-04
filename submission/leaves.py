@@ -153,7 +153,7 @@ def _solved_subtractions(hyps) -> list[tuple[str, str, str]]:
     out = []
     for n, t in hyps:
         m = re.match(r"^([A-Za-z_][\w']*)((?: - [^-=()]+)+) = (.+)$", t)
-        if m:
+        if m and not re.search(r"[∨∧↔→]", t):
             terms = [x.strip() for x in m.group(2).split(" - ") if x.strip()]
             d = m.group(3).strip()
             out.append((n, f"{m.group(1)} = {' + '.join(terms)} + ({d})", d))
@@ -266,6 +266,27 @@ def leaf_candidates(goal_text: str) -> list[str]:
                        f"have hsolve : {eq} := by first | omega | (clear * - {keep}; omega)\n"
                        f"subst hsolve\n{finish}")
             break
+    # A disjunction of such equations (what divisor_cases leaves as a fact):
+    # every case at once, the same block in each. Measured on rmo_2001_2
+    # (v7.87): the eight-way fact was on the board four times and the models
+    # never split it inside the clock.
+    for hn, t in hyps:
+        cases = [c.strip() for c in t.split(" ∨ ")]
+        if len(cases) < 2 or not re.search(r"[∨]", t) or re.search(r"[↔→∀∃]", target):
+            continue
+        heads = [re.match(r"^([A-Za-z_][\w']*)((?: - [^-=()]+)+) = (.+)$", c) for c in cases]
+        if not all(heads) or len({(h.group(1), h.group(2)) for h in heads}) != 1:
+            continue
+        v, sub = heads[0].group(1), heads[0].group(2)
+        terms = [x.strip() for x in sub.split(" - ") if x.strip()]
+        lhs = f"{v}{sub}"
+        keep = " ".join(["hc", "hpos_d"] + [f"hge_{n}" for n in _primes(hyps)])
+        alts = " | ".join(["hc"] * len(cases))
+        out.append(f"rcases {hn} with {alts} <;> ({primes.replace(chr(10), '; ')}"
+                   f"have hpos_d : 0 < {lhs} := by first | omega | positivity | nlinarith; "
+                   f"have hsolve : {v} = {' + '.join(terms)} + ({lhs}) := by first | omega | (clear * - {keep}; omega); "
+                   f"rw [hc] at hsolve; subst hsolve; {finish})")
+        break
     if "-" in goal_text and not re.search(r"[↔→∀∃∣]", target):
         out.append(f"{primes}nat_sub_exact\n{finish}")
     # d ∣ N: one goal per divisor, each finished mechanically.
