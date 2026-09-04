@@ -142,9 +142,10 @@ def _primes(hyps) -> list[str]:
 
 
 def _prime_facts(hyps) -> str:
-    """`2 ≤ p` for every `hp : Nat.Prime p`: what omega and nlinarith need and
-    a printed context never carries."""
-    return "".join(f"have hge_{n} := Nat.Prime.two_le {n}\n" for n in _primes(hyps))
+    """`2 ≤ p` for every `Nat.Prime p` (the `prime_facts` elab, whatever the
+    hypothesis is named): what omega and nlinarith need and a printed context
+    never carries."""
+    return "prime_facts\n" if _primes(hyps) else ""
 
 
 def _solved_subtractions(hyps) -> list[tuple[str, str, str]]:
@@ -162,12 +163,25 @@ def _solved_subtractions(hyps) -> list[tuple[str, str, str]]:
     return out
 
 
-def _finish(target: str) -> str:
-    """The closing chain; a disjunction also tries each disjunct."""
-    if "∨" not in target:
-        return FINISH
-    return (FINISH + " | (left; nlinarith) | (right; left; constructor <;> nlinarith)"
-            " | (right; right; constructor <;> nlinarith) | (right; nlinarith)")
+def _finish(target: str, primes: list[str] = ()) -> str:
+    """The closing chain; a disjunction also tries each disjunct; with two prime
+    variables and numerals in the target, both bounded by the largest numeral
+    and every pair tried (the (p-2)(q-2) = 9 case of rmo_2001_2)."""
+    chain = FINISH
+    if "∨" in target:
+        chain += (" | (left; nlinarith) | (right; left; constructor <;> nlinarith)"
+                  " | (right; right; constructor <;> nlinarith) | (right; nlinarith)")
+    nums = [int(x) for x in re.findall(r"\b\d+\b", target)]
+    if len(primes) == 2 and nums and max(nums) <= CASES_MAX:
+        # Measured (image): with `p * q = 2p + 2q + 5` nlinarith bounds p only
+        # once q = 2 is split off, the product (p - 2)(q - 3) ≥ 0 doing the rest.
+        a, b, n = primes[0], primes[1], max(nums)
+        # `:= (by ...)`: on one line a bare `by` would swallow the tactics after `;`.
+        bound = lambda v, w: (f"have hb_{v} : {v} ≤ {n} := (by rcases Nat.lt_or_ge {w} 3 with h3 | h3 <;> "
+                              f"[(interval_cases {w} <;> nlinarith); nlinarith])")
+        chain += (f" | ({bound(a, b)}; {bound(b, a)}; interval_cases {a} <;> interval_cases {b} <;> "
+                  f"first | omega | (norm_num at *; done) | (simp_all; done))")
+    return chain
 
 
 def _claims_about(target: str, y: str, n: str) -> list[tuple[str, str]]:
@@ -192,7 +206,8 @@ def leaf_candidates(goal_text: str) -> list[str]:
     bounds = _bounds(hyps)
     powers = _powers(hyps)
     primes = _prime_facts(hyps)
-    finish = _finish(target)
+    prime_vars = [t.split()[-1] for n, t in hyps if n in _primes(hyps)]
+    finish = _finish(target, prime_vars)
     # The tightest bounds first; `0 < v` carries nothing a subtraction needs.
     lowers = sorted(((n, v, c) for n, v, kind, c in bounds if kind == "lower" and c >= 2),
                     key=lambda b: -b[2])
@@ -244,10 +259,10 @@ def leaf_candidates(goal_text: str) -> list[str]:
             root = int(round(small ** (1 / int(n)))) + 2
             if root > CASES_MAX:
                 continue
-            out.append(f"rcases Nat.lt_or_ge {x} {t} with hlt | hge\n"
-                       f"· interval_cases {x} <;> first | omega | (bounded_cases {y} {root})\n"
-                       f"· obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le hge\n  subst hk\n"
-                       f"  first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)")
+            out.append(f"rcases Nat.lt_or_ge {x} {t} with hlt | hge <;> "
+                       f"[(interval_cases {x} <;> first | omega | (bounded_cases {y} {root})); "
+                       f"(obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le hge; subst hk; "
+                       f"first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith))]")
             break
     # A variable defined by an equation `w = E`: substitute, make ℕ subtraction
     # exact, then arithmetic. Measured on rmo_2000_2: `hyx : y = x + 2 ⊢ x = 9`.
@@ -261,13 +276,8 @@ def leaf_candidates(goal_text: str) -> list[str]:
     # A variable defined through ℕ subtraction, `m - p - q = D`: solve for it and
     # substitute. Measured on rmo_2001_2 (v7.79): divisor_cases left eight such
     # cases and every model reply on them failed at the truncated subtraction.
-    for hn, eq, d in _solved_subtractions(hyps):
-        if not re.search(r"[↔→∀∃]", target):
-            keep = " ".join([hn, "hpos_d"] + [f"hge_{n}" for n in _primes(hyps)])
-            out.append(f"{primes}have hpos_d : 0 < ({d}) := by first | omega | positivity | nlinarith\n"
-                       f"have hsolve : {eq} := by first | omega | (clear * - {keep}; omega)\n"
-                       f"subst hsolve\n{finish}")
-            break
+    if _solved_subtractions(hyps) and not re.search(r"[↔→∀∃]", target):
+        out.append(f"{primes}solve_sub\n{finish}")
     # A disjunction of such equations (what divisor_cases leaves as a fact):
     # every case at once, the same block in each. Measured on rmo_2001_2
     # (v7.87): the eight-way fact was on the board four times and the models
@@ -286,23 +296,15 @@ def leaf_candidates(goal_text: str) -> list[str]:
         heads = [re.match(r"^([A-Za-z_][\w']*)((?: - [^-=()]+)+) = (.+)$", c) for c in cases]
         if not all(heads) or len({(h.group(1), h.group(2)) for h in heads}) != 1:
             continue
-        v, sub = heads[0].group(1), heads[0].group(2)
-        terms = [x.strip() for x in sub.split(" - ") if x.strip()]
-        lhs = f"{v}{sub}"
-        keep = " ".join(["hc", "hpos_d"] + [f"hge_{n}" for n in _primes(hyps)])
         alts = " | ".join(["hc"] * len(cases))
-        out.append(f"rcases {hn} with {alts} <;> ({primes.replace(chr(10), '; ')}"
-                   f"have hpos_d : 0 < {lhs} := by first | omega | positivity | nlinarith; "
-                   f"have hsolve : {v} = {' + '.join(terms)} + ({lhs}) := by first | omega | (clear * - {keep}; omega); "
-                   f"rw [hc] at hsolve; subst hsolve; {finish})")
+        out.append(f"{primes}rcases {hn} with {alts} <;> (solve_sub; {finish})")
         break
     if "-" in goal_text and not re.search(r"[↔→∀∃∣]", target):
         out.append(f"{primes}nat_sub_exact\n{finish}")
     # d ∣ N: one goal per divisor, each finished mechanically.
     for n, t in hyps:
         if re.match(r"^.+ ∣ .+$", t) and re.search(r"\d", t):
-            out.append(f"divisor_cases {n} <;> ({primes.replace(chr(10), '; ')}{finish})" if primes
-                       else f"divisor_cases {n} <;> {finish}")
+            out.append(f"{primes}divisor_cases {n} <;> (first | (solve_sub; {finish}) | ({finish}))")
     # A bound below on a variable and ℕ subtraction or a polynomial: substitute.
     if lowers and ("-" in goal_text or "^" in goal_text):
         for hn, _, _ in lowers[:2]:
@@ -323,5 +325,8 @@ def leaf_candidates(goal_text: str) -> list[str]:
         if c not in seen:
             seen.add(c)
             uniq.append(c)
-    return [f"{BUDGET}\n{c}" if not c.startswith(("obtain", "subst", "by_contra", "have", "rcases")) else c
+    # One line each, the whole block under the heartbeat cap: `set_option ... in`
+    # governs only the tactic that follows it, and a `first` alternative is a
+    # tactic sequence, so the closing chain is always the last element.
+    return [f"{BUDGET} ({'; '.join(l.strip() for l in c.split(chr(10)) if l.strip())})"
             for c in uniq[:LEAF_CAP]]

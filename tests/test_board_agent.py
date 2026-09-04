@@ -1787,11 +1787,11 @@ def test_leaf_candidates_are_built_from_the_goal_s_shape_and_tried_before_any_mo
     crux = ("x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n"
             "hxge : x ≥ 9\n⊢ y = x + 2")
     got = leaf_candidates(crux)
-    assert got[0].endswith("pow_squeeze y 3 (x + 2) with hxge") and any("Nat.exists_eq_add_of_le hxge" in c for c in got)
+    assert got[0].endswith("(pow_squeeze y 3 (x + 2) with hxge)") and any("Nat.exists_eq_add_of_le hxge" in c for c in got)
     assert not any(c.endswith("with hx") or c.endswith("with hy") for c in got)
     dvd = "m p q : ℕ\nhp : Nat.Prime p\nhA_dvd : m - (p + q) ∣ 5 * p * q\n⊢ m - (p + q) = 1 ∨ m - (p + q) = 5"
-    assert any("divisor_cases hA_dvd <;> (have hge_hp := Nat.Prime.two_le hp; first | omega" in c
-               and c.endswith("(right; nlinarith))") for c in leaf_candidates(dvd))
+    assert any(c.startswith("set_option maxHeartbeats 60000 in (prime_facts; divisor_cases hA_dvd <;> (first | (solve_sub; first | omega")
+               for c in leaf_candidates(dvd))
     assert leaf_candidates("⊢ True") == []
     small = "x : ℕ\nhb : x ≤ 3\nh : x ^ 2 = 4\n⊢ x = 2"
     assert any("interval_cases x <;>" in c for c in leaf_candidates(small))
@@ -1993,9 +1993,9 @@ def test_powers_bounded_in_the_context_give_a_pow_bounds_leaf():
             "h_up : x ^ 3 + 8 * x ^ 2 - 6 * x + 8 ≤ (x + 3) ^ 3\n"
             "h_low : (x + 2) ^ 3 ≤ x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ y = x + 2 ∨ y = x + 3")
     blocks = [c.split("\n")[-1] for c in leaf_candidates(goal)]
-    assert blocks[0] == "pow_bounds y 3" and not any("pow_bounds x" in b for b in blocks)
+    assert blocks[0].endswith("(pow_bounds y 3)") and not any("pow_bounds x" in b for b in blocks)
     direct = "a b : ℕ\nh1 : (b + 1) ^ 2 ≤ a ^ 2\nh2 : a ^ 2 < (b + 3) ^ 2\n⊢ b + 1 ≤ a ∧ a ≤ b + 2"
-    assert [c.split("\n")[-1] for c in leaf_candidates(direct)] == ["pow_bounds a 2"]
+    assert [c for c in leaf_candidates(direct)] == ["set_option maxHeartbeats 60000 in (pow_bounds a 2)"]
     assert not any("pow_bounds" in c for c in leaf_candidates("n : ℕ\n⊢ 7 ∣ 2 ^ n - 1 ↔ 3 ∣ n"))
 
 
@@ -2009,10 +2009,10 @@ def test_an_upper_bound_on_the_variable_under_a_power_gets_the_contradiction_squ
     assert _shifts("x ^ 2 + x + 5", 2) == [] and _shifts("11", 3) == []
     ctx = "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n"
     blocks = leaf_candidates(ctx + "⊢ x ≤ 9")
-    assert blocks[0] == "by_contra hc\npush_neg at hc\npow_squeeze y 3 (x + 2) with hc"
+    assert blocks[0].endswith("(by_contra hc; push_neg at hc; pow_squeeze y 3 (x + 2) with hc)")
     # `hyx : y = x + 2 ⊢ x = 9`: substitute, make the ℕ subtraction exact, arithmetic.
     blocks = leaf_candidates(ctx + "hyx : y = x + 2\n⊢ x = 9")
-    assert blocks[0].startswith("subst hyx\nnat_sub_exact\nfirst | omega")
+    assert blocks[0].startswith("set_option maxHeartbeats 60000 in (subst hyx; nat_sub_exact; first | omega")
     # Under the contradiction hypothesis the squeeze uses it as the lower bound.
     blocks = leaf_candidates("x y : ℕ\nhc : 9 < x\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ False")
     assert "pow_squeeze y 3 (x + 2) with hc" in blocks[0]
@@ -2031,8 +2031,8 @@ def test_a_claim_that_holds_only_past_a_threshold_is_split_there():
     ctx = "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n"
     for target in ("⊢ (x + 2) ^ 3 ≤ y ^ 3", "⊢ y ≤ x + 2", "⊢ x + 2 ≤ y"):
         block = leaf_candidates(ctx + target)[0]
-        assert block.startswith("rcases Nat.lt_or_ge x 10 with hlt | hge\n· interval_cases x <;> "
-                                "first | omega | (bounded_cases y 13)\n· obtain")
+        assert block.startswith("set_option maxHeartbeats 60000 in (rcases Nat.lt_or_ge x 10 with hlt | hge <;> "
+                                "[(interval_cases x <;> first | omega | (bounded_cases y 13)); (obtain")
     assert not any("rcases Nat.lt_or_ge" in c for c in leaf_candidates(ctx + "⊢ y ^ 3 < (x + 3) ^ 3"))
 
 
@@ -2069,9 +2069,8 @@ def test_a_disjunction_of_subtraction_equations_is_split_and_each_case_solved():
             "hA : m - p - q = 1 ∨ m - p - q = 5 ∨ m - p - q = p ∨ m - p - q = p * q\n"
             "⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3")
     blocks = leaf_candidates(goal)
-    assert blocks[0].startswith("rcases hA with hc | hc | hc | hc <;> (have hge_hp := Nat.Prime.two_le hp; "
-                                "have hge_hq := Nat.Prime.two_le hq; have hpos_d : 0 < m - p - q := by")
-    assert "have hsolve : m = p + q + (m - p - q) := by" in blocks[0] and "rw [hc] at hsolve; subst hsolve;" in blocks[0]
+    assert blocks[0].startswith("set_option maxHeartbeats 60000 in (prime_facts; rcases hA with hc | hc | hc | hc <;> (solve_sub; first | omega")
+    assert "interval_cases p <;> interval_cases q" in blocks[0]      # (p-2)(q-2) = 9 needs the pair search
     assert not any("0 < (1 ∨" in b for b in blocks)      # the disjunction is not read as one equation
 
 
@@ -2082,5 +2081,5 @@ def test_a_disjunction_of_values_is_substituted_case_by_case():
     goal = ("a b : ℤ\nh_eq : (3 * a - 2018) * (3 * b - 2018) = 2018 ^ 2\n"
             "ha : a = 673 ∨ a = 674 ∨ a = 1009\n⊢ (a, b) ∈ {(673, 1358114), (674, 340033), (1009, 2018)}")
     blocks = leaf_candidates(goal)
-    assert blocks[0].startswith("rcases ha with rfl | rfl | rfl <;> (first | omega")
+    assert blocks[0].startswith("set_option maxHeartbeats 60000 in (rcases ha with rfl | rfl | rfl <;> (first | omega")
     assert "norm_num [Set.mem_insert_iff" in blocks[0]

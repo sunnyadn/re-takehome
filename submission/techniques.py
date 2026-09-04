@@ -102,13 +102,75 @@ elab_rules : tactic
     let xs ← Lean.PrettyPrinter.delab x
     evalTactic (← `(tactic| divisor_cases $h for $xs : $l = $r))
   else
+    -- A divisor that is not a variable (`m - p - q`) is named first, so that
+    -- each case keeps `hcase : m - p - q = <divisor>` (measured: `rw [← hd] at *`
+    -- rewrote hd into a triviality and left every other hypothesis untouched).
+    unless x.isFVar do
+      let xs ← Lean.PrettyPrinter.delab x
+      let dc := mkIdent (Name.mkSimple "dcase")
+      let hc := mkIdent (Name.mkSimple "hcase")
+      evalTactic (← `(tactic| generalize $hc : $xs = $dc at $h:ident))
     evalTactic (← `(tactic| first | divisor_split $h : $r | divisor_cases $h : $l = $r))
 
-end DivisorCases""",
+end DivisorCases
+
+-- `prime_facts`: `2 ≤ p` for every `Nat.Prime p` in the context, however the hypothesis is named.
+-- `solve_sub`: a hypothesis `m - t₁ - ... = D` over ℕ (either way round, however named): `m` is
+-- replaced by `t₁ + ... + d` and `d = D` substituted, so the truncated subtraction is gone.
+section LeafMeta
+open Lean Elab Tactic Meta
+
+elab "prime_facts" : tactic => withMainContext do
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail then continue
+    let ty ← instantiateMVars decl.type
+    if ty.isAppOfArity ``Nat.Prime 1 then
+      let val ← mkAppM ``Nat.Prime.two_le #[decl.toExpr]
+      let goal ← getMainGoal
+      let g ← goal.assert (Name.mkSimple s!"hge_{decl.userName.eraseMacroScopes}") (← inferType val) val
+      let (_, g) ← g.intro1P
+      replaceMainGoal [g]
+
+elab "solve_sub" : tactic => withMainContext do
+  let some (m, terms, d) ← (do
+      for decl in ← getLCtx do
+        if decl.isImplementationDetail then continue
+        let ty ← instantiateMVars decl.type
+        if ty.isAppOfArity ``Eq 3 && (ty.getArg! 0).isConstOf ``Nat then
+          for (side, other) in [(ty.getArg! 1, ty.getArg! 2), (ty.getArg! 2, ty.getArg! 1)] do
+            let mut lhs := side
+            let mut ts : Array Expr := #[]
+            while lhs.isAppOfArity ``HSub.hSub 6 do
+              ts := ts.push (lhs.getArg! 5)
+              lhs := lhs.getArg! 4
+            if lhs.isFVar && !ts.isEmpty then
+              return some (lhs, ts.reverse, other)
+      return none)
+    | throwError "solve_sub: no hypothesis `m - ... = D`"
+  let ms ← PrettyPrinter.delab m
+  let ds ← PrettyPrinter.delab d
+  let tss ← terms.mapM fun e => (liftMetaM (PrettyPrinter.delab e) : TacticM Term)
+  let rest := tss.extract 1 tss.size
+  let sum ← rest.foldlM (fun acc t => `($acc + $t)) tss[0]!
+  let sub ← tss.foldlM (fun acc t => `($acc - $t)) ms
+  let sumd ← `($sum + d_sub)
+  let subd ← tss.foldlM (fun acc t => `($acc - $t)) sumd
+  evalTactic (← `(tactic| (
+    have hpos_sub : 0 < $sub := by first | omega | positivity | nlinarith
+    obtain ⟨d_sub, hd_sub⟩ : ∃ d, $ms = $sum + d := ⟨$sub, by omega⟩
+    subst hd_sub
+    have hcancel : $subd = d_sub := by omega
+    simp only [hcancel] at *
+    have hd_val : d_sub = $ds := by omega
+    subst hd_val)))
+end LeafMeta""",
                  "`divisor_cases h` (h : d ∣ N, over ℕ or ℤ, N a numeral or a product of numerals and "
                  "prime variables with Nat.Prime in context, such as 2018 ^ 2 or 5 * p * q): one goal per "
                  "divisor with d replaced by it (over ℤ, `hx : d = m` or `hx : d = -m` in each case). "
-                 "For `h : a * b = N` first `have hd : a ∣ N := Dvd.intro _ h`. Never `decide` a divisor set.")
+                 "For `h : a * b = N` first `have hd : a ∣ N := Dvd.intro _ h`; when d is an expression each "
+                 "case also has `hcase : d = <divisor>`. Never `decide` a divisor set. `prime_facts` adds "
+                 "`2 ≤ p` for every `Nat.Prime p` in context; `solve_sub` takes a hypothesis `m - a - b = D` "
+                 "(any name, either way round), replaces m by a + b + d and substitutes d = D.")
 
 # Measured on rmo_2000_2: the route reached `hxge : x ≥ 9 ⊢ y = x + 2` with
 # `h : y ^ 3 = ...` by 306 s and no model closed it in three runs.
