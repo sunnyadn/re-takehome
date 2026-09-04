@@ -2259,6 +2259,12 @@ class BoardAgent(FrameworkAgent):
                           author: str) -> tuple[Board | None, str]:
             """A step, then its prefixes, then `exact?` in place of a bad proof."""
 
+            opening = block.strip().split("\n")[0].strip()
+            if opening and opening in undone.get(goal.decl, []) and not opening.startswith("have "):
+                # Measured on rmo_2000_6: a cell reset nine times, the model
+                # re-writing the same opening step each time.
+                return None, (f"`{opening[:80]}` was tried here and taken back after the goals "
+                              "under it went nowhere; open with a different step")
             nxt, why = await judge(base, goal, block)
             if nxt is None and why not in (BUDGET_RETRY, TIMED_OUT):
                 # The first error's line says where to cut; one check instead of
@@ -2391,6 +2397,7 @@ class BoardAgent(FrameworkAgent):
                 probe_spent["leaf"] += time.monotonic() - t0
 
         conjectured: dict[tuple[str, str], str] = {}
+        undone: dict[str, list[str]] = {}
 
         async def generalise_sweep(goal: Goal) -> bool:
             """A sum identity in one variable that its own induction did not
@@ -2814,6 +2821,8 @@ class BoardAgent(FrameworkAgent):
                                "tries": tries.get(worst.key, 0)})
                 for table in (tries, said, plans):
                     table.pop(worst.key, None)
+                first_line = board.text.split("\n")[held.start].strip()
+                undone.setdefault(worst.decl, []).append(first_line)
                 await commit(await look(reset_cell(board.text, held)), progress=False)
                 prune()
                 return
