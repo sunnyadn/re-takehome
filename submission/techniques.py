@@ -301,10 +301,10 @@ macro_rules
       have hlt : $n % $k < $k := Nat.mod_lt _ (by norm_num)
       generalize hr : $n % $k = r at hpow hlt
       interval_cases r <;> norm_num at hpow <;> (try simp only [Nat.ModEq] at *) <;>
-        first | omega | (generalize $a ^ $n = x at *; omega)))""",
+        first | omega | (generalize $a ^ $n = x at *; omega) | (generalize $a ^ $n = x at *; split_ifs at * <;> omega)))""",
              "`pow_cycle a m k n` (a, m, k numerals with a ^ k % m = 1, n : ℕ a variable): a ^ n % m "
              "has period k in n, so it splits n % k into its k values and finishes each by omega; closes "
-             "`a ^ n % m = r`, `m ∣ a ^ n - 1`, `¬ m ∣ a ^ n + 1`, `a ^ n ≡ r [MOD m]` and their converses.")
+             "`a ^ n % m = r`, `m ∣ a ^ n - 1`, `¬ m ∣ a ^ n + 1`, `a ^ n ≡ r [MOD m]`, an if-then-else on n % k, and their converses.")
 
 TECHNIQUES: tuple[tuple[str, str], ...] = (DIVISOR_CASES, LEAF_TACTICS, POW_CYCLE)
 
