@@ -1785,11 +1785,21 @@ class BoardAgent(FrameworkAgent):
                     was = next(carried)
                     goals.append(Goal(g.line, g.indent, g.decl, was.text, was.stmt, g.cell))
                 kept = []
+                holes = [g.line for g in goals if not new[0] <= g.line <= new[1]]
                 for m in base.messages:
                     at = message_line(m)
                     if at is None or old[0] <= at <= old[1]:
                         continue
-                    kept.append(shift_message(m, delta) if at > old[1] else m)
+                    m = shift_message(m, delta) if at > old[1] else m
+                    span = message_span(m)
+                    if m in classify([m])[0] and span and not any(span[0] <= h <= span[1] for h in holes):
+                        # A goal report from before the edit that no placeholder
+                        # outside the checked unit sits under is about the goal
+                        # just closed (measured: `exact Nat.sum_range_choose_halfway k`
+                        # closed the theorem and its old header report made
+                        # `unreachable` refuse the step).
+                        continue
+                    kept.append(m)
                 found = Board(candidate, goals, kept + messages, accepted, base.bid, check.duration_ms)
             for g in found.goals:
                 if g.stmt:

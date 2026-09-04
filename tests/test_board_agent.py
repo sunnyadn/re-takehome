@@ -102,7 +102,7 @@ class BoardLean:
                 # block: the nearest line above at a shallower indent.
                 head_at = next((j for j in range(i - 2, -1, -1) if rows[j].strip() and
                                 len(rows[j]) - len(rows[j].lstrip()) < depth), i - 2)
-                messages.append({"severity": "error", "pos": {"line": head_at},
+                messages.append({"severity": "error", "pos": {"line": head_at, "column": 2},
                                  "endPos": {"line": i - 1},
                                  "data": f"unsolved goals\n{hyps}⊢ {target}"})
                 if body == CELL_PROBE and self.states_goals:
@@ -2447,3 +2447,20 @@ def test_a_sum_identity_its_own_induction_misses_is_generalised_tabulated_fitted
     # The rewritten goal is put to Mathlib at once (Nat.sum_range_choose_halfway states it).
     assert any("apply?" in s and "rw [h_gen]" in s for s in lean.sources)
     assert result.metadata["solved_by"] == "board_loop"
+
+
+def test_closing_the_last_goal_of_a_theorem_in_its_own_cell_is_not_read_as_unreachable():
+    # Measured on putnam_2020_a2 (frame105): `exact Nat.sum_range_choose_halfway k`
+    # closed the theorem's last goal in a fresh cell, but the theorem-level
+    # `unsolved goals` report from before the edit was carried over and
+    # `unreachable` refused the step; the run then spent 40 minutes re-proving it.
+    # The first reply answers the shared-lemma question; `exact h` closes demo's
+    # trailing goal (its own cell) and is wasted when demo_b is asked instead.
+    lean, llm = CellLean(), ScriptLLM({
+        "model-a": ["no", "have h : True := by trivial"] + ["exact h"] * 3 +
+                   ["have key : True := by trivial\nexact key"] * 3})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0, audit=False))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=TWO),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["solved_by"] == "board_loop"
+    assert not any("nothing can get back to" in e.get("why", "") for e in result.metadata["events"])
