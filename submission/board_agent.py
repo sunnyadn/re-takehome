@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import subprocess
 import time
@@ -17,6 +18,8 @@ from re_harness import AgentResult, LLMCallError, Problem, Services
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
+from submission.cells import (CELL_PROBE, Cells, dissolve, enclosing, marker, modular,
+                              remap, render_check, strip_markers)
 from submission.leaves import leaf_candidates
 from submission.techniques import (PREAMBLE_MARK, blank_techniques, strip_techniques,
                                    uses_techniques, without_techniques)
@@ -270,6 +273,8 @@ class Goal:
     indent: str
     decl: str
     text: str
+    stmt: str = field(default="", compare=False)   # what extract_goal printed here
+    cell: int = field(default=0, compare=False)    # the marked span it sits in
 
     @property
     def key(self) -> tuple[str, str]:
@@ -312,6 +317,33 @@ class Board:
 PROBE = "focus skip"
 
 
+def is_root_goal(text: str, goal: Goal) -> bool:
+    """The placeholder that is a proof's whole body: its cell is the proof."""
+
+    span = proof_span(text, goal.decl) if goal.decl else None
+    if not span:
+        return False
+    head = DECL_HEAD.match(text[span[0]:span[1]])
+    if not head:
+        return False
+    first = line_of(text, span[0]) + head.group(1).count("\n") + 1
+    return goal.line == first
+
+
+def shift_message(message: dict[str, Any], delta: int) -> dict[str, Any]:
+    out = dict(message)
+    for key in ("pos", "endPos"):
+        pos = out.get(key)
+        if isinstance(pos, dict) and isinstance(pos.get("line"), int):
+            out[key] = dict(pos, line=pos["line"] + delta)
+    return out
+
+
+def all_cell_spans(text: str):
+    from submission.cells import all_spans
+    return all_spans(text)
+
+
 def render_all(text: str) -> str:
     """Every placeholder as the probe, so one check prints every goal and
     names every placeholder with no goal behind it."""
@@ -338,12 +370,15 @@ def read_board(text: str, messages: Sequence[dict[str, Any]], accepted: bool) ->
     """Each placeholder takes the tightest `unsolved goals` span holding it."""
 
     spans = [(m, message_span(m)) for m in classify(messages)[0]]
+    stated = statements(messages)
     goals = []
     for match in placeholders(text):
         line = line_of(text, match.start())
         fits = [(s[1] - s[0], goal_text(m)) for m, s in spans if s and s[0] <= line <= s[1]]
+        held = enclosing(text, line)
         goals.append(Goal(line, match.group(1), owner(text, line),
-                          min(fits, key=lambda f: f[0])[1] if fits else ""))
+                          min(fits, key=lambda f: f[0])[1] if fits else "",
+                          stated.get(line, ""), held.id if held else 0))
     return Board(text, goals, list(messages), accepted)
 
 
@@ -1277,13 +1312,17 @@ def unwrap(block: str, text: str, goal: Goal) -> str:
     return "\n".join(out)
 
 
-def put(text: str, goal: Goal, block: str, trailing: bool = True) -> tuple[str, tuple[int, int]]:
-    """The block where the goal's placeholder is, and the lines it now covers."""
+def put(text: str, goal: Goal, block: str, trailing: bool = True,
+        cell_id: int | None = None) -> tuple[str, tuple[int, int]]:
+    """The block where the goal's placeholder is (under a cell marker when it
+    gets one), and the lines it now covers."""
 
     lines = text.split("\n")
     body = reindent(normalise_steps(fold_heads(unwrap(block, text, goal))), goal.indent)
     if trailing:
         body = f"{body}\n{goal.indent}sorry"
+    if cell_id is not None:
+        body = f"{marker(goal.indent, cell_id)}\n{body}"
     lines[goal.line - 1] = body
     return "\n".join(lines), (goal.line, goal.line + body.count("\n"))
 
@@ -1307,7 +1346,7 @@ def view(source: str, decl: str) -> tuple[str, int]:
         out.append((span, f"{head.group(1)}\n  -- proved, {lines} lines elided\n\n"))
     for (start, end), replacement in sorted(out, reverse=True):
         source = source[:start] + replacement + source[end:]
-    source, _ = without_techniques(source)
+    source, _ = without_techniques(strip_markers(source))
     at = next((i for i, l in enumerate(source.split("\n"), start=1) if l.strip() == "skip"), 0)
     return source, at
 
@@ -1587,7 +1626,7 @@ class BoardAgent(FrameworkAgent):
             # Every event, so a run's accounting (who wrote, who audited, what
             # closed without a model) can be read off result.json. A 500-turn
             # run is about 150 KB; the earlier last-60 cut made counts tails.
-            return AgentResult(source, {
+            return AgentResult(strip_markers(source), {
                 "strategy": "board",
                 "solved_by": how,
                 "accepted_by_repl": accepted,
@@ -1598,6 +1637,16 @@ class BoardAgent(FrameworkAgent):
             })
 
         async def deliver(text: str, how: str) -> AgentResult | None:
+            """The finished file as one declaration per cell; the one-declaration
+            form only if that fails to compile."""
+            shaped = modular(text, cells) if "-- cell " in text else strip_markers(text)
+            delivered = await deliver_form(shaped, how)
+            if delivered is None and shaped != strip_markers(text):
+                events.append({"stage": "deliver", "form": "inline"})
+                delivered = await deliver_form(strip_markers(text), how)
+            return delivered
+
+        async def deliver_form(text: str, how: str) -> AgentResult | None:
             state = await self._finish(State(text=text, accepted=True), services, time_left)
             final = state.text
             if not uses_techniques(final):
@@ -1639,12 +1688,90 @@ class BoardAgent(FrameworkAgent):
                 branches.remove(worst)
                 events.append({"stage": "prune", "bid": worst.bid, "goals": len(worst.goals)})
 
-        async def look(candidate: str, base: Board | None = None) -> Board:
+        cells = Cells()
+        known_stmts: dict[tuple[str, str], str] = {}
+
+        def base_region(base: Board, focus: int | str, edited: Goal | None) -> tuple[int, int] | None:
+            """The lines of `focus` in the base text: a cell's span, a proof's
+            span, or the one placeholder a new cell replaced."""
+            if isinstance(focus, int):
+                held = next((sp for sp in all_cell_spans(base.text) if sp.id == focus), None)
+                if held:
+                    return held.start, held.end
+                return (edited.line, edited.line) if edited else None
+            span = proof_span(base.text, focus)
+            return (line_of(base.text, span[0]), line_of(base.text, max(span[1] - 1, span[0]))) if span else None
+
+        dissolved = 0
+
+        async def look(candidate: str, base: Board | None = None,
+                       focus: int | str | None = None, edited: Goal | None = None) -> Board:
+            """The board after one Lean check: the whole file as cells, or, with
+            a focus, that one cell (or proof) checked and the rest inherited."""
+            nonlocal dissolved
+
+            old = base_region(base, focus, edited) if base is not None and focus is not None else None
+            if focus is not None and old is None:
+                focus = None
+            rendered = render_check(candidate, cells, focus)
             check = await services.lean.check_file(
-                blank_techniques(render_all(candidate)), timeout_s=check_timeout_s((base or board).ms))
-            found = read_board(candidate, check.messages, check.accepted)
+                blank_techniques(rendered.text), timeout_s=check_timeout_s((base or board).ms))
+            messages = remap(check.messages, rendered.lines)
+            errors = [m for m in messages if isinstance(m, dict) and m.get("severity") == "error"]
+            if focus is None:
+                # An error on a marker line is the cell's own header or its link
+                # failing, not the proof: that cell goes back inline.
+                at = {message_line(m) for m in errors}
+                broken = [sp for sp in all_cell_spans(candidate) if sp.start in at]
+                if broken and dissolved < 8:
+                    dissolved += len(broken)
+                    text = candidate
+                    for sp in broken:
+                        events.append({"stage": "inline", "cell": sp.id, "why": "link"})
+                        text = dissolve(text, sp.id)
+                    return await look(text, base)
+            accepted = not check.timed_out and not errors and not placeholders(candidate)
+            found = read_board(candidate, messages, accepted)
             found.ms = check.duration_ms
+            if rendered.region is not None and base is not None and old is not None:
+                new = rendered.region
+                inside_old = [g for g in base.goals if old[0] <= g.line <= old[1]]
+                outside_old = [g for g in base.goals if g not in inside_old]
+                outside_new = [g for g in found.goals if not new[0] <= g.line <= new[1]]
+                if len(outside_old) != len(outside_new):
+                    return await look(candidate, base)
+                delta = (new[1] - new[0]) - (old[1] - old[0])
+                goals = []
+                carried = iter(outside_old)
+                for g in found.goals:
+                    if new[0] <= g.line <= new[1]:
+                        goals.append(g)
+                        continue
+                    was = next(carried)
+                    goals.append(Goal(g.line, g.indent, g.decl, was.text, was.stmt, g.cell))
+                kept = []
+                for m in base.messages:
+                    at = message_line(m)
+                    if at is None or old[0] <= at <= old[1]:
+                        continue
+                    kept.append(shift_message(m, delta) if at > old[1] else m)
+                found = Board(candidate, goals, kept + messages, accepted, base.bid, check.duration_ms)
+            for g in found.goals:
+                if g.stmt:
+                    known_stmts[g.key] = g.stmt
+            found.goals = [g if g.stmt or not known_stmts.get(g.key) else
+                           Goal(g.line, g.indent, g.decl, g.text, known_stmts[g.key], g.cell)
+                           for g in found.goals]
             return found
+
+        async def probe(text: str, line: int, timeout_s: int) -> tuple[list[dict[str, Any]], int]:
+            """One check of the file with a probe line in it, focused on the cell
+            or proof that holds the line; messages in file coordinates, and ms."""
+            held = enclosing(text, line)
+            focus: int | str | None = held.id if held else (owner(text, line) or None)
+            rendered = render_check(text, cells, focus)
+            check = await services.lean.check_file(blank_techniques(rendered.text), timeout_s=timeout_s)
+            return remap(check.messages, rendered.lines), check.duration_ms
 
         async def commit(candidate: Board, progress: bool = True) -> None:
             """Make a board current, after its own housekeeping. Every commit
@@ -1703,6 +1830,7 @@ class BoardAgent(FrameworkAgent):
             return candidate
 
         failed_at = 0
+        last_span = (0, 0)
         known_names: dict[str, str] = {}
         # The environment's answer to a goal's vocabulary, once per token set.
         shelf: dict[tuple[str, ...], str] = {}
@@ -1765,15 +1893,31 @@ class BoardAgent(FrameworkAgent):
             """`failed_at` keeps the block-relative line of the first error, for
             the prefix cut."""
 
-            nonlocal failed_at
-            candidate, span = put(base.text, goal, block)
-            nxt = await look(candidate, base)
+            nonlocal failed_at, last_span
+            cell_id = cells.new(goal.stmt) if goal.stmt and not is_root_goal(base.text, goal) else None
+            focus: int | str = cell_id if cell_id is not None else (goal.cell or goal.decl)
+
+            async def placed(trailing: bool) -> tuple[str, tuple[int, int], Board]:
+                nonlocal cell_id, focus
+                candidate, span = put(base.text, goal, block, trailing, cell_id)
+                nxt = await look(candidate, base, focus, goal)
+                if cell_id is not None and any(message_line(m) == span[0] for m in classify(nxt.messages)[3]):
+                    # The statement Lean printed does not elaborate on its own
+                    # (measured: a set literal loses its `: Set _`); the block
+                    # stays inside what encloses it.
+                    events.append({"stage": "inline", "cell": cell_id, "decl": goal.decl})
+                    cell_id, focus = None, goal.cell or goal.decl
+                    candidate, span = put(base.text, goal, block, trailing)
+                    nxt = await look(candidate, base, focus, goal)
+                return candidate, span, nxt
+
+            candidate, span, nxt = await placed(True)
             _, surplus, expensive, failures = classify(nxt.messages)
             if not failures and {message_line(m) for m in surplus if in_span(m, span)} == {span[1]}:
                 # Only the trailing placeholder has no goal: the step closed it.
-                candidate, span = put(base.text, goal, block, trailing=False)
-                nxt = await look(candidate, base)
+                candidate, span, nxt = await placed(False)
                 _, surplus, expensive, failures = classify(nxt.messages)
+            last_span = span
             lines = [l for l in (message_line(m) for m in failures) if l and span[0] <= l <= span[1]]
             failed_at = (min(lines) - span[0]) if lines else 0
             if any("TIMEOUT" in str(m.get("data")) for m in failures):
@@ -1901,16 +2045,18 @@ class BoardAgent(FrameworkAgent):
                 return ""
             goals = [sub for sub in subjects if "goal" in sub]
             haves = [sub for sub in subjects if "at" in sub]
-            if goals:
-                said_ = statements((await services.lean.check_file(
-                    extract_file(nxt.text, [sub["goal"] for sub in goals]),
-                    timeout_s=check_timeout_s(nxt.ms))).messages)
-                for sub in goals:
+            for sub in goals:
+                sub["stmt"] = sub["goal"].stmt
+            unstated = [sub for sub in goals if not sub["stmt"]]
+            if unstated:
+                said_ = statements((await probe(
+                    extract_file(nxt.text, [sub["goal"] for sub in unstated]),
+                    unstated[0]["goal"].line, check_timeout_s(nxt.ms)))[0])
+                for sub in unstated:
                     sub["stmt"] = said_.get(sub["goal"].line, "")
             if haves:
                 text, where = have_extract_file(lines, [sub["at"] for sub in haves])
-                said_ = statements((await services.lean.check_file(
-                    text, timeout_s=check_timeout_s(nxt.ms))).messages)
+                said_ = statements((await probe(text, where.get(haves[0]["at"], 1), check_timeout_s(nxt.ms)))[0])
                 for sub in haves:
                     sub["stmt"] = said_.get(where.get(sub["at"], -1), "")
             # Definitions only: a hoisted lemma's proof would be paid again.
@@ -2060,8 +2206,12 @@ class BoardAgent(FrameworkAgent):
                            "ms": int((time.monotonic() - t0) * 1000)})
             if nxt is None:
                 return False
-            tactic = fired_closer(nxt.messages, put(base.text, goal, block)[1], cocktail)
-            flat = await look(put(base.text, goal, tactic, trailing=False)[0]) if tactic else None
+            tactic = fired_closer(nxt.messages, last_span, cocktail)
+            flat = None
+            if tactic:
+                cell_id = cells.new(goal.stmt) if goal.stmt and not is_root_goal(base.text, goal) else None
+                flat = await look(put(base.text, goal, tactic, trailing=False, cell_id=cell_id)[0],
+                                  base, cell_id if cell_id is not None else (goal.cell or goal.decl), goal)
             if flat is not None and flat.find(goal.key) is None and not any(
                     classify(flat.messages)[2:]):
                 nxt = flat
@@ -2143,10 +2293,9 @@ class BoardAgent(FrameworkAgent):
             if not affordable("scan"):
                 return False
             # The file's own check time plus the heartbeat-capped search.
-            check = await services.lean.check_file(apply_file(board.text, goal),
-                                                   timeout_s=check_timeout_s(board.ms) + 30)
-            probe_spent["scan"] += check.duration_ms / 1000
-            found = read_suggestions(check.messages, goal.line)
+            answered, took = await probe(apply_file(board.text, goal), goal.line, check_timeout_s(board.ms) + 30)
+            probe_spent["scan"] += took / 1000
+            found = read_suggestions(answered, goal.line)
             accepted = False
             for how, term in found:
                 if how != "exact":

@@ -5,6 +5,7 @@ import time
 from re_harness import Problem
 from re_harness.lean import LeanCheck
 from submission.agent import COCKTAIL, Config
+from submission.cells import CELL_PROBE
 from submission.board_agent import (
     PROBE,
     Board, BoardAgent, Goal, interpret, read_board, render_all,
@@ -21,6 +22,8 @@ class BoardLean:
     """Every `skip` reports its own goal, whose hypotheses are the `have`s above
     it in the same declaration. `exact key` closes when `key` is in scope."""
 
+    states_goals = False   # a CellLean answers the probe's extract_goal too
+
     def __init__(self):
         self.sources: list[str] = []
 
@@ -34,11 +37,15 @@ class BoardLean:
                                      "data": f"{n} is not a name. Nearest that exist:\n  "
                                              f"Nat.real_{n.split('.')[-1]} : ∀ n, True"}
                                     for n in asked], False, False, 1)
-        messages, decl, haves = [], "", []
+        messages, decl, haves, target_of_decl = [], "", [], ""
         for i, line in enumerate(source.split("\n"), start=1):
             head = HEAD.match(line)
             if head:
-                decl, haves = head.group(1), []
+                decl, haves, target_of_decl = head.group(1), [], ""
+                if decl.startswith("vm_cell_"):
+                    # A cell's header carries the context it was stated with.
+                    haves = re.findall(r"\((\w+) : P\)", line)
+                    target_of_decl = re.match(r"\s*theorem \w+(?: \(.*\))? : (.+?) := by\s*$", line).group(1)
                 continue
             body = line.strip()
             if body.startswith("have "):
@@ -62,7 +69,7 @@ class BoardLean:
                 messages.append({"severity": "error", "pos": {"line": i - 1},
                                  "endPos": {"line": i - 1},
                                  "data": "linarith failed to find a contradiction"})
-            if body in ("skip", PROBE):
+            if body in ("skip", PROBE, CELL_PROBE):
                 # An `exact` of a name in scope closes the block it is in: the
                 # placeholders after it in that block have no goal (real Lean:
                 # `skip` is silent there, the probe reports it).
@@ -79,7 +86,7 @@ class BoardLean:
                         closed = True
                         break
                 if closed:
-                    if body == PROBE:
+                    if body in (PROBE, CELL_PROBE):
                         messages.append({"severity": "error", "pos": {"line": i - 1},
                                          "endPos": {"line": i - 1},
                                          "data": "No goals to be solved"})
@@ -89,7 +96,8 @@ class BoardLean:
                 target = (above.split(":", 1)[1].split(":=")[0].strip()
                           if above.startswith("have ") and above.endswith(":= by")
                           else "False" if above == "exfalso"
-                          else f"P {above.split()[1]}" if above.startswith("use ") else decl)
+                          else f"P {above.split()[1]}" if above.startswith("use ")
+                          else target_of_decl or decl)
                 # Lean reports the block's open goal on its `by`, spanning the
                 # block: the nearest line above at a shallower indent.
                 head_at = next((j for j in range(i - 2, -1, -1) if rows[j].strip() and
@@ -97,8 +105,18 @@ class BoardLean:
                 messages.append({"severity": "error", "pos": {"line": head_at},
                                  "endPos": {"line": i - 1},
                                  "data": f"unsolved goals\n{hyps}⊢ {target}"})
+                if body == CELL_PROBE and self.states_goals:
+                    binders = " ".join(f"({h} : P)" for h in haves)
+                    messages.append({"severity": "info", "pos": {"line": i - 1}, "endPos": {"line": i - 1},
+                                     "data": f"theorem {decl}.extracted_1 {binders} : {target} := sorry"})
         errors = [m for m in messages if m["severity"] == "error"]
         return LeanCheck(not errors, messages, "sorry" in source, False, 1)
+
+
+class CellLean(BoardLean):
+    """BoardLean that also states every goal, so blocks get cells of their own."""
+
+    states_goals = True
 
 
 class ScriptLLM:
@@ -613,12 +631,12 @@ def test_a_closer_that_fires_is_flattened_from_its_own_trace_in_one_check():
                     else:
                         msgs.append({"severity": "error", "pos": {"line": i - 1},
                                      "data": "no closer"})
-                elif body in ("skip", PROBE) and closed:
+                elif body in ("skip", PROBE, CELL_PROBE) and closed:
                     closed = False
-                    if body == PROBE:
+                    if body in (PROBE, CELL_PROBE):
                         msgs.append({"severity": "error", "pos": {"line": i - 1},
                                      "data": "No goals to be solved"})
-                elif body in ("skip", PROBE):
+                elif body in ("skip", PROBE, CELL_PROBE):
                     msgs.append({"severity": "error", "pos": {"line": i - 2},
                                  "endPos": {"line": i - 1}, "data": "unsolved goals\n⊢ demo"})
                 elif body == "omega":
@@ -689,7 +707,7 @@ class WitnessLean(BoardLean):
         if "(w_" in source:
             self.sources.append(source)
             return LeanCheck(True, [], False, False, 1)
-        if "extract_goal" not in source:
+        if not any(l.strip().endswith("extract_goal") for l in source.split("\n")):
             return await super().check_file(source, timeout_s)
         lines, messages, binders = source.split("\n"), [], ""
         for i, line in enumerate(lines, start=1):
@@ -2280,3 +2298,81 @@ def test_a_leaf_that_runs_out_of_heartbeats_is_retried_at_the_raised_budget():
                                      FakeServices(lean, llm)))
     assert result.metadata["solved_by"] == "board_loop"
     assert any("set_option maxHeartbeats 400000" in s and "divisor_cases" in s for s in lean.sources)
+
+
+def test_a_step_at_a_stated_goal_becomes_a_cell_checked_and_delivered_on_its_own():
+    # Measured on rmo_2001_2 (v7.99, win h99): 6 checks ran out of heartbeats
+    # at the raised 400000 because one theorem carried every step and the
+    # leaf. A goal Lean can state is checked as its own declaration and
+    # delivered as one, so each block has the whole budget to itself.
+    lean, llm = CellLean(), ScriptLLM({"model-a": ["have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["solved_by"] == "board_loop"
+    # The root placeholder is the proof's own body: no cell there.
+    assert "vm_cell_" not in result.solution and "-- cell" not in result.solution
+
+
+def test_a_goal_under_a_have_is_checked_as_its_own_declaration_with_the_rest_stubbed():
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = CellLean(), ScriptLLM({
+        "model-a": ["have outer : True := by\n  sorry\nexact outer",
+                    "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0, audit=False))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=challenge),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["solved_by"] == "board_loop"
+    focused = [s for s in lean.sources if "theorem vm_cell_" in s and "have key : True := by trivial" in s]
+    assert focused, "the step under `outer` was never checked as a cell"
+    body = focused[0]
+    # The cell carries the block; the theorem that holds it is a stub in that check.
+    assert "theorem vm_cell_" in body and "(outer : P) : True := by" in body
+    assert "theorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry" in body
+    # Delivered: the cell before the theorem, linked from where it stood.
+    text = result.solution
+    assert text.index("theorem vm_cell_") < text.index("theorem demo")
+    assert "    apply vm_cell_" in text and "<;> assumption" in text and "-- cell" not in text
+
+
+def test_a_leaf_that_only_fits_a_budget_of_its_own_passes_in_its_cell():
+    # The fake refuses any declaration that holds both the earlier step and the
+    # leaf (one budget); the leaf alone in a declaration of its own closes.
+    PLAIN = "p q m : ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\n⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3"
+
+    class HeavyLean(CellLean):
+        async def check_file(self, source, timeout_s=None):
+            self.sources.append(source)
+            probes = [i for i, l in enumerate(source.split("\n"), start=1)
+                      if l.strip() in ("skip", PROBE, CELL_PROBE)]
+            for body in re.findall(r"^theorem \w+[^\n]*:= by\n((?:[ \t]+[^\n]*\n?)*)", source, re.M):
+                if "expensive" in body and "divisor_cases" in body:
+                    at = next(i for i, l in enumerate(source.split("\n"), start=1) if "divisor_cases" in l)
+                    return LeanCheck(False, [{"severity": "error", "pos": {"line": at}, "endPos": {"line": at},
+                                              "data": "(deterministic) timeout at `whnf`, maximum number of "
+                                                      "heartbeats (200000) has been reached"}], False, False, 1)
+            if "divisor_cases" in source.split("-- end of techniques")[-1]:
+                return LeanCheck(not probes, [{"severity": "error", "pos": {"line": at}, "endPos": {"line": at},
+                                               "data": "No goals to be solved"} for at in probes], False, False, 1)
+            if "vm_probe" not in source and not probes and "sorry" not in source:
+                return LeanCheck(False, [{"severity": "error", "pos": {"line": 4}, "endPos": {"line": 4},
+                                          "data": "linarith failed to find a contradiction"}], False, False, 1)
+            check = await super().check_file(source, timeout_s)
+            for m in check.messages:
+                if str(m.get("data", "")).startswith("unsolved goals"):
+                    m["data"] = "unsolved goals\n" + (PRODUCT_GOAL if "expensive" in source else PLAIN)
+            return check
+
+    lean, llm = HeavyLean(), ScriptLLM({"model-a": ["have expensive : True := by trivial"] + ["no"] * 6})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0, audit=False))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=PRODUCT),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["solved_by"] == "board_loop"
+    text = result.solution
+    assert text.index("theorem vm_cell_") < text.index("theorem demo")
+    checked = [s.split("-- end of techniques")[-1] for s in lean.sources
+               if "divisor_cases" in s.split("-- end of techniques")[-1]]
+    assert checked, "the divisor leaf was never checked"
+    cell = checked[-1][checked[-1].index("theorem vm_cell_"):checked[-1].index("theorem demo")]
+    assert "divisor_cases" in cell and "expensive" not in cell.split(":= by", 1)[1]
+    assert "apply vm_cell_" in text
