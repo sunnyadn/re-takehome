@@ -110,6 +110,46 @@ def dissolve(text: str, cell_id: int) -> str:
                      if not (MARK.match(l) and int(MARK.match(l).group(2)) == cell_id))
 
 
+BINDER_GROUP = re.compile(r"\(([^():]+?) : ")
+
+
+def explicit_names(statement: str) -> list[str]:
+    """The explicit binder names of a statement, in order (instance and
+    implicit binders are inferred and not passed)."""
+
+    depth, groups, cur = 0, [], ""
+    for ch in statement:
+        if depth == 0 and ch == ":":
+            break
+        if ch == "(":
+            depth += 1
+            if depth == 1:
+                cur = ""
+                continue
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                groups.append(cur)
+                continue
+        if depth >= 1:
+            cur += ch
+    names: list[str] = []
+    for g in groups:
+        if " : " in g:
+            names += g.split(" : ", 1)[0].split()
+    return names
+
+
+def link(cell_id: int, statement: str) -> str:
+    """The parent's call of a cell: by name when every binder is a name in
+    scope, `apply … <;> assumption` otherwise (measured on rmo_2000_6: apply
+    unified a symmetric conclusion the wrong way round 356 times)."""
+
+    names = explicit_names(statement)
+    by_name = f"exact {LEMMA}{cell_id} {' '.join(names)}" if names else f"exact {LEMMA}{cell_id}"
+    return f"first | ({by_name}) | (apply {LEMMA}{cell_id} <;> assumption)"
+
+
 class Cells:
     """Statements by cell id, for the whole run; ids never repeat."""
 
@@ -159,7 +199,7 @@ def render_check(text: str, cells: Cells, focus: int | str | None = None,
         while i <= b:
             kid = next((k for k in kids if k.start == i), None)
             if kid:
-                got.append((" " * max(kid.indent - shift, 0) + f"apply {LEMMA}{kid.id} <;> assumption", kid.start))
+                got.append((" " * max(kid.indent - shift, 0) + link(kid.id, cells.statements.get(kid.id, "")), kid.start))
                 i = kid.end + 1
                 continue
             ln = lines[i - 1]

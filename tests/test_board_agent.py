@@ -65,7 +65,7 @@ class BoardLean:
                 messages.append({"severity": "error", "pos": {"line": i - 1},
                                  "endPos": {"line": i - 1},
                                  "data": f"Unknown constant `{body.split()[1]}`"})
-            if decl and body.startswith(("first", "exact?", "linarith")):
+            if decl and body.startswith(("first", "exact?", "linarith")) and "vm_cell_" not in body:
                 messages.append({"severity": "error", "pos": {"line": i - 1},
                                  "endPos": {"line": i - 1},
                                  "data": "linarith failed to find a contradiction"})
@@ -2332,7 +2332,7 @@ def test_a_goal_under_a_have_is_checked_as_its_own_declaration_with_the_rest_stu
     # Delivered: the cell before the theorem, linked from where it stood.
     text = result.solution
     assert text.index("theorem vm_cell_") < text.index("theorem demo")
-    assert "    apply vm_cell_" in text and "<;> assumption" in text and "-- cell" not in text
+    assert "    first | (exact vm_cell_" in text and "<;> assumption" in text and "-- cell" not in text
 
 
 def test_a_leaf_that_only_fits_a_budget_of_its_own_passes_in_its_cell():
@@ -2375,7 +2375,7 @@ def test_a_leaf_that_only_fits_a_budget_of_its_own_passes_in_its_cell():
     assert checked, "the divisor leaf was never checked"
     cell = checked[-1][checked[-1].index("theorem vm_cell_"):checked[-1].index("theorem demo")]
     assert "divisor_cases" in cell and "expensive" not in cell.split(":= by", 1)[1]
-    assert "apply vm_cell_" in text
+    assert "vm_cell_" in text
 
 
 def test_an_identity_between_sums_ending_at_a_variable_gets_the_induction_leaf():

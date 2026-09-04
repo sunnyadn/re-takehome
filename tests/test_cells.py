@@ -42,9 +42,9 @@ def test_a_full_render_puts_children_before_parents_and_links_them():
     main = lines.index("theorem demo (n : ℕ) (h : 0 < n) : n ≠ 0 := by")
     assert c2 < c1 < main
     assert lines[c2 + 1:c2 + 3] == ["  simp at hn", "  " + CELL_PROBE]
-    assert lines[c1 + 1] == "  have k : n = 0 := by" and lines[c1 + 2] == "    apply vm_cell_2 <;> assumption"
+    assert lines[c1 + 1] == "  have k : n = 0 := by" and lines[c1 + 2] == "    first | (exact vm_cell_2 n hn) | (apply vm_cell_2 <;> assumption)"
     assert lines[c1 + 3] == "  " + CELL_PROBE
-    assert lines[main + 1:main + 3] == ["  intro hn", "  apply vm_cell_1 <;> assumption"]
+    assert lines[main + 1:main + 3] == ["  intro hn", "  first | (exact vm_cell_1 n h hn) | (apply vm_cell_1 <;> assumption)"]
     assert got.lines[c2] == 7 and got.lines[c2 + 2] == 9 and got.lines[c1 + 2] == 7 and got.lines[main + 2] == 5
     assert "-- cell" not in got.text and got.region is None
     back = remap([{"severity": "error", "pos": {"line": c2 + 3, "column": 2}, "endPos": {"line": c2 + 3, "column": 4}}], got.lines)
