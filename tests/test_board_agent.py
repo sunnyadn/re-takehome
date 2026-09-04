@@ -2239,3 +2239,44 @@ def test_a_check_issued_during_a_renewal_waits_for_the_new_container():
     inner, check = asyncio.run(scenario())
     assert inner.during_swap == 0
     assert check.accepted
+
+
+PRODUCT = ("import Mathlib\n\ntheorem demo (p q m : ℕ) (hp : Nat.Prime p) (hq : Nat.Prime q)\n"
+           "    (h_factor : (m - p - q) * (m + p + q) = 5 * p * q) :\n"
+           "    p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3 := by\n  sorry\n")
+PRODUCT_GOAL = ("p q m : ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\n"
+                "h_factor : (m - p - q) * (m + p + q) = 5 * p * q\n"
+                "⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3")
+
+
+def test_a_leaf_that_runs_out_of_heartbeats_is_retried_at_the_raised_budget():
+    # Measured on rmo_2001_2 (v7.98, win h98): the divisor leaf closes the
+    # live goal in a fresh theorem at 200000 heartbeats but needs 150000 of
+    # them, so on a board whose earlier steps had spent some it failed with
+    # "maximum number of heartbeats (200000)" five times; the raised budget
+    # existed for model steps only, and no check ever ran at 400000.
+    class HeavyLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            if "divisor_cases" in source and "vm_probe" not in source:
+                self.sources.append(source)
+                if "set_option maxHeartbeats 400000" in source:
+                    return LeanCheck(True, [], False, False, 1)
+                at = next(i for i, l in enumerate(source.split("\n"), start=1) if "divisor_cases" in l)
+                return LeanCheck(False, [{"severity": "error", "pos": {"line": at}, "endPos": {"line": at},
+                                          "data": "(deterministic) timeout at `whnf`, maximum number of "
+                                                  "heartbeats (200000) has been reached"}], False, False, 1)
+            if "vm_probe" not in source and not any(t in source for t in ("sorry", "skip", PROBE)):
+                return LeanCheck(False, [{"severity": "error", "pos": {"line": 4}, "endPos": {"line": 4},
+                                          "data": "linarith failed to find a contradiction"}], False, False, 1)
+            check = await super().check_file(source, timeout_s)
+            for m in check.messages:
+                if str(m.get("data", "")).startswith("unsolved goals"):
+                    m["data"] = "unsolved goals\n" + PRODUCT_GOAL
+            return check
+
+    lean, llm = HeavyLean(), ScriptLLM({"model-a": ["no"] * 6, "model-b": ["no"] * 6})
+    agent = BoardAgent(Config(lines=("model-a", "model-b"), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=PRODUCT),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["solved_by"] == "board_loop"
+    assert any("set_option maxHeartbeats 400000" in s and "divisor_cases" in s for s in lean.sources)

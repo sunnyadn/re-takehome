@@ -1550,7 +1550,6 @@ class BoardAgent(FrameworkAgent):
         refused: set[tuple[tuple[str, str], str]] = set()
         withdrawn: dict[str, list[str]] = {}
         audited: dict[tuple[str, str], str] = {}
-        raised = False
         finished = False
 
         def time_left() -> float:
@@ -1749,8 +1748,22 @@ class BoardAgent(FrameworkAgent):
             return "\n".join(known_names[n] for n in names if known_names.get(n))
 
         async def judge(base: Board, goal: Goal, block: str) -> tuple[Board | None, str]:
-            """One edit at one goal, judged against the whole file. `failed_at`
-            keeps the block-relative line of the first error, for the prefix cut."""
+            """One edit at one goal, judged against the whole file; an edit that
+            only ran out of Lean's budget is judged once more with the budget
+            raised, whoever wrote it (a leaf as much as a model step)."""
+
+            nxt, why = await judge_once(base, goal, block)
+            if nxt is None and why == BUDGET_RETRY and RAISED_BUDGETS not in base.text:
+                lifted = await look(insert_preamble(base.text, RAISED_BUDGETS), base)
+                moved = lifted.find(goal.key)
+                if moved:
+                    events.append({"stage": "budget", "decl": goal.decl})
+                    nxt, why = await judge_once(lifted, moved, block)
+            return nxt, why
+
+        async def judge_once(base: Board, goal: Goal, block: str) -> tuple[Board | None, str]:
+            """`failed_at` keeps the block-relative line of the first error, for
+            the prefix cut."""
 
             nonlocal failed_at
             candidate, span = put(base.text, goal, block)
@@ -1998,7 +2011,6 @@ class BoardAgent(FrameworkAgent):
                           author: str) -> tuple[Board | None, str]:
             """A step, then its prefixes, then `exact?` in place of a bad proof."""
 
-            nonlocal raised
             nxt, why = await judge(base, goal, block)
             if nxt is None and why not in (BUDGET_RETRY, TIMED_OUT):
                 # The first error's line says where to cut; one check instead of
@@ -2024,12 +2036,6 @@ class BoardAgent(FrameworkAgent):
                                    "accepted": nxt is not None})
                 if nxt is None:
                     nxt, why = await mine(base, goal, block, author, why)
-            if nxt is None and why == BUDGET_RETRY and not raised:
-                raised = True
-                lifted = await look(insert_preamble(base.text, RAISED_BUDGETS))
-                moved = lifted.find(goal.key)
-                if moved:
-                    nxt, why = await judge(lifted, moved, block)
             if nxt is None and why == BUDGET_RETRY:
                 why = ("the step exceeded Lean's elaboration budget even at a "
                        "raised budget; make it cheaper")
