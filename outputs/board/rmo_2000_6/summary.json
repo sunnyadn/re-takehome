@@ -7,8 +7,8 @@
       "status": "passed",
       "passed": true,
       "points": 1,
-      "actual_cost_usd": 0.011367425999999995,
-      "wall_s": 474.984,
+      "actual_cost_usd": 0.021610645,
+      "wall_s": 714.062,
       "models_used": [
         "openai/gpt-oss-120b",
         "qwen/qwen3.5-flash-02-23"
@@ -18,9 +18,9 @@
   ],
   "total_points": 1,
   "max_points": 1,
-  "actual_cost_usd": 0.011367426,
-  "wall_s_sum": 474.984,
-  "run_id": "91b618f2687d41bcbd7d4a2732468f6f",
-  "wall_s": 475.225,
-  "finished_at": "2026-09-04T02:26:39.749073+00:00"
+  "actual_cost_usd": 0.021610645,
+  "wall_s_sum": 714.062,
+  "run_id": "9d4289f9aec040d29d3db7d819f18b42",
+  "wall_s": 714.316,
+  "finished_at": "2026-09-04T05:00:37.076323+00:00"
 }

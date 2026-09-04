@@ -99,9 +99,68 @@ elab_rules : tactic
     let xs ← Lean.PrettyPrinter.delab x
     evalTactic (← `(tactic| divisor_cases $h for $xs : $l = $r))
   else
+    -- A divisor that is not a variable (`m - p - q`) is named first, so that
+    -- each case keeps `hcase : m - p - q = <divisor>` (measured: `rw [← hd] at *`
+    -- rewrote hd into a triviality and left every other hypothesis untouched).
+    unless x.isFVar do
+      let xs ← Lean.PrettyPrinter.delab x
+      let dc := mkIdent (Name.mkSimple "dcase")
+      let hc := mkIdent (Name.mkSimple "hcase")
+      evalTactic (← `(tactic| generalize $hc : $xs = $dc at $h:ident))
     evalTactic (← `(tactic| first | divisor_split $h : $r | divisor_cases $h : $l = $r))
 
 end DivisorCases
+
+-- `prime_facts`: `2 ≤ p` for every `Nat.Prime p` in the context, however the hypothesis is named.
+-- `solve_sub`: a hypothesis `m - t₁ - ... = D` over ℕ (either way round, however named): `m` is
+-- replaced by `t₁ + ... + d` and `d = D` substituted, so the truncated subtraction is gone.
+section LeafMeta
+open Lean Elab Tactic Meta
+
+elab "prime_facts" : tactic => withMainContext do
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail then continue
+    let ty ← instantiateMVars decl.type
+    if ty.isAppOfArity ``Nat.Prime 1 then
+      let val ← mkAppM ``Nat.Prime.two_le #[decl.toExpr]
+      let goal ← getMainGoal
+      let g ← goal.assert (Name.mkSimple s!"hge_{decl.userName.eraseMacroScopes}") (← inferType val) val
+      let (_, g) ← g.intro1P
+      replaceMainGoal [g]
+
+elab "solve_sub" : tactic => withMainContext do
+  let some (m, terms, d) ← (do
+      for decl in ← getLCtx do
+        if decl.isImplementationDetail then continue
+        let ty ← instantiateMVars decl.type
+        if ty.isAppOfArity ``Eq 3 && (ty.getArg! 0).isConstOf ``Nat then
+          for (side, other) in [(ty.getArg! 1, ty.getArg! 2), (ty.getArg! 2, ty.getArg! 1)] do
+            let mut lhs := side
+            let mut ts : Array Expr := #[]
+            while lhs.isAppOfArity ``HSub.hSub 6 do
+              ts := ts.push (lhs.getArg! 5)
+              lhs := lhs.getArg! 4
+            if lhs.isFVar && !ts.isEmpty then
+              return some (lhs, ts.reverse, other)
+      return none)
+    | throwError "solve_sub: no hypothesis `m - ... = D`"
+  let ms ← PrettyPrinter.delab m
+  let ds ← PrettyPrinter.delab d
+  let tss ← terms.mapM fun e => (liftMetaM (PrettyPrinter.delab e) : TacticM Term)
+  let rest := tss.extract 1 tss.size
+  let sum ← rest.foldlM (fun acc t => `($acc + $t)) tss[0]!
+  let sub ← tss.foldlM (fun acc t => `($acc - $t)) ms
+  let sumd ← `($sum + d_sub)
+  let subd ← tss.foldlM (fun acc t => `($acc - $t)) sumd
+  evalTactic (← `(tactic| (
+    have hpos_sub : 0 < $sub := by first | omega | positivity | nlinarith
+    obtain ⟨d_sub, hd_sub⟩ : ∃ d, $ms = $sum + d := ⟨$sub, by omega⟩
+    subst hd_sub
+    have hcancel : $subd = d_sub := by omega
+    simp only [hcancel] at *
+    have hd_val : d_sub = $ds := by omega
+    subst hd_val)))
+end LeafMeta
 
 -- `pow_squeeze y n E` (a hypothesis y ^ n = ...): E ^ n < y ^ n < (E + 1) ^ n (or ≤ below) by
 -- omega/nlinarith, then Nat.pow_le/lt_pow_iff_left and omega, which also closes False when
@@ -216,37 +275,21 @@ theorem rmo_2000_2
   (hy : 0 < y)
   (h : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8) :
   x = 9 ∧ y = 11 := by
-  have h5 : (x + 2) ^ 3 ≤ y ^ 3 := by
-    rcases Nat.lt_or_ge x 10 with hlt | hge
-    · interval_cases x <;> first | omega | (bounded_cases y 13)
-    · obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le hge
-      subst hk
-      first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
-  have h6 : y ^ 3 < (x + 3) ^ 3 := by
+  have h_lower : (x + 1) ^ 3 < y ^ 3 := by
+    set_option maxHeartbeats 60000 in (nat_sub_exact; first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; omega))
+  have h_upper : y ^ 3 < (x + 3) ^ 3 := by
     ring_nf; omega
-  have h7 : x ≥ 3 → y = x + 2 := by
-    intro hge
-    set_option maxHeartbeats 60000 in
-    pow_bounds y 3
-  have h8 : x = 1 ∨ x = 2 ∨ x ≥ 3 := by
-    omega
-  have h9 : x ≠ 1 := by
-    aesop
-  have h10 : x ≠ 2 := by
-    aesop
-  have h11 : x = 9 := by
-    have h13 : y = x + 2 := by
-      have h14 : x ≥ 3 := by
-        omega
-      exact h7 h14
-    rw [h13] at h5
-    ring_nf at h5
-    have h_eq : (x + 2) ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8 := by
-      simpa [h13] using h
-    set_option maxHeartbeats 60000 in
-    nat_sub_exact
-    first | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; omega)
-  have h12 : y = 11 := by
-    omega
-  exact ⟨h11, h12⟩
+  have h_cases : x ≤ 9 := by
+    set_option maxHeartbeats 60000 in (by_contra hc; push_neg at hc; pow_squeeze y 3 (x + 2) with hc)
+  have h_main : x = 9 ∧ y = 11 := by
+    have hy_eq : y = x + 2 := by
+      have h1 : x + 1 < y :=
+        (Nat.pow_lt_pow_iff_left (by decide : (3 : ℕ) ≠ 0)).1 h_lower
+      have h2 : y < x + 3 :=
+        (Nat.pow_lt_pow_iff_left (by decide : (3 : ℕ) ≠ 0)).1 h_upper
+      have hle1 : x + 2 ≤ y := Nat.succ_le_iff.mpr h1
+      have hle2 : y ≤ x + 2 := (Nat.lt_succ_iff).mp h2
+      exact le_antisymm hle2 hle1
+    set_option maxHeartbeats 60000 in (interval_cases x <;> first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; omega))
+  trivial
 
