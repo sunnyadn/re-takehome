@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import subprocess
 import time
 from dataclasses import dataclass, field
 from typing import Any, Sequence
@@ -155,6 +156,83 @@ CHECK_TIMEOUT_CAP_S = 120
 
 def check_timeout_s(base_ms: int) -> int:
     return min(CHECK_TIMEOUT_CAP_S, max(CHECK_TIMEOUT_FLOOR_S, (3 * base_ms + 20_000) // 1000))
+
+
+# The REPL keeps every command's state. Measured in the harness image: a real
+# board leaves 46–77 MB behind per check (a trivial file leaves nothing), the
+# container's cap is 5 GiB, so the kernel killed the REPL every 55–90 checks,
+# mid-check, and the next check paid a cold Mathlib import (28 kills in three
+# hours across the lanes on one machine). Renewed on our terms instead: when
+# its memory is up (sampled) or, without a reading, after this many checks,
+# while a model reply is awaited so the import overlaps that wait.
+RENEW_AT_BYTES = int(3.6 * 2 ** 30)
+RENEW_AFTER_CHECKS = 50
+MEMORY_SAMPLE_EVERY = 8
+UNITS = {"B": 1, "KiB": 2 ** 10, "MiB": 2 ** 20, "GiB": 2 ** 30, "KB": 10 ** 3, "MB": 10 ** 6, "GB": 10 ** 9}
+
+
+def container_memory_bytes(name: str) -> int | None:
+    """One `docker stats` reading for the container, None when unavailable."""
+    try:
+        out = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", name],
+                             capture_output=True, text=True, timeout=20).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.match(r"\s*([\d.]+)\s*([KMG]i?B|B)", out)
+    return int(float(m.group(1)) * UNITS[m.group(2)]) if m else None
+
+
+class RenewingLean:
+    """Counts the checks on the current Lean container, samples its memory,
+    and renews it on request; check results pass through unchanged."""
+
+    def __init__(self, inner: Any, events: list[dict[str, Any]]) -> None:
+        self._inner = inner
+        self._events = events
+        self.checks = 0
+        self.memory: int | None = None
+        self.task: asyncio.Task[Any] | None = None
+        self._sampling: asyncio.Task[Any] | None = None
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    async def check_file(self, source: str, timeout_s: Any = None) -> Any:
+        check = await self._inner.check_file(source, timeout_s=timeout_s)
+        self.checks = 1 if getattr(check, "container_restarted", False) else self.checks + 1
+        name = getattr(self._inner, "_container_name", None)
+        if name and self.checks % MEMORY_SAMPLE_EVERY == 0 and (self._sampling is None or self._sampling.done()):
+            self._sampling = asyncio.ensure_future(self._sample(name))
+        return check
+
+    async def _sample(self, name: str) -> None:
+        self.memory = await asyncio.to_thread(container_memory_bytes, name)
+
+    def due(self) -> bool:
+        if self.task is not None and not self.task.done():
+            return False
+        if self.memory is not None:
+            return self.memory >= RENEW_AT_BYTES
+        return self.checks >= RENEW_AFTER_CHECKS
+
+    def renew(self) -> None:
+        """Start the renewal in the background; the next check waits for it."""
+        if not (hasattr(self._inner, "close") and hasattr(self._inner, "start")):
+            return
+        checks, memory = self.checks, self.memory
+        self.checks, self.memory = 0, None
+
+        def swap() -> None:
+            self._inner.close()
+            self._inner.start()
+
+        async def run() -> None:
+            t0 = time.monotonic()
+            await asyncio.to_thread(swap)
+            self._events.append({"stage": "renew", "checks": checks,
+                                 "mem_mb": (memory or 0) // 2 ** 20 or None,
+                                 "ms": int((time.monotonic() - t0) * 1000)})
+        self.task = asyncio.ensure_future(run())
 
 
 # A step that makes the file slower to check by this much is refused as too
@@ -1392,6 +1470,13 @@ class BoardAgent(FrameworkAgent):
             return "refuted", given
         return ("holds" if tries or given or "holds" in reply else "unverified"), {}
 
+    async def _call(self, model: str, prompt: str, max_tokens: int, services: Services,
+                    ledger: Ledger, *args: Any, **kwargs: Any) -> tuple[str, str]:
+        lean = getattr(services, "lean", None)
+        if isinstance(lean, RenewingLean) and lean.due():
+            lean.renew()
+        return await super()._call(model, prompt, max_tokens, services, ledger, *args, **kwargs)
+
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
         services = in_file_coordinates(services)
         cfg = self.config
@@ -1405,6 +1490,8 @@ class BoardAgent(FrameworkAgent):
         first_graded = next(iter(root_names(text)), "")
         best = text
         events: list[dict[str, Any]] = []
+        if not isinstance(services.lean, RenewingLean):
+            services.lean = RenewingLean(services.lean, events)
         models = list(cfg.lines)
         loose: list[asyncio.Task[Any]] = []
         lock = asyncio.Lock()

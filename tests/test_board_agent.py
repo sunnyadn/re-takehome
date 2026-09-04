@@ -2115,3 +2115,36 @@ def test_a_hypothesis_lean_prints_over_several_lines_is_still_read():
     assert dict(_hyps(goal))["h_cases"].startswith("m - p - q = 1 ∨ m - p - q = 5 ∨ m - p - q = p ∨")
     assert any("rcases h_cases with hc | hc | hc | hc | hc | hc | hc | hc <;> (solve_sub;" in b
                for b in leaf_candidates(goal))
+
+
+def test_an_old_lean_container_is_renewed_while_a_model_is_being_waited_on(monkeypatch):
+    # Measured (win, harness image, --memory 5g): the REPL keeps ~46–77 MB per
+    # check of a real board (a trivial file keeps nothing), so it is OOM-killed
+    # after 55–90 checks; 28 kills in three hours across the lanes, each costing
+    # the check in flight plus a cold import. The renewal happens on our terms,
+    # under a model wait, before the kernel does it mid-check.
+    import submission.board_agent as ba
+
+    class AgedLean(BoardLean):
+        def __init__(self):
+            super().__init__()
+            self.starts = 0
+            self._container_name = "re-takehome-repl-test"
+
+        def close(self):
+            pass
+
+        def start(self):
+            self.starts += 1
+
+    monkeypatch.setattr(ba, "RENEW_AFTER_CHECKS", 3)
+    monkeypatch.setattr(ba, "container_memory_bytes", lambda name: None)
+    lean, llm = AgedLean(), ScriptLLM({
+        "model-a": ["no", "have key : True := by trivial", "exact key"],
+        "model-b": ["no", "have key : True := by trivial", "exact key"]})
+    agent = BoardAgent(Config(lines=("model-a", "model-b"), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=TWO),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["solved_by"] == "board_loop"
+    assert lean.starts >= 1
+    assert any(e.get("stage") == "renew" for e in result.metadata["events"])
