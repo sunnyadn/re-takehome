@@ -1799,28 +1799,41 @@ class BoardAgent(FrameworkAgent):
                     above = [sp for sp in all_cell_spans(candidate) if sp.holds(new[0]) and sp.id != focus]
                     parent: int | str = max(above, key=lambda sp: sp.start).id if above else owner(candidate, new[0])
                     if parent and parent != focus:
-                        return await look(candidate, base, parent)
-                inside_old = [g for g in base.goals if old[0] <= g.line <= old[1]]
-                outside_old = [g for g in base.goals if g not in inside_old]
-                outside_new = [g for g in found.goals if not new[0] <= g.line <= new[1]]
+                        return await look(candidate, base, parent, edited)
+                # Fresh goals are the placeholders this check rendered as probes;
+                # every other placeholder (outside the unit, or inside a nested
+                # cell that was a stub here) keeps its goal from the base, by order.
+                shown = rendered.text.split("\n")
+                probed = {rendered.lines[i] for i, l in enumerate(shown) if CELL_PROBE in l}
+                nested_old = {sp.id for sp in all_cell_spans(base.text)} - ({focus} if isinstance(focus, int) else set())
+                outside_old = [g for g in base.goals
+                               if not old[0] <= g.line <= old[1]
+                               or (g.cell in nested_old and g.cell != 0)]
+                outside_new = [g for g in found.goals if g.line not in probed]
                 if len(outside_old) != len(outside_new):
                     return await look(candidate, base)
                 delta = (new[1] - new[0]) - (old[1] - old[0])
                 goals = []
                 carried = iter(outside_old)
                 for g in found.goals:
-                    if new[0] <= g.line <= new[1]:
+                    if g.line in probed:
                         goals.append(g)
                         continue
                     was = next(carried)
                     goals.append(Goal(g.line, g.indent, g.decl, was.text, was.stmt, g.cell))
                 kept = []
-                holes = [g.line for g in goals if not new[0] <= g.line <= new[1]]
+                holes = [g.line for g in goals if g.line not in probed]
+                inner_old = {g.line for g in base.goals if old[0] <= g.line <= old[1]
+                             and g.cell in nested_old and g.cell != 0}
                 for m in base.messages:
                     at = message_line(m)
-                    if at is None or old[0] <= at <= old[1]:
+                    if at is None or (old[0] <= at <= old[1] and not (
+                            m in classify([m])[0] and any(
+                                (message_span(m) or (at, at))[0] <= h <= (message_span(m) or (at, at))[1]
+                                for h in inner_old))):
                         continue
-                    m = shift_message(m, delta) if at > old[1] else m
+                    cut = edited.line if edited is not None else old[0]
+                    m = shift_message(m, delta) if at > cut else m
                     span = message_span(m)
                     if m in classify([m])[0] and span and not any(span[0] <= h <= span[1] for h in holes):
                         # A goal report from before the edit that no placeholder
