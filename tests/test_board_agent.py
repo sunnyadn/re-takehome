@@ -2570,3 +2570,24 @@ def test_a_diophantine_cube_equation_asked_for_its_solution_gets_the_two_sided_s
     plain = "x y : ℕ\nh : y ^ 3 = x ^ 3 + 6 * x ^ 2 + 1\n⊢ x = 0 ∧ y = 1"
     got = [c for c in leaf_candidates(plain) if "have hle : x ≤ 0" in c]
     assert got and "nat_sub_exact" not in got[0] and "pow_squeeze y 3 (x + 2) with hc" in got[0]
+
+
+def test_a_square_equal_to_a_symmetric_quadratic_in_two_variables_gets_the_difference_of_squares_leaf():
+    # Measured on rmo_2001_2 (frame119 rmo12b, 0/1; 2 of 5 before): the pass had
+    # `hfac : (m-p-q)(m+p+q) = 5pq` and `hdiv` on the board and the divisor leaf
+    # closed the rest in 11 s; the failures wrote the 8-way disjunction instead
+    # and withdrew it 4 times. The two steps from `hm` are mechanical.
+    from submission.leaves import leaf_candidates
+    goal = ("p q : ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\nm : ℕ\nhm : p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2\n"
+            "⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3")
+    got = [c for c in leaf_candidates(goal) if "have hfac" in c]
+    assert got
+    block = got[0]
+    assert "have hle : p + q ≤ m := (by nlinarith [Nat.Prime.two_le hp, Nat.Prime.two_le hq])" in block
+    assert "have hfac : (m - p - q) * (m + p + q) = 5 * p * q := (by obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le hle; subst hk" in block
+    assert "have hdvd : m - p - q ∣ 5 * p * q := Dvd.intro _ hfac; prime_facts; divisor_cases hdvd <;> " in block
+    assert "have hb_p : p ≤ 11" in block
+    # The other way round, and k ≤ 2 gives nothing.
+    flipped = goal.replace("hm : p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2", "hm : m ^ 2 = p ^ 2 + 7 * p * q + q ^ 2")
+    assert any("have hfac" in c for c in leaf_candidates(flipped))
+    assert not any("have hfac" in c for c in leaf_candidates(goal.replace("7 * p * q", "2 * p * q")))

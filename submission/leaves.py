@@ -556,6 +556,28 @@ def leaf_candidates(goal_text: str) -> list[str]:
                            f"(try simp only [{MEMBERSHIP}] at *); rw [hx] at {n}; norm_num at {n} <;> omega)")
             out.append(f"{primes}have hdvd : {factor} ∣ {m.group(3)} := {intro} _ {n}; "
                        f"divisor_cases hdvd <;> (first | (solve_sub; {finish}) | ({finish}))")
+    # `p² + k·pq + q² = m²` (k > 2): (m - p - q)(m + p + q) = (k-2)pq, so m - p - q
+    # divides a product of primes and the divisor leaf takes over. Measured on
+    # rmo_2001_2 (frame119): the passes had these two facts written by a model,
+    # the failures wrote the 8-way disjunction instead and withdrew it 4 times.
+    for hn, t in hyps:
+        m = (re.match(r"^([A-Za-z_][\w']*) \^ 2 \+ (\d+) \* \1 \* ([A-Za-z_][\w']*) \+ \3 \^ 2 = ([A-Za-z_][\w']*) \^ 2$", t)
+             or re.match(r"^([A-Za-z_][\w']*) \^ 2 = ([A-Za-z_][\w']*) \^ 2 \+ (\d+) \* \2 \* ([A-Za-z_][\w']*) \+ \4 \^ 2$", t))
+        if not m:
+            continue
+        p, k, q, mm = (m.group(1), m.group(2), m.group(3), m.group(4)) if " = " + m.group(4) + " ^ 2" in t \
+            else (m.group(2), m.group(3), m.group(4), m.group(1))
+        c = int(k) - 2
+        if c < 1:
+            continue
+        two_le = ", ".join(f"Nat.Prime.two_le {n}" for n in _primes(hyps))
+        out.append(
+            f"have hle : {p} + {q} ≤ {mm} := (by nlinarith [{two_le}])\n"
+            f"have hfac : ({mm} - {p} - {q}) * ({mm} + {p} + {q}) = {c} * {p} * {q} := "
+            f"(by obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le hle; subst hk; "
+            f"have hk' : {p} + {q} + k - {p} - {q} = k := (by omega); rw [hk']; ring_nf at {hn} ⊢; omega)\n"
+            f"have hdvd : {mm} - {p} - {q} ∣ {c} * {p} * {q} := Dvd.intro _ hfac; {primes}"
+            f"divisor_cases hdvd <;> (first | (solve_sub; {finish}) | ({finish}))")
     # A bound below on a variable and ℕ subtraction or a polynomial: substitute.
     if lowers and ("-" in goal_text or "^" in goal_text):
         for hn, _, _ in lowers[:2]:
