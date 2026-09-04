@@ -343,6 +343,30 @@ def dump_check(text: str, focus: Any, check: Any) -> None:
                       "data": str(m.get("data"))[:400]} for m in check.messages]}, ensure_ascii=False, indent=1))
 
 
+LITERAL_MEMBER = re.compile(r"(\([^()]*\)|[A-Za-z_][\w']*) ∈ (\{[^{}|]*\})(?! :)")
+
+
+def ascribe_literals(stmt: str) -> str:
+    """A set literal after `∈` ascribed from the member's binder type: `(a, b) ∈
+    {…}` with `(a b : ℤ)` becomes `(a, b) ∈ ({…} : Set (ℤ × ℤ))`. Lean drops the
+    ascription when it prints a goal and cannot elaborate the literal without it."""
+
+    types: dict[str, str] = {}
+    for grp in re.findall(r"\(([^():]+) : ([^()]+(?:\([^()]*\)[^()]*)*)\)", stmt):
+        for n in grp[0].split():
+            types[n] = grp[1].strip()
+
+    def fix(m: re.Match[str]) -> str:
+        member, lit = m.group(1), m.group(2)
+        names = re.findall(r"[A-Za-z_][\w']*", member)
+        kinds = [types.get(n) for n in names]
+        if not names or any(k is None for k in kinds):
+            return m.group(0)
+        typ = kinds[0] if len(kinds) == 1 else "(" + " × ".join(kinds) + ")"
+        return f"{member} ∈ ({lit} : Set {typ})"
+    return LITERAL_MEMBER.sub(fix, stmt)
+
+
 def is_root_goal(text: str, goal: Goal) -> bool:
     """The placeholder that is a proof's whole body: its cell is the proof."""
 
@@ -1982,7 +2006,8 @@ class BoardAgent(FrameworkAgent):
             the prefix cut."""
 
             nonlocal failed_at, last_span
-            cell_id = cells.new(goal.stmt) if goal.stmt and not is_root_goal(base.text, goal) else None
+            splittable = goal.stmt and goal.key not in unsplittable and not is_root_goal(base.text, goal)
+            cell_id = cells.new(goal.stmt) if splittable else None
             focus: int | str = cell_id if cell_id is not None else (goal.cell or goal.decl)
 
             async def placed(trailing: bool) -> tuple[str, tuple[int, int], Board]:
@@ -1991,12 +2016,23 @@ class BoardAgent(FrameworkAgent):
                 nxt = await look(candidate, base, focus, goal)
                 if cell_id is not None and any(message_line(m) == span[0] for m in classify(nxt.messages)[3]):
                     # The statement Lean printed does not elaborate on its own
-                    # (measured: a set literal loses its `: Set _`); the block
-                    # stays inside what encloses it.
-                    events.append({"stage": "inline", "cell": cell_id, "decl": goal.decl})
-                    cell_id, focus = None, goal.cell or goal.decl
-                    candidate, span = put(base.text, goal, block, trailing)
-                    nxt = await look(candidate, base, focus, goal)
+                    # (measured: a set literal loses its `: Set _`). A literal
+                    # is ascribed from the binder types once; failing that, the
+                    # block stays inside what encloses it and the goal is not
+                    # split again (measured on putnam_2018_a1: 128 such retries).
+                    repaired = ascribe_literals(goal.stmt)
+                    if repaired != goal.stmt and repaired not in tried_statements:
+                        tried_statements.add(repaired)
+                        cells.statements[cell_id] = repaired
+                        nxt = await look(candidate, base, focus, goal)
+                    if any(message_line(m) == span[0] for m in classify(nxt.messages)[3]):
+                        events.append({"stage": "inline", "cell": cell_id, "decl": goal.decl})
+                        unsplittable.add(goal.key)
+                        cell_id, focus = None, goal.cell or goal.decl
+                        candidate, span = put(base.text, goal, block, trailing)
+                        nxt = await look(candidate, base, focus, goal)
+                    else:
+                        known_stmts[goal.key] = repaired
                 return candidate, span, nxt
 
             candidate, span, nxt = await placed(True)
@@ -2397,6 +2433,8 @@ class BoardAgent(FrameworkAgent):
                 probe_spent["leaf"] += time.monotonic() - t0
 
         conjectured: dict[tuple[str, str], str] = {}
+        unsplittable: set[tuple[str, str]] = set()
+        tried_statements: set[str] = set()
         undone: dict[str, list[str]] = {}
 
         async def generalise_sweep(goal: Goal) -> bool:

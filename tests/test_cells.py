@@ -94,3 +94,15 @@ def test_resetting_a_cell_puts_its_goal_back_as_one_placeholder():
     text = reset_cell(FILE, cell)
     assert "-- cell 2" not in text and "simp at hn" not in text
     assert text.split("\n")[6] == "    sorry" and "-- cell 1" in text
+
+
+def test_a_set_literal_after_a_membership_is_ascribed_from_the_binder_types():
+    # Measured on putnam_2018_a1: `(a, b) ∈ {(673, 1358114), …}` loses its
+    # `: Set (ℤ × ℤ)` when Lean prints the goal, the cell header then fails
+    # (`Insert (ℤ × ℤ) ?m` stuck) and the run re-split the same goal 128 times.
+    from submission.board_agent import ascribe_literals
+    stmt = "(a b : ℤ) (h : (3 : ℤ) * a > (0 : ℤ)) : (a, b) ∈ {((673 : ℤ), (1358114 : ℤ)), ((674 : ℤ), (340033 : ℤ))}"
+    assert ascribe_literals(stmt).endswith(": (a, b) ∈ ({((673 : ℤ), (1358114 : ℤ)), ((674 : ℤ), (340033 : ℤ))} : Set (ℤ × ℤ))")
+    assert ascribe_literals("(n : ℕ) : n ∈ {(1 : ℕ), (2 : ℕ)} ∨ (4 : ℕ) ≤ n") == "(n : ℕ) : n ∈ ({(1 : ℕ), (2 : ℕ)} : Set ℕ) ∨ (4 : ℕ) ≤ n"
+    same = "(S : Set ℕ) (hS : S = {n | (3 : ℕ) ∣ n}) : (6 : ℕ) ∈ S"
+    assert ascribe_literals(same) == same
