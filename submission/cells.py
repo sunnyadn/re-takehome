@@ -12,8 +12,9 @@ from submission.framework import (DECL_HEAD, PLACEHOLDER, PROOF_HEAD, proof_span
 
 MARK = re.compile(r"^([ \t]*)-- cell (\d+)[ \t]*$")
 # One placeholder asks Lean two things: state this goal (info) and report it
-# as open (error). Numerals are typed so the statement elaborates on its own.
-CELL_PROBE = "(set_option pp.numericTypes true in extract_goal); focus skip"
+# as open (error). `*` keeps every hypothesis (measured: plain extract_goal
+# dropped `h_mem : 6 < 7`, and steps using it failed); numerals are typed.
+CELL_PROBE = "(set_option pp.numericTypes true in extract_goal *); focus skip"
 LEMMA = "vm_cell_"
 
 
