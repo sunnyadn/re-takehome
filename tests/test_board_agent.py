@@ -2833,3 +2833,26 @@ def test_leaf_reads_past_a_set_forall_and_a_conjunction_hypothesis():
     # A bound variable named differently from the set's own is renamed.
     assert leaf_candidates(outer.replace("∀ n ∈", "∀ m ∈").replace(", 10 ≤ n", ", 10 ≤ m"))[0].startswith(
         "set_option maxHeartbeats 400000 in (intro m vm_hn;")
+
+
+def test_an_inaccessible_hypothesis_becomes_a_named_binder_of_the_cell():
+    # rmo_2000_6 (frame130): `a✝ : 10 ∈ S` came back as `10 ∈ S → ∀ n ∈ S, 10 ≤ n`,
+    # the link passed no argument and a leaf's `intro n` took the premise.
+    from submission.board_agent import read_board
+    from submission.cells import link
+    S = "{n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b}"
+    St = "{n | ∃ a b, (0 : ℕ) < a ∧ (0 : ℕ) < b ∧ (2000 : ℕ) ∣ a ^ (2 : ℕ) * b ^ (5 : ℕ) ∧ n = a * b}"
+    text = f"import Mathlib\n\ntheorem demo : ∀ n ∈ {S}, 10 ≤ n := by\n  sorry\n"
+    messages = [
+        {"severity": "error", "pos": {"line": 3, "column": 40}, "endPos": {"line": 4, "column": 7},
+         "data": f"unsolved goals\na✝ : 10 ∈ {S}\n⊢ ∀ n ∈ {S}, 10 ≤ n"},
+        {"severity": "info", "pos": {"line": 4, "column": 2}, "endPos": {"line": 4, "column": 14},
+         "data": f"theorem demo.extracted_1 : (10 : ℕ) ∈ {St} → ∀ n ∈ {St}, (10 : ℕ) ≤ n := sorry"},
+    ]
+    goal = read_board(text, messages, False).goals[0]
+    assert goal.stmt == f"(vm_p1 : (10 : ℕ) ∈ {St}) : ∀ n ∈ {St}, (10 : ℕ) ≤ n"
+    assert link(7, goal.stmt).startswith("first | (exact vm_cell_7 ‹_›)")
+    # A goal that is itself an implication keeps its arrow.
+    messages[0]["data"] = "unsolved goals\n⊢ 0 < x → 0 < x + 1"
+    messages[1]["data"] = "theorem demo.extracted_1 (x : ℕ) : (0 : ℕ) < x → (0 : ℕ) < x + (1 : ℕ) := sorry"
+    assert read_board(text, messages, False).goals[0].stmt == "(x : ℕ) : (0 : ℕ) < x → (0 : ℕ) < x + (1 : ℕ)"

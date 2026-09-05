@@ -436,9 +436,9 @@ def read_board(text: str, messages: Sequence[dict[str, Any]], accepted: bool) ->
         line = line_of(text, match.start())
         fits = [(s[1] - s[0], goal_text(m)) for m, s in spans if s and s[0] <= line <= s[1]]
         held = enclosing(text, line)
-        goals.append(Goal(line, match.group(1), owner(text, line),
-                          min(fits, key=lambda f: f[0])[1] if fits else "",
-                          stated.get(line, ""), held.id if held else 0))
+        shown = min(fits, key=lambda f: f[0])[1] if fits else ""
+        goals.append(Goal(line, match.group(1), owner(text, line), shown,
+                          name_premises(stated.get(line, ""), shown), held.id if held else 0))
     return Board(text, goals, list(messages), accepted)
 
 
@@ -569,6 +569,36 @@ def statements(messages: Sequence[Any]) -> dict[int, str]:
             body = found.group(1)
             out[line] = " ".join(body.rsplit(":=", 1)[0].split())
     return out
+
+
+NUMERAL_TYPE = re.compile(r"\((\d+) : ℕ\)")
+
+
+def name_premises(stmt: str, goal_text: str) -> str:
+    """An inaccessible hypothesis (`a✝`) comes back from `extract_goal` as an arrow
+    premise. Named as a binder, the link passes it (`‹_›`) and a block sees the goal
+    it was written for (measured on rmo_2000_6: 10 link failures in two runs)."""
+    parsed = split_statement(stmt) if stmt else None
+    if not parsed or "⊢" not in goal_text:
+        return stmt
+    groups, target = parsed
+    shown = " ".join(goal_text.rsplit("⊢", 1)[-1].split())
+
+    def same(a: str, b: str) -> bool:
+        return NUMERAL_TYPE.sub(r"\1", a).strip() == NUMERAL_TYPE.sub(r"\1", b).strip()
+
+    premises: list[str] = []
+    rest = target
+    while not same(rest, shown):
+        cut = split_top(rest, " → ")
+        if cut is None:
+            return stmt
+        premises.append(cut[0].strip())
+        rest = cut[1].strip()
+    if not premises:
+        return stmt
+    named = [f"(vm_p{i + 1} : {prem})" for i, prem in enumerate(premises)]
+    return " ".join(groups + named) + f" : {rest}"
 
 
 def split_statement(stmt: str) -> tuple[list[str], str] | None:
