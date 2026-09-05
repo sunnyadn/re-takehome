@@ -2918,3 +2918,20 @@ def test_a_conjunction_of_two_leaf_goals_is_one_block():
     # `And.intro`, since `IsLeast` is itself a conjunction and swallows `⟨_, _⟩`.
     assert "refine And.intro (by " in got[0]
     assert got[0].count("prime_to_bases 5") == 2
+
+
+def test_a_pair_of_reciprocals_against_a_listed_solution_set_is_a_leaf():
+    # The goal is quoted from a run (frame134, putnam_2018_a1), wrapped as Lean
+    # printed it.
+    from submission.leaves import leaf_candidates
+    goal = ("a b : ℤ\nh : 0 < a ∧ 0 < b\n"
+            "⊢ 1 / ↑a + 1 / ↑b = 3 / 2018 ↔\n"
+            "    (a, b) ∈ {(673, 1358114), (674, 340033), (1009, 2018), (2018, 1009),"
+            " (340033, 674), (1358114, 673)}")
+    got = next((c for c in leaf_candidates(goal) if "Iff.intro" in c), "")
+    assert "(3 * a - 2018) * (3 * b - 2018) = (2018 : ℤ) ^ 2" in got
+    assert "divisor_cases vm_dvd" in got
+    # One `rfl` pair per listed solution, and the commas inside a pair do not count.
+    assert got.count("⟨rfl, rfl⟩") == 6
+    # Every `have` hands its proof a parenthesised `by`, or the block is swallowed.
+    assert ":= by " not in got

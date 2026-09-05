@@ -422,6 +422,46 @@ def _square_blocks(hyps: list[tuple[str, str]], target: str) -> str | None:
 
 # `[^{}]` so that a conjunction of two of these is not read as one (measured on
 # rmo_2000_6: a greedy body swallowed both halves and produced a 7-part obtain).
+RECIP_PAIR = re.compile(r"^1 / ↑(\w+) \+ 1 / ↑(\w+) = (\d+) / (\d+) ↔ \(\1, \2\) ∈ \{(.+)\}$")
+
+
+def _reciprocal_pair(target: str) -> str | None:
+    """`1/a + 1/b = p/q ↔ (a, b) ∈ {…}` over ℤ, both directions without a model.
+    Forward: clear the denominators, `(pa - q)(pb - q) = q²`, and the divisor leaf
+    over ℤ. Backward: every listed pair by `norm_num`. Measured on putnam_2018_a1:
+    the factorisation and the membership finish were model steps, 8 of 11 runs."""
+
+    found = RECIP_PAIR.match(target)
+    if not found:
+        return None
+    a, b, p, q = found.group(1), found.group(2), found.group(3), found.group(4)
+    depth, cases = 0, 1
+    for ch in found.group(5):
+        depth += (ch in "([{") - (ch in ")]}")
+        cases += depth == 0 and ch == ","
+    # `:= (by …)`, never `:= by …`: a bare `by` swallows the rest of the block.
+    forward = "; ".join([
+        "intro vm_he",
+        f"have vm_a0 : ({a} : ℚ) ≠ 0 := (by exact_mod_cast (by omega : {a} ≠ 0))",
+        f"have vm_b0 : ({b} : ℚ) ≠ 0 := (by exact_mod_cast (by omega : {b} ≠ 0))",
+        "field_simp at vm_he",
+        f"have vm_r : (({p} * {a} * {b} : ℤ) : ℚ) = (({q} * {a} + {q} * {b} : ℤ) : ℚ) := "
+        "(by push_cast; linarith)",
+        f"have vm_int : ({p} : ℤ) * {a} * {b} = {q} * {a} + {q} * {b} := (by exact_mod_cast vm_r)",
+        f"have vm_fac : ({p} * {a} - {q}) * ({p} * {b} - {q}) = ({q} : ℤ) ^ 2 := "
+        "(by nlinarith [vm_int])",
+        f"have vm_dvd : {p} * {a} - {q} ∣ ({q} : ℤ) ^ 2 := Dvd.intro _ vm_fac",
+        f"divisor_cases vm_dvd <;> (clear vm_dvd vm_he vm_int vm_r; "
+        f"(try simp only [{MEMBERSHIP}] at *); rw [hx] at vm_fac; norm_num at vm_fac <;> omega)",
+    ])
+    backward = "; ".join([
+        "intro vm_hm",
+        f"simp only [{MEMBERSHIP}] at vm_hm",
+        "rcases vm_hm with " + " | ".join(["⟨rfl, rfl⟩"] * cases) + " <;> norm_num",
+    ])
+    return f"refine Iff.intro (by {forward}) (by {backward})"
+
+
 IS_LEAST = re.compile(r"^IsLeast \{(\w+) \| ∃ ([\w ]+), ([^{}]+)\} (\d+)$")
 
 
@@ -580,6 +620,9 @@ def leaf_candidates(goal_text: str) -> list[str]:
                 radical = _radical_bound(hyps, "≤", lo.strip(), m.group(1))
                 if radical:
                     out.append(f"subst {n}\n{radical}")
+    pairs = _reciprocal_pair(target)
+    if pairs:
+        out.append(pairs)
     least = _is_least(target)
     if least:
         out.append(least)
