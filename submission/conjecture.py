@@ -9,7 +9,10 @@ from itertools import product
 from math import comb as _comb
 from typing import Any, Sequence
 
-RANGE_BOUND = re.compile(r"Finset\.(?:range \((\w+) \+ 1\)|Icc 0 (\w+))")
+# `FS` from the leaf sweep: with `open Finset` Lean prints the bare name.
+from submission.leaves import FS
+
+RANGE_BOUND = re.compile(rf"{FS}(?:range \((\w+) \+ 1\)|Icc 0 (\w+))")
 EVAL_TAG = "vm_table"
 GRID = (6, 7)          # n rows, k columns tabulated
 VERIFY = 11            # n, k < VERIFY checked before a fit is posted

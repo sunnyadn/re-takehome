@@ -31,7 +31,7 @@ BUDGET = "set_option maxHeartbeats 400000 in"
 def _hyps(goal_text: str) -> list[tuple[str, str]]:
     """Lean wraps a long type over indented continuation lines (and may end the
     `name :` line there); each hypothesis is read back as one line."""
-    head = goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
+    head = _head(goal_text)
     lines: list[str] = []
     for line in head.split("\n"):
         if line[:1].isspace() and lines:
@@ -50,6 +50,10 @@ def _hyps(goal_text: str) -> list[tuple[str, str]]:
 
 def _target(goal_text: str) -> str:
     return " ".join(goal_text.rsplit("⊢", 1)[-1].split()) if "⊢" in goal_text else ""
+
+
+def _head(goal_text: str) -> str:
+    return goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
 
 
 def _bounds(hyps) -> list[tuple[str, str, str, int]]:
@@ -364,36 +368,35 @@ BLOCKS = re.compile(rf"∑ \w+ ∈ {FS}Ico \S+ \((\w+) \+ 1\), ∑ \w+ ∈ {FS}I
 FACTOR = r"\((?:[^()]|\([^()]*\))+\)|[A-Za-z_][\w']*"
 
 
-SQUARE_SUM = re.compile(rf"^∑ (\w+) ∈ {FS}Ico (\d+) \((\w+) \+ 1\), ([A-Za-z_][\w']*) \1 / (?:↑\1|\(\1 : ℝ\)) ≤ (\d+)$")
+SQUARE_SUM = re.compile(rf"^∑ (\w+) ∈ {FS}Ico 1 \((\w+) \+ 1\), ([A-Za-z_][\w']*) \1 / (?:↑\1|\(\1 : ℝ\)) ≤ (\d+)$")
 
 
 def _square_blocks(hyps: list[tuple[str, str]], target: str) -> str | None:
-    """`∑_{i ∈ Ico a (k+1)} f i / i ≤ C` from a hypothesis bounding the same sum
-    over the squares, `∀ N, ∑_{i ∈ Ico a (N+1)} f (i*i) / i ≤ B`, f positive and
-    non-increasing: extend to `Ico a ((k+1)*(k+1))`, split into the blocks
-    `[j², (j+1)²)`, bound each by `3 f(j²)/j` (length 2j+1 over j², the whole
-    block at its first term) and sum. Needs 3B ≤ C. Measured on rmo_2000_3:
-    both models decompose by √k instead and withdraw the block bound."""
+    """`∑_{i ∈ Ico 1 (k+1)} f i / i ≤ C` from `∀ N, ∑_{i ∈ Ico 1 (N+1)} f (i*i) / i ≤ B`,
+    f positive and non-increasing: extend to `(k+1)²`, block by `[j², (j+1)²)`, each
+    block at `3 f(j²)/j`, sum. Needs 3B ≤ C. Measured on rmo_2000_3 (models withdraw it)."""
 
     found = SQUARE_SUM.match(target)
     if not found:
         return None
-    i, a, k, f, c = found.groups()
-    sq = re.compile(rf"^∀ (?:\((\w+) : ℕ\)|(\w+)), ∑ (\w+) ∈ {FS}Ico {a} \(\1?\2? \+ 1\), "
-                    rf"{re.escape(f)} \(\3 \* \3\) / (?:↑\3|\(\3 : ℝ\)) ≤ (\d+)$")
-    bound = next(((n, m.group(4)) for n, t in hyps for m in [sq.match(t)] if m), None)
+    i, k, f, c = found.groups()
+    sq = re.compile(rf"^∀ \(?(\w+)(?: : ℕ)?\)?, ∑ (\w+) ∈ {FS}Ico 1 \(\1 \+ 1\), "
+                    rf"{re.escape(f)} \(\2 \* \2\) / (?:↑\2|\(\2 : ℝ\)) ≤ (\d+)$")
+    bound = next(((n, m.group(3)) for n, t in hyps for m in [sq.match(t)] if m), None)
     pos = next((n for n, t in hyps if re.match(rf"^∀ (?:\w+|\(\w+ : ℕ\)), 0 < {re.escape(f)} \w+$", t)), None)
     anti = next((n for n, t in hyps if t == f"Antitone {f}"), None)
+    # Both orientations, as the block leaf below already reads them.
     mono = next((n for n, t in hyps
-                 if re.match(rf"^∀ (?:\w+|\(\w+ : ℕ\)), {re.escape(f)} \w+ ≥ {re.escape(f)} \(\w+ \+ 1\)$", t)), None)
-    if bound is None or pos is None or (anti is None and mono is None) or a != "1":
+                 if re.match(rf"^∀ (?:\w+|\(\w+ : ℕ\)), (?:{re.escape(f)} \w+ ≥ {re.escape(f)} \(\w+ \+ 1\)"
+                             rf"|{re.escape(f)} \(\w+ \+ 1\) ≤ {re.escape(f)} \w+)$", t)), None)
+    if bound is None or pos is None or (anti is None and mono is None):
         return None
     hb, b = bound
     if 3 * int(b) > int(c):
         return None
-    anti = anti or "vm_anti"
-    lines = ([] if anti != "vm_anti" else
+    lines = ([] if anti else
              [f"have vm_anti : Antitone {f} := antitone_nat_of_succ_le (fun vm_n => {mono} vm_n)"])
+    anti = anti or "vm_anti"
     blk = (f"∑ vm_i ∈ Finset.Ico (vm_j * vm_j) ((vm_j + 1) * (vm_j + 1)), {f} vm_i / (vm_i : ℝ)")
     full = f"∑ {i} ∈ Finset.Ico 1 (({k} + 1) * ({k} + 1)), {f} {i} / ({i} : ℝ)"
     lines += [
@@ -426,19 +429,15 @@ RECIP_PAIR = re.compile(r"^1 / ↑(\w+) \+ 1 / ↑(\w+) = (\d+) / (\d+) ↔ \(\1
 
 
 def _reciprocal_pair(target: str) -> str | None:
-    """`1/a + 1/b = p/q ↔ (a, b) ∈ {…}` over ℤ, both directions without a model.
-    Forward: clear the denominators, `(pa - q)(pb - q) = q²`, and the divisor leaf
-    over ℤ. Backward: every listed pair by `norm_num`. Measured on putnam_2018_a1:
-    the factorisation and the membership finish were model steps, 8 of 11 runs."""
+    """`1/a + 1/b = p/q ↔ (a, b) ∈ {…}` over ℤ: forward through `(pa - q)(pb - q) = q²`
+    and the divisor leaf, backward by `norm_num` on each listed pair. Measured on
+    putnam_2018_a1: the factorisation and the finish were model steps, 8 of 11 runs."""
 
     found = RECIP_PAIR.match(target)
     if not found:
         return None
-    a, b, p, q = found.group(1), found.group(2), found.group(3), found.group(4)
-    depth, cases = 0, 1
-    for ch in found.group(5):
-        depth += (ch in "([{") - (ch in ")]}")
-        cases += depth == 0 and ch == ","
+    a, b, p, q, listed = found.groups()
+    cases = len(_split_top(listed, ", "))
     # `:= (by …)`, never `:= by …`: a bare `by` swallows the rest of the block.
     forward = "; ".join([
         "intro vm_he",
@@ -466,11 +465,9 @@ IS_LEAST = re.compile(r"^IsLeast \{(\w+) \| ∃ ([\w ]+), ([^{}]+)\} (\d+)$")
 
 
 def _is_least(target: str) -> str | None:
-    """`IsLeast {n | ∃ a b, … ∧ m ∣ a^i * b^j ∧ n = a * b} c`, both halves without a
-    model: the witness of `n = a * b` at a literal is a factor pair of it, tried in
-    turn, and the bound is the radical route already used for `c ≤ a * b`. Measured
-    on rmo_2000_6: both halves are this shape and the models write the split and the
-    witness by hand, 9 of 16 runs."""
+    """`IsLeast {n | ∃ a b, … ∧ m ∣ a^i * b^j ∧ n = a * b} c`: the witness of `n = a * b`
+    at a literal is one of its factor pairs, the bound is the radical route already used
+    for `c ≤ a * b`. Measured on rmo_2000_6: both halves are this shape, 9 of 16 runs."""
 
     found = IS_LEAST.match(target)
     if not found:
@@ -488,8 +485,12 @@ def _is_least(target: str) -> str | None:
     bound = _radical_bound(hyps, "≤", c, product)
     if bound is None:
         return None
+    # Trial division to the root, and no chain Lean could not walk under one budget.
     value = int(c)
-    pairs = [(d, value // d) for d in range(1, value + 1) if value % d == 0]
+    small = [d for d in range(1, math.isqrt(value) + 1) if value % d == 0]
+    pairs = sorted({(d, value // d) for d in small} | {(value // d, d) for d in small})
+    if len(pairs) > CASES_MAX:
+        return None
     witness = " | ".join(f"exact ⟨{a}, {b}, by norm_num⟩" for a, b in pairs)
     held = ", ".join(f"vm_c{i}" for i in range(len(parts)))
     lower = (f"intro vm_n vm_hn\nobtain ⟨{', '.join(names)}, {held}⟩ := vm_hn\n"
@@ -507,19 +508,18 @@ FORALL_EXISTS = re.compile(r"^∀ \((\w+) : ℕ\), \(∃ ([\w ]+?), (.+)\) → (
 PLAIN_FORALL = re.compile(r"^∀ \(([\w ]+) : ([^)]+)\), (.+)$")
 
 
-def _conjuncts(prop: str) -> list[str]:
-    """Top-level `∧` parts of a proposition."""
-    depth, parts, cur = 0, [], ""
-    i = 0
-    while i < len(prop):
-        ch = prop[i]
-        if ch in "([{":
+def _split_top(text: str, sep: str) -> list[str]:
+    """The parts of `text` between separators that no bracket encloses."""
+    depth, parts, cur, i = 0, [], "", 0
+    while i < len(text):
+        ch = text[i]
+        if ch in "([{⦃":
             depth += 1
-        elif ch in ")]}":
+        elif ch in ")]}⦄":
             depth -= 1
-        if depth == 0 and prop.startswith(" ∧ ", i):
+        if depth == 0 and text.startswith(sep, i):
             parts.append(cur.strip())
-            cur, i = "", i + 3
+            cur, i = "", i + len(sep)
             continue
         cur += ch
         i += 1
@@ -527,12 +527,17 @@ def _conjuncts(prop: str) -> list[str]:
     return parts
 
 
+def _conjuncts(prop: str) -> list[str]:
+    """Top-level `∧` parts of a proposition."""
+    return _split_top(prop, " ∧ ")
+
+
 def _destructured(goal_text: str) -> list[tuple[str, str]]:
     """(prefix, inner goal): `∀ n ∈ {n | ∃ a b, P ∧ …}, T` (or `c ∈ lowerBounds {…}`)
     introduced and destructured, a hypothesis `P ∧ Q` split. Measured on rmo_2000_6
     (frame129): the inner leaf was accepted 4 times, then failed 4 times on these."""
     hyps, target = _hyps(goal_text), _target(goal_text)
-    head = goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
+    head = _head(goal_text)
     out: list[tuple[str, str]] = []
     m = SET_FORALL.match(target) or LOWER_BOUNDS.match(target) or FORALL_EXISTS.match(target)
     if m:
@@ -566,13 +571,14 @@ def leaf_candidates(goal_text: str) -> list[str]:
     hyps = _hyps(goal_text)
     target = _target(goal_text)
     for prefix, inner in _destructured(goal_text):
-        got = [f"{prefix}\n{c[len(BUDGET) + 2:-1].replace('; ', chr(10))}" for c in leaf_candidates(inner)]
+        got = [f"{prefix}\n{_unwrapped(c)}" for c in leaf_candidates(inner)]
         if got:
             return _finalised(got)
     bounds = _bounds(hyps)
     powers = _powers(hyps)
     primes = _prime_facts(hyps)
-    prime_vars = [t.split()[-1] for n, t in hyps if n in _primes(hyps)]
+    named = _primes(hyps)
+    prime_vars = [t.split()[-1] for n, t in hyps if n in named]
     finish = _finish(target, prime_vars)
     # The tightest bounds first; `0 < v` carries nothing a subtraction needs.
     lowers = sorted(((n, v, c) for n, v, kind, c in bounds if kind == "lower" and c >= 2),
@@ -620,16 +626,10 @@ def leaf_candidates(goal_text: str) -> list[str]:
                 radical = _radical_bound(hyps, "≤", lo.strip(), m.group(1))
                 if radical:
                     out.append(f"subst {n}\n{radical}")
-    pairs = _reciprocal_pair(target)
-    if pairs:
-        out.append(pairs)
-    least = _is_least(target)
-    if least:
-        out.append(least)
-    # A sum bounded through its subsequence at the squares (rmo_2000_3's shape).
-    blocks = _square_blocks(hyps, target)
-    if blocks:
-        out.append(blocks)
+    # Whole-theorem shapes: reciprocals against a listed solution set, a least
+    # element of a product set, a sum bounded through its squares.
+    out.extend(c for c in (_reciprocal_pair(target), _is_least(target),
+                           _square_blocks(hyps, target)) if c)
     dv = re.match(r"^(?:\((\d+) : ℕ\)|(\d+)) ∣ (.+)$", target)
     if dv:
         radical = _radical_bound(hyps, "∣", dv.group(1) or dv.group(2), dv.group(3))
@@ -849,31 +849,39 @@ def leaf_candidates(goal_text: str) -> list[str]:
                 out.append(f"bounded_cases {v} {root}")
     if out:
         return _finalised(out)
-    # Nothing reads the quantified form: introduce the binder and read the body.
-    # Measured on rmo_2000_3 (frame133): the top goal is `∀ (k : ℕ), ∑ … ≤ 3`,
-    # and every leaf of the body is blind until `k` is a hypothesis.
-    # A conjunction of goals each of which a leaf reads: both halves in one block.
-    # Measured on rmo_2000_6: the theorem is two `IsLeast` of the same shape and a
-    # model wrote the split in every run.
-    parts = _conjuncts(target)
-    if len(parts) > 1:
-        head = goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
-        halves = [leaf_candidates(f"{head}⊢ {t}") for t in parts]
-        if all(halves):
-            # `And.intro`, not `⟨_, _⟩`: a first half that is itself a conjunction
-            # (`IsLeast` is one) swallows the anonymous constructor.
-            inner = " ".join(f"(by {h[0][len(BUDGET) + 2:-1]})" for h in halves)
-            return _finalised([f"refine And.intro {inner}"])
+    head = _head(goal_text)
+    # The quantifier first: `∀ k, A ∧ B` is not `(∀ k, A) ∧ B`, and splitting it
+    # here would recurse over halves the introduction is about to recompute.
     intro = PLAIN_FORALL.match(target)
     if intro:
         names, typ, inner = intro.groups()
-        head = goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
         bound = "".join(f"{v} : {typ}\n" for v in names.split())
         body = leaf_candidates(f"{head}{bound}⊢ {inner}")
         if body:
-            return _finalised([f"intro {names}\n" + c[len(BUDGET) + 2:-1].replace("; ", chr(10))
-                               for c in body])
-    return _finalised(out)
+            return _finalised([f"intro {names}\n{_unwrapped(c)}" for c in body])
+    # Both halves of a conjunction in one block, `And.intro` rather than `⟨_, _⟩`:
+    # a first half that is itself a conjunction (`IsLeast` is one) swallows the
+    # anonymous constructor. Measured on rmo_2000_6, whose theorem is two of them.
+    parts = _conjuncts(target)
+    halves = []
+    for part in parts if len(parts) > 1 else []:
+        got = leaf_candidates(f"{head}⊢ {part}")
+        if not got:
+            return []
+        halves.append(got)
+    if halves:
+        inner = " ".join(f"(by {_inline(_unwrapped(c[0]))})" for c in halves)
+        return _finalised([f"refine And.intro {inner}"])
+    return []
+
+
+def _unwrapped(candidate: str) -> str:
+    """A finished candidate back to its block: the inverse of `_finalised`."""
+    return candidate[len(BUDGET) + 2:-1].replace("; ", "\n")
+
+
+def _inline(block: str) -> str:
+    return "; ".join(l.strip() for l in block.split("\n") if l.strip())
 
 
 def _finalised(out: list[str]) -> list[str]:
