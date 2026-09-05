@@ -113,6 +113,20 @@ class BoardLean:
         return LeanCheck(not errors, messages, "sorry" in source, False, 1)
 
 
+class YieldingLean(BoardLean):
+    """A check that actually suspends, so a second worker can be scheduled.
+
+    `BoardLean.check_file` has no await in its body, so awaiting it never
+    yields and the two workers run strictly one after the other. A test about
+    what two workers do to each other needs this instead. It is not the
+    default: the stall tests drive their clock off the number of
+    `time.monotonic` calls, and an extra suspension point changes that count."""
+
+    async def check_file(self, source, timeout_s=None):
+        await asyncio.sleep(0)
+        return await super().check_file(source, timeout_s)
+
+
 class CellLean(BoardLean):
     """BoardLean that also states every goal, so blocks get cells of their own."""
 
@@ -151,6 +165,36 @@ def run(challenge, scripts, delay=None, lines=("model-a", "model-b"), time_limit
     started = time.monotonic()
     result = asyncio.run(agent.solve(problem, FakeServices(lean, llm)))
     return result, lean, llm, time.monotonic() - started
+
+
+def test_two_workers_never_have_two_lean_checks_in_flight_at_once():
+    # One container per problem, so a check cannot overlap a check whatever the
+    # board does. The second worker is there to overlap model latency, and this
+    # says so in a way that fails if a check ever escapes the board lock.
+    # `YieldingLean` is what makes the assertion mean anything: `BoardLean`
+    # never suspends, so nothing could overlap even if the lock were gone.
+    class Counting(YieldingLean):
+        def __init__(self):
+            super().__init__()
+            self.inside, self.most, self.n = 0, 0, 0
+
+        async def check_file(self, source, timeout_s=None):
+            self.inside += 1
+            self.n += 1
+            self.most = max(self.most, self.inside)
+            try:
+                return await super().check_file(source, timeout_s)
+            finally:
+                self.inside -= 1
+
+    lean, llm = Counting(), ScriptLLM({m: ["trivial"] * 8 for m in ("model-a", "model-b")},
+                                  {"model-a": 0.001, "model-b": 0.001})
+    agent = BoardAgent(Config(lines=("model-a", "model-b"), budget_usd=1.0, time_limit_s=30.0))
+    asyncio.run(agent.solve(Problem(id="demo", description="prove it", challenge=TWO),
+                            FakeServices(lean, llm)))
+    assert lean.n > 5, "the run did too little to mean anything: %d checks" % lean.n
+    assert lean.most == 1, "two Lean checks overlapped: %d" % lean.most
+    assert lean.inside == 0
 
 
 def steps(result):
