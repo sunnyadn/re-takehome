@@ -2526,6 +2526,8 @@ def test_a_bound_on_a_product_from_a_numeral_dividing_a_product_of_its_powers_ge
     assert any("prime_to_bases 5 hdiv" in c for c in leaf_candidates(typed))
     bare = "a b : ℕ\nh : 360 ∣ a * b ^ 3\n⊢ 30 ≤ a * b"
     assert any("prime_to_bases 3 h" in c for c in leaf_candidates(bare))
+    named = "n a b : ℕ\nha : 0 < a\nhb : 0 < b\nhdiv : 2000 ∣ a ^ 2 * b ^ 5\nhn : n = a * b\n⊢ 10 ≤ n"
+    assert any(c.startswith("set_option maxHeartbeats 400000 in (subst hn; have hp2 : 2 ∣ a * b") for c in leaf_candidates(named))
     dvd = "a b : ℕ\nh : 2000 ∣ a ^ 2 * b ^ 5\n⊢ 10 ∣ a * b"
     assert any("; exact hrad)" in c for c in leaf_candidates(dvd) if "prime_to_bases" in c)
     # Too weak (the radical is below the bound) or the wrong atoms: nothing.

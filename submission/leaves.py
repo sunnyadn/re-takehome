@@ -406,6 +406,13 @@ def leaf_candidates(goal_text: str) -> list[str]:
         radical = _radical_bound(hyps, "≤", lo.strip(), hi.strip())
         if radical:
             out.append(radical)
+        # The same through `hn : n = a * b` (measured on rmo_2000_6: `⊢ 10 ≤ n`).
+        for n, t in hyps:
+            m = re.match(rf"^{re.escape(hi.strip())} = ([A-Za-z_][\w']*(?: \* [A-Za-z_][\w']*)?)$", t)
+            if m and VAR.match(hi.strip()):
+                radical = _radical_bound(hyps, "≤", lo.strip(), m.group(1))
+                if radical:
+                    out.append(f"subst {n}\n{radical}")
     dv = re.match(r"^(?:\((\d+) : ℕ\)|(\d+)) ∣ (.+)$", target)
     if dv:
         radical = _radical_bound(hyps, "∣", dv.group(1) or dv.group(2), dv.group(3))
