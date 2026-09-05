@@ -5,7 +5,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from submission.agent import BUDGET_HEADROOM, Ledger
+from submission.agent import BUDGET_HEADROOM
+from submission.run.context import Run
 
 # What the harness's own Lean probes may take of the wall clock so far: the
 # environment scans (names, the vocabulary scan, apply?) and the leaf blocks,
@@ -18,10 +19,10 @@ PROBE_GRACE_S = 60.0
 
 
 class Budget:
-    def __init__(self, cfg: Any, ledger: Ledger, events: list[dict[str, Any]]) -> None:
-        self.cfg, self.ledger, self.events = cfg, ledger, events
+    def __init__(self, run: Run) -> None:
+        self.cfg, self.ledger, self.events = run.cfg, run.ledger, run.events
         self.started = time.monotonic()
-        self.deadline = self.started + cfg.last_turn_start_s
+        self.deadline = self.started + run.cfg.last_turn_start_s
         self.probe_spent = {"scan": 0.0, "leaf": 0.0, "retry": 0.0}
 
     def elapsed(self) -> float:

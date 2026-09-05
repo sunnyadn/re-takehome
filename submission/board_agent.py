@@ -27,6 +27,8 @@ from submission.framework_agent import (VACUOUS, BUDGET_RETRY, FILE_CHARS, ANSWE
 from submission.board.types import (Board, Edit, Goal, HAVE_HEAD, Notes, all_cell_spans, author_free, binder_names, hyp_count, hypotheses, inherit, is_root_goal, narrates, owner, shift_message, signature, split_top, step_tokens, target_of)
 from submission.board.reply import (ascribe_literals, claim_of, dialect, interpret, mine_statements, salvage, set_elements, unwrap)
 from submission.run.budget import Budget
+from submission.run.context import Run
+from submission.run.delivery import Delivery
 from submission.board.text import (base_region, context_grows, drop_declaration, enclosing_chain, enclosing_have, inflated, is_stated, proved_facts, put, restates, settled_inside, shed_unreferenced, split_facts, split_statement, stated_facts, view, withdraw, withdraw_only)
 from submission.board.probes import (CHECK_TIMEOUT_CAP_S, CHECK_TIMEOUT_FLOOR_S, PROBE, UNKNOWN_NAME, WITNESS_BOUND, apply_file, audit_prompt, check_timeout_s, container_memory_bytes, counterexample_search, dump_check, existential, extract_file, fired_closer, goal_tokens, have_extract_file, is_closed, library_file, library_names, name_probe_file, read_board, read_library, read_name_probe, read_suggestions, read_witness, read_witnesses, render_all, searched_clean, statements, tagged_closers, witness_file, witness_search_file)
 
@@ -550,21 +552,19 @@ class BoardAgent(FrameworkAgent):
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
         services = in_file_coordinates(services)
         cfg = self.config
-        ledger = Ledger()
-        names = answer_names(problem.challenge)
-        graded = declared_names(problem.challenge)
-        text = with_preamble(normalise_imports(problem.challenge, problem.challenge))
-        first_graded = next(iter(root_names(text)), "")
-        best = text
         events: list[dict[str, Any]] = []
         if not isinstance(services.lean, RenewingLean):
             services.lean = RenewingLean(services.lean, events)
-        models = list(cfg.lines)
+        run = Run(problem, services, cfg, events)
+        ledger, names, graded = run.ledger, run.names, run.graded
+        models, first_graded = run.models, run.first_graded
+        text = run.text
         loose: list[asyncio.Task[Any]] = []
         lock = asyncio.Lock()
         changed = asyncio.Event()
-        notes = Notes()
-        budget = Budget(cfg, ledger, events)
+        notes = run.notes
+        budget = Budget(run)
+        delivery = Delivery(self, run, budget)
         progress_at = budget.started
 
         restated: dict[str, int] = {}
@@ -574,86 +574,11 @@ class BoardAgent(FrameworkAgent):
 
 
 
-        def offer(candidate: str, accepted: bool) -> None:
-            nonlocal best
-            if accepted or not scoring_faults(candidate, names, problem.challenge):
-                best = candidate
-                # The checkpoint is what a killed run is graded on: cells as
-                # declarations, each within its own budget.
-                services.checkpoint(modular(best, cells) if "-- cell " in best else best,
-                                    {"accepted": accepted})
 
-        shed_named: set[str] = set()
 
-        def done_text(b: Board) -> str | None:
-            """The finished file: accepted with nothing open, or sound (no
-            failure beyond its open goals) with every open goal inside a helper
-            nothing graded uses, which is removed. `deliver` checks it again."""
-            if b.accepted and is_done(b.text):
-                return b.text
-            if classify(b.messages)[3]:
-                return None
-            text, shed = shed_unreferenced(b.text, graded)
-            if not shed or not is_done(text) or re.search(r"\bsorry\b", text) \
-                    or any(g.decl not in shed for g in b.goals):
-                return None
-            for name in shed:
-                if name not in shed_named:
-                    shed_named.add(name)
-                    events.append({"stage": "shed", "name": name})
-            return text
 
-        def result(source: str, how: str, accepted: bool) -> AgentResult:
-            # Every event, so a run's accounting (who wrote, who audited, what
-            # closed without a model) can be read off result.json. A 500-turn
-            # run is about 150 KB; the earlier last-60 cut made counts tails.
-            return AgentResult(strip_markers(source), {
-                "strategy": "board",
-                "solved_by": how,
-                "accepted_by_repl": accepted,
-                "spend_usd": round(ledger.spent_usd, 6),
-                "wall_s": round(budget.elapsed(), 1),
-                "turns": len(events),
-                "events": list(events),
-            })
 
-        async def deliver(text: str, how: str) -> AgentResult | None:
-            """The finished file as one declaration per cell; the one-declaration
-            form only if that fails to compile."""
-            shaped = modular(text, cells) if "-- cell " in text else strip_markers(text)
-            delivered = await deliver_form(shaped, how)
-            if delivered is None and shaped != strip_markers(text):
-                events.append({"stage": "deliver", "form": "inline"})
-                delivered = await deliver_form(strip_markers(text), how)
-            return delivered
 
-        async def deliver_form(text: str, how: str) -> AgentResult | None:
-            state = await self._finish(State(text=text, accepted=True), services, budget.time_left)
-            final = state.text
-            if not uses_techniques(final):
-                # The judge compiles cold, 180 s on 4 cores; a proof that never
-                # calls a technique does not carry the block that defines them.
-                final = strip_techniques(final)
-            check = await services.lean.check_file(
-                axiom_probe(final, declared_names(problem.challenge)))
-            faults, _ = grade(final, check, names, problem.challenge)
-            if (not check.accepted or faults) and final != state.text:
-                final = state.text
-                check = await services.lean.check_file(
-                    axiom_probe(final, declared_names(problem.challenge)))
-                faults, _ = grade(final, check, names, problem.challenge)
-            events.append({"stage": "verify", "accepted": check.accepted,
-                           "faults": faults[:5], "compile_ms": check.duration_ms,
-                           "slow": check.duration_ms > SLOW_COMPILE_MS,
-                           "techniques": "kept" if PREAMBLE_MARK in final else "dropped"})
-            if any("sorry" in f for f in faults):
-                shown = final.split("\n")
-                events.append({"stage": "sorry_left", "lines": [
-                    "\n".join(shown[max(i - 3, 0):i + 1]) for i, l in enumerate(shown) if "sorry" in l][:3]})
-            if not check.accepted or faults:
-                return None
-            offer(final, True)
-            return result(final, how, True)
 
         board = Board(text)
         branches: list[Board] = []
@@ -673,7 +598,7 @@ class BoardAgent(FrameworkAgent):
                 branches.remove(worst)
                 events.append({"stage": "prune", "bid": worst.bid, "goals": len(worst.goals)})
 
-        cells = Cells()
+        cells = run.cells
         # Statement → the block that closed a cell stating it. A closed cell is
         # a proof of a theorem; withdrawing what enclosed it does not unprove
         # it (measured on rmo_2001_2: the final goal, closed at 67 s, came back
@@ -841,8 +766,8 @@ class BoardAgent(FrameworkAgent):
                     break
             else:
                 branches.append(fresh)
-            finished_text = done_text(board)
-            offer(finished_text or board.text, finished_text is not None)
+            finished_text = delivery.done_text(board)
+            delivery.offer(finished_text or board.text, finished_text is not None)
             changed.set()
             changed.clear()
 
@@ -1728,8 +1653,8 @@ class BoardAgent(FrameworkAgent):
                                         notes[g.key].tries, g.line, b, g))
             if not options:
                 return None
-            best = min(options, key=lambda o: o[:6])
-            return best[6], best[7]
+            first = min(options, key=lambda o: o[:6])
+            return first[6], first[7]
 
         def exhausted() -> bool:
             """Every open goal answered with a repeat by every model: nothing
@@ -1882,7 +1807,7 @@ class BoardAgent(FrameworkAgent):
             nonlocal finished, next_bid
             if True:
                 async with lock:
-                    if any(done_text(b) is not None for b in branches):
+                    if any(delivery.done_text(b) is not None for b in branches):
                         finished = True
                         return True
                     if all_last_in_line() or stalled() or exhausted():
@@ -2064,11 +1989,11 @@ class BoardAgent(FrameworkAgent):
                 check = await services.lean.check_file(candidate)
                 if check.accepted and not scoring_faults(candidate, names, problem.challenge):
                     events.append({"stage": "sweep", "accepted": True})
-                    won = await deliver(candidate, "deterministic_sweep")
+                    won = await delivery.deliver(candidate, "deterministic_sweep")
                     if won:
                         return won
-                    offer(candidate, True)
-                    return result(candidate, "deterministic_sweep", True)
+                    delivery.offer(candidate, True)
+                    return delivery.result(candidate, "deterministic_sweep", True)
 
             if graded_theorems(problem.challenge) > 1 and budget.can_ask():
                 text = await self._share(problem, text, services, ledger, events)
@@ -2087,18 +2012,18 @@ class BoardAgent(FrameworkAgent):
                 finished = True
                 await asyncio.wait(tasks, timeout=LOOSE_DRAIN_S)
 
-            done = [t for t in (done_text(b) for b in branches) if t is not None]
+            done = [t for t in (delivery.done_text(b) for b in branches) if t is not None]
             if done:
-                won = await deliver(done[0], "board_loop")
+                won = await delivery.deliver(done[0], "board_loop")
                 if won:
                     return won
             if branches:
                 board = min(branches, key=lambda b: b.score)
-            offer(board.text, False)
-            return result(best, "best_effort", False)
+            delivery.offer(board.text, False)
+            return delivery.result(delivery.best, "best_effort", False)
         except (BudgetExceeded, BudgetAccountingError, LeanRuntimeError, LLMCallError) as exc:
             events.append({"stage": "abort", "error": type(exc).__name__})
-            return result(best, "aborted", False)
+            return delivery.result(delivery.best, "aborted", False)
         finally:
             # Every call the agent started must settle before it returns: the
             # harness fails a problem whose ledger still holds a reservation.
