@@ -266,6 +266,10 @@ SLOW_STEP_MS = 10_000
 # 180 s, and a 24 s warm p09 file timed out there. Measured on rmo_2000_2
 # (4-core pod): 318 checks, 2229 s of 2645 s in Lean, 5 timeouts, 5 restarts.
 CHECK_CAP_MS = 25_000
+# A leaf is one cell the comparator compiles once; its own cost is not a per-step
+# tax. Measured on rmo_2001_2 (frame123): the difference-of-squares leaf takes
+# 12 s idle and 50 s on a loaded host, and was cut by the 30 s timeout.
+LEAF_CAP_MS = 90_000
 # There is no refutation probe. Proving `¬ target` from the context by
 # decide/omega only refutes the goal when the context is consistent, and a
 # proof by contradiction lives in an inconsistent one: on p09 the probe
@@ -1773,6 +1777,8 @@ class BoardAgent(FrameworkAgent):
 
         dissolved = 0
 
+        heavy = {"leaf": False}   # set while a leaf block is judged
+
         async def look(candidate: str, base: Board | None = None,
                        focus: int | str | None = None, edited: Goal | None = None) -> Board:
             """The board after one Lean check: the whole file as cells, or, with
@@ -1783,8 +1789,8 @@ class BoardAgent(FrameworkAgent):
             if focus is not None and old is None:
                 focus = None
             rendered = render_check(candidate, cells, focus)
-            check = await services.lean.check_file(
-                blank_techniques(rendered.text), timeout_s=check_timeout_s((base or board).ms))
+            timeout_s = CHECK_TIMEOUT_CAP_S if heavy["leaf"] else check_timeout_s((base or board).ms)
+            check = await services.lean.check_file(blank_techniques(rendered.text), timeout_s=timeout_s)
             messages = remap(check.messages, rendered.lines)
             errors = [m for m in messages if isinstance(m, dict) and m.get("severity") == "error"]
             dump_check(rendered.text, focus, check)
@@ -2053,7 +2059,9 @@ class BoardAgent(FrameworkAgent):
             if expensive and not failures:
                 return None, BUDGET_RETRY
             over_cap = nxt.ms > CHECK_CAP_MS and nxt.ms - base.ms > SLOW_STEP_MS // 5
-            if not failures and (nxt.ms - base.ms > SLOW_STEP_MS or over_cap):
+            if heavy["leaf"]:
+                over_cap = nxt.ms > LEAF_CAP_MS
+            if not failures and ((nxt.ms - base.ms > SLOW_STEP_MS and not heavy["leaf"]) or over_cap):
                 events.append({"stage": "slow", "ms": nxt.ms, "was": base.ms})
                 return None, (f"that step makes the file take {nxt.ms // 1000}s to "
                               f"check, up from {base.ms // 1000}s; every later step "
@@ -2419,6 +2427,7 @@ class BoardAgent(FrameworkAgent):
                 return False
             t0 = time.monotonic()
             tried = 0
+            heavy["leaf"] = True
             try:
                 for block in candidates:
                     tried += 1
@@ -2435,6 +2444,7 @@ class BoardAgent(FrameworkAgent):
                                "tried": tried, "ms": int((time.monotonic() - t0) * 1000)})
                 return False
             finally:
+                heavy["leaf"] = False
                 probe_spent["leaf"] += time.monotonic() - t0
 
         conjectured: dict[tuple[str, str], str] = {}

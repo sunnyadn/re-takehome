@@ -2652,3 +2652,49 @@ def test_an_answer_slot_equated_to_a_closed_term_is_evaluated_by_the_harness_not
     probes = [e for e in result.metadata["events"] if e.get("stage") == "probe"]
     assert probes and probes[0]["by"] == "harness" and probes[0]["printed"] == ["49"]
     assert not any("#eval" in p for _, p in llm.calls)
+
+
+def test_a_leaf_is_checked_at_the_cap_timeout_and_its_own_cost_is_not_a_slow_step():
+    # Measured on rmo_2001_2 (frame123, 0/2 with the difference-of-squares leaf
+    # on board): the leaf takes 12 s in an idle image and 50 s on a loaded host;
+    # judged as a model step it hit the 30 s check timeout (one candidate tried,
+    # then break) and the 10 s slow-step delta. A leaf is one cell, paid once.
+    from submission.board_agent import CHECK_TIMEOUT_CAP_S
+
+    class SlowLeafLean(BoardLean):
+        """The theorem's goal carries `hb : x ≤ 3`; every check with the leaf
+        (or with the model's `omega`) closes it, but takes 15 s."""
+        def __init__(self):
+            super().__init__()
+            self.timeouts: list[tuple[str, int | None]] = []
+        async def check_file(self, source, timeout_s=None):
+            check = await super().check_file(source)
+            if "theorem demo" in source and ("interval_cases x" in source or "\n  omega" in source):
+                self.timeouts.append(("leaf" if "interval_cases x" in source else "step", timeout_s))
+                return LeanCheck(True, [], False, False, 15_000)
+            msgs = [dict(m, data=m["data"].replace("⊢ demo", "hb : x ≤ 3\n⊢ x = 2"))
+                    if "⊢ demo" in str(m.get("data")) else m for m in check.messages]
+            return LeanCheck(check.accepted, msgs, check.has_sorry, False, 1)
+
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hb : x ≤ 3) : x = 2 := by\n  sorry\n"
+    lean, llm = SlowLeafLean(), ScriptLLM({"model-a": ["omega"] * 3})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=challenge),
+                                     FakeServices(lean, llm)))
+    leaf = [e for e in result.metadata["events"] if e.get("kind") == "leaf"]
+    assert leaf and leaf[0]["accepted"] and "interval_cases x" in result.solution
+    assert lean.timeouts and lean.timeouts[0] == ("leaf", CHECK_TIMEOUT_CAP_S)
+    assert not any(e.get("stage") == "slow" for e in result.metadata["events"])
+    # The same 15 s from a model step is still refused as slow.
+    lean2, llm2 = SlowLeafLean(), ScriptLLM({"model-a": ["omega"] * 3})
+    lean2.no_leaf = True
+    from submission import board_agent as ba
+    saved = ba.leaf_candidates
+    ba.leaf_candidates = lambda text: []
+    try:
+        result2 = asyncio.run(BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0)).solve(
+            Problem(id="demo", description="p", challenge=challenge), FakeServices(lean2, llm2)))
+    finally:
+        ba.leaf_candidates = saved
+    assert any(e.get("stage") == "slow" for e in result2.metadata["events"])
+    assert lean2.timeouts and lean2.timeouts[0][1] < CHECK_TIMEOUT_CAP_S
