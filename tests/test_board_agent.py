@@ -2796,3 +2796,22 @@ def test_a_step_that_closes_its_goal_is_not_refused_for_its_own_check_time():
     assert not any(e.get("stage") == "slow" for e in result.metadata["events"])
     from submission.agent import COCKTAIL
     assert "subst_vars <;> ring" in COCKTAIL and "subst_vars <;> nlinarith" in COCKTAIL
+
+
+def test_a_goal_a_model_has_repeated_on_is_not_offered_to_it_again_until_the_board_changes():
+    # Measured on rmo_2000_6 (frame128): qwen resubmitted the same rejected
+    # block 1190 times (runs of 125 in a row), 1393 model calls in the run,
+    # most of them repeats the detector caught after the call was paid for.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean = BoardLean()
+    llm = ScriptLLM({"model-a": ["exact gone"] * 40,
+                     "model-b": ["have key : True := by trivial\nexact key"]},
+                    delay={"model-b": 2.0})
+    agent = BoardAgent(Config(lines=("model-a", "model-b"), budget_usd=1.0, time_limit_s=600.0, audit=False))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=challenge),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["solved_by"] == "board_loop"
+    repeats = [e for e in result.metadata["events"] if e.get("kind") == "repeat"]
+    assert len(repeats) <= 1, f"{len(repeats)} repeats"
+    assert sum(1 for m, _ in llm.calls if m == "model-a") <= 3
+

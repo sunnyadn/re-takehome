@@ -2827,15 +2827,25 @@ class BoardAgent(FrameworkAgent):
             options = []
             for rank, b in enumerate(sorted(branches, key=lambda b: b.score)):
                 for g in b.goals:
-                    if g.text and claimed.get(g.key) != model:
-                        options.append(((g.key, model) in repeated, g.key in claimed,
+                    # A goal this model has already answered with a byte-identical
+                    # rejected block is not offered to it again until the board
+                    # changes (measured on rmo_2000_6: 1190 repeats in one run,
+                    # runs of 125 while the other model was in a long call).
+                    if g.text and claimed.get(g.key) != model and (g.key, model) not in repeated:
+                        options.append((g.key in claimed,
                                         b.bid in busy and len(branches) > 1, rank,
                                         tries.get(g.key, 0) >= LAST_IN_LINE,
                                         tries.get(g.key, 0), g.line, b, g))
             if not options:
                 return None
-            best = min(options, key=lambda o: o[:7])
-            return best[7], best[8]
+            best = min(options, key=lambda o: o[:6])
+            return best[6], best[7]
+
+        def exhausted() -> bool:
+            """Every open goal answered with a repeat by every model: nothing
+            more will come from asking, so the board has to change."""
+            return bool(board.goals) and not claimed and all(
+                all((g.key, m) in repeated for m in cfg.lines) for g in board.goals)
 
         def all_last_in_line() -> bool:
             return bool(board.goals) and not claimed and all(
@@ -2964,7 +2974,7 @@ class BoardAgent(FrameworkAgent):
                         idle = 0
                     else:
                         idle += 1
-                        if idle > 3 and not claimed:
+                        if idle > 3 and not claimed and not board.goals:
                             events.append({"stage": "stop", "note": "no goal left to work on"})
                             return
                         try:
@@ -2989,8 +2999,13 @@ class BoardAgent(FrameworkAgent):
                     if any(done_text(b) is not None for b in branches):
                         finished = True
                         return True
-                    if all_last_in_line() or stalled():
+                    if all_last_in_line() or stalled() or exhausted():
+                        drained = exhausted()
                         await unstick()
+                        if drained:
+                            # The board moved (or could not): the models may be
+                            # asked once more, with the new feedback in front of them.
+                            repeated.clear()
                     picked = pick(model)
                     goal = picked[1] if picked else None
                     if picked:
