@@ -1400,21 +1400,24 @@ def test_a_goal_keeps_its_history_when_a_fact_is_added_above_it():
     # Measured on rmo_2000_6 (one52b): every lifted fact changed the hypothesis
     # list, hence the key, of every goal below it; tries reset, and with all
     # goals at 0 the line order decided: `case inl` got 2 prompts in 28 minutes.
-    from submission.board_agent import inherit
+    from submission.board_agent import Notes, inherit
     old = [Goal(5, "  ", "t", "a : ℕ\n⊢ P a"), Goal(9, "  ", "t", "a : ℕ\n⊢ Q a")]
     new = [Goal(5, "  ", "t", "a : ℕ\n⊢ R a"),            # the fact just posted
            Goal(7, "  ", "t", "a : ℕ\nx : R a\n⊢ P a"),   # the same goals, one hypothesis richer
            Goal(11, "  ", "t", "a : ℕ\nx : R a\n⊢ Q a")]
-    tries = {old[0].key: 3, old[1].key: 1}
-    said = {old[1].key: "feedback"}
-    inherit(old, new, (tries, said))
-    assert tries[new[1].key] == 3 and tries[new[2].key] == 1 and said[new[2].key] == "feedback"
-    assert new[0].key not in tries
+    notes = Notes()
+    notes[old[0].key].tries, notes[old[1].key].tries = 3, 1
+    notes[old[1].key].said = "feedback"
+    inherit(old, new, notes)
+    assert notes[new[1].key].tries == 3 and notes[new[2].key].tries == 1
+    assert notes[new[2].key].said == "feedback"
+    assert notes[new[0].key].tries == 0        # the fact just posted starts clean
     # two candidates with the same target: no guess
     twin = new + [Goal(13, "  ", "t", "a : ℕ\nx : R a\n⊢ Q a")]
-    tries2 = {old[1].key: 1}
-    inherit(old, twin, (tries2,))
-    assert new[2].key not in tries2
+    fresh = Notes()
+    fresh[old[1].key].tries = 1
+    inherit(old, twin, fresh)
+    assert fresh[new[2].key].tries == 0
 
 
 def test_an_existential_goal_with_a_decidable_body_gets_its_witness_from_evaluation():

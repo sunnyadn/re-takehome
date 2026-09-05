@@ -1188,10 +1188,78 @@ def inflated(before: str, after: str) -> float:
     return len(now_text) / was
 
 
-def inherit(old: Sequence[Goal], new: Sequence[Goal], tables: Sequence[dict]) -> None:
+@dataclass
+class GoalRecord:
+    """What the ladder remembers about one goal.
+
+    One record per goal in place of a container per thing remembered, so that
+    `has this goal been through the leaf sweep` is a field and not a question
+    about which of fifteen tables to look in."""
+
+    tries: int = 0
+    said: Feedback | None = None
+    plan: str | None = None
+    known_stmt: str = ""
+    claimed_by: str | None = None
+    recalled: bool = False
+    swept: bool = False
+    searched: bool = False
+    divided: bool = False
+    unsplittable: bool = False
+    leaf_restarted: bool = False
+    shelved: str = ""
+    hint: str = ""
+    # Measured on putnam_2020_a2: one model sent the same rejected step to the
+    # same goal 274 times in 23 min. A goal a model repeats itself on goes to
+    # the end of that model's line, so the other model sees it first.
+    repeated: set[str] = field(default_factory=set)
+    refused: set[str] = field(default_factory=set)
+
+    def forget(self) -> None:
+        """The attempt history a restart rolls back, and only that: what was
+        tried, what Lean said, the plan. What the harness learned about the
+        goal's shape survives, because the shape did not change."""
+        self.tries, self.said, self.plan = 0, None, None
+
+
+class Notes(dict):
+    """Goal key to record, making one on first mention."""
+
+    def __missing__(self, key: tuple[str, str]) -> GoalRecord:
+        self[key] = GoalRecord()
+        return self[key]
+
+    def busy(self) -> bool:
+        """Whether any worker is mid-step on any goal."""
+        return any(r.claimed_by for r in self.values())
+
+    def claim(self, key: tuple[str, str], model: str) -> None:
+        if self[key].claimed_by is None:
+            self[key].claimed_by = model
+
+    def forget(self, key: tuple[str, str]) -> None:
+        self[key].forget()
+
+    def forget_decl(self, decl: str) -> None:
+        for key, record in self.items():
+            if key[0] == decl:
+                record.forget()
+
+    def forget_repeats(self) -> None:
+        for record in self.values():
+            record.repeated.clear()
+
+
+def author_free(record: GoalRecord, model: str) -> bool:
+    """Whether this model has not already repeated itself on this goal."""
+    return model not in record.repeated
+
+
+def inherit(old: Sequence[Goal], new: Sequence[Goal], notes: Notes) -> None:
     """A goal whose key vanished because a fact was added above it keeps its
     history: the one new goal of the same declaration and target whose
-    hypotheses contain the old ones takes over its entries in each table."""
+    hypotheses contain the old ones takes over what was tried, what Lean said,
+    and the plan. The rest is about the old key and stays there."""
     kept = {g.key for g in new}
     fresh = [g for g in new if g.key not in {o.key for o in old}]
     for g in old:
@@ -1202,9 +1270,13 @@ def inherit(old: Sequence[Goal], new: Sequence[Goal], tables: Sequence[dict]) ->
                    and hyps <= set(hypotheses(n.text))]
         if len(matches) != 1:
             continue
-        for table in tables:
-            if g.key in table and matches[0].key not in table:
-                table[matches[0].key] = table[g.key]
+        was, now = notes[g.key], notes[matches[0].key]
+        if was.tries and not now.tries:
+            now.tries = was.tries
+        if was.said is not None and now.said is None:
+            now.said = was.said
+        if was.plan is not None and now.plan is None:
+            now.plan = was.plan
 
 
 EXISTS = re.compile(r"^∃\s+(?:\(\s*)?([\w' ]+?)(?:\s*:\s*([^,)]+))?\)?\s*,\s*(.*)$", re.S)
@@ -1663,16 +1735,7 @@ class BoardAgent(FrameworkAgent):
         loose: list[asyncio.Task[Any]] = []
         lock = asyncio.Lock()
         changed = asyncio.Event()
-        claimed: dict[tuple[str, str], str] = {}
-        # Measured on putnam_2020_a2: one model sent the same rejected step to the
-        # same goal 274 times in 23 min. A goal a model repeats itself on goes to
-        # the end of that model's line, so the other model sees it first.
-        repeated: set[tuple[tuple[str, str], str]] = set()
-        tries: dict[tuple[str, str], int] = {}
-        said: dict[tuple[str, str], Feedback] = {}
-        plans: dict[tuple[str, str], str] = {}
-        swept: set[tuple[str, str]] = set()
-        searched: set[tuple[str, str]] = set()
+        notes = Notes()
         probe_spent: dict[str, float] = {"scan": 0.0, "leaf": 0.0, "retry": 0.0}
 
         def affordable(kind: str) -> bool:
@@ -1684,9 +1747,7 @@ class BoardAgent(FrameworkAgent):
             events.append({"stage": "probe_skipped", "kind": kind,
                            "spent_s": round(probe_spent[kind]), "elapsed_s": round(elapsed)})
             return False
-        divided: set[tuple[str, str]] = set()
         restated: dict[str, int] = {}
-        refused: set[tuple[tuple[str, str], str]] = set()
         withdrawn: dict[str, list[str]] = {}
         audited: dict[tuple[str, str], str] = {}
         finished = False
@@ -1797,13 +1858,11 @@ class BoardAgent(FrameworkAgent):
                 events.append({"stage": "prune", "bid": worst.bid, "goals": len(worst.goals)})
 
         cells = Cells()
-        known_stmts: dict[tuple[str, str], str] = {}
         # Statement → the block that closed a cell stating it. A closed cell is
         # a proof of a theorem; withdrawing what enclosed it does not unprove
         # it (measured on rmo_2001_2: the final goal, closed at 67 s, came back
         # as new after the enclosing have was withdrawn and was never reclosed).
         proven: dict[str, str] = {}
-        recalled: set[tuple[str, str]] = set()
 
         def remember_closed(b: Board) -> None:
             lines = b.text.split("\n")
@@ -1932,9 +1991,9 @@ class BoardAgent(FrameworkAgent):
                 found = Board(candidate, goals, kept + messages, accepted, base.bid, check.duration_ms)
             for g in found.goals:
                 if g.stmt:
-                    known_stmts[g.key] = g.stmt
-            found.goals = [g if g.stmt or not known_stmts.get(g.key) else
-                           Goal(g.line, g.indent, g.decl, g.text, known_stmts[g.key], g.cell)
+                    notes[g.key].known_stmt = g.stmt
+            found.goals = [g if g.stmt or not notes[g.key].known_stmt else
+                           Goal(g.line, g.indent, g.decl, g.text, notes[g.key].known_stmt, g.cell)
                            for g in found.goals]
             return found
 
@@ -1957,7 +2016,7 @@ class BoardAgent(FrameworkAgent):
             bid = board.bid
             fresh = await settle(candidate)
             fresh.bid = bid
-            inherit(board.goals, fresh.goals, (tries, said, plans))
+            inherit(board.goals, fresh.goals, notes)
             _, _, dear, broken = classify(fresh.messages)
             if broken or dear:
                 if fresh.text != sound.get(bid, ""):
@@ -1993,8 +2052,8 @@ class BoardAgent(FrameworkAgent):
                     candidate = await look(drop_lines(candidate.text, surplus or idle))
                     continue
                 for goal in candidate.goals:
-                    if goal.text.count("⊢") >= 2 and goal.key not in divided:
-                        divided.add(goal.key)
+                    if goal.text.count("⊢") >= 2 and not notes[goal.key].divided:
+                        notes[goal.key].divided = True
                         apart = split_cursor(candidate.text, goal.text, candidate.index(goal))
                         if apart:
                             events.append({"stage": "split", "goals": goal.text.count("⊢")})
@@ -2009,10 +2068,6 @@ class BoardAgent(FrameworkAgent):
         known_names: dict[str, str] = {}
         # The environment's answer to a goal's vocabulary, once per token set.
         shelf: dict[tuple[str, ...], str] = {}
-        shelved: dict[tuple[str, str], str] = {}
-        leaf_restarts: set[tuple[str, str]] = set()
-        # What evaluation found for an existential goal that no closer finished.
-        hints: dict[tuple[str, str], str] = {}
         # Every plan asked for a declaration, kept across restarts: the next
         # plan is asked to differ from them.
         routes: dict[str, list[str]] = {}
@@ -2032,7 +2087,7 @@ class BoardAgent(FrameworkAgent):
                 events.append({"stage": "library", "tokens": list(tokens),
                                "lines": shelf[tokens].count("\n") + bool(shelf[tokens]),
                                "ms": check.duration_ms})
-            shelved[goal.key] = shelf[tokens]
+            notes[goal.key].shelved = shelf[tokens]
 
         async def nearest_names(messages: Sequence[dict[str, Any]], goal: Goal) -> str:
             """Lean's own answer to a misspelt library name, once per name."""
@@ -2069,7 +2124,7 @@ class BoardAgent(FrameworkAgent):
             the prefix cut."""
 
             nonlocal failed_at, last_span
-            splittable = goal.stmt and goal.key not in unsplittable and not is_root_goal(base.text, goal)
+            splittable = goal.stmt and not notes[goal.key].unsplittable and not is_root_goal(base.text, goal)
             cell_id = cells.new(goal.stmt) if splittable else None
             focus: int | str = cell_id if cell_id is not None else (goal.cell or goal.decl)
 
@@ -2090,12 +2145,12 @@ class BoardAgent(FrameworkAgent):
                         nxt = await look(candidate, base, focus, goal)
                     if any(message_line(m) == span[0] for m in classify(nxt.messages)[3]):
                         events.append({"stage": "inline", "cell": cell_id, "decl": goal.decl})
-                        unsplittable.add(goal.key)
+                        notes[goal.key].unsplittable = True
                         cell_id, focus = None, goal.cell or goal.decl
                         candidate, span = put(base.text, goal, block, trailing)
                         nxt = await look(candidate, base, focus, goal)
                     else:
-                        known_stmts[goal.key] = repaired
+                        notes[goal.key].known_stmt = repaired
                 return candidate, span, nxt
 
             candidate, span, nxt = await placed(True)
@@ -2470,7 +2525,7 @@ class BoardAgent(FrameworkAgent):
             if found:
                 # Kept even when the goal closed: the same goal on a sibling
                 # branch is not swept again (same key) and reads it from the prompt.
-                hints[goal.key] = ("Evaluation over 0 ≤ " + ", ".join(names) + f" < {WITNESS_BOUND} found "
+                notes[goal.key].hint = ("Evaluation over 0 ≤ " + ", ".join(names) + f" < {WITNESS_BOUND} found "
                                    "these values satisfy the body: " + "; ".join(
                                        ", ".join(f"{n} = {v}" for n, v in zip(names, row)) for row in found)
                                    + (f". `{block}` closed it." if accepted else ""))
@@ -2511,7 +2566,6 @@ class BoardAgent(FrameworkAgent):
                 probe_spent["leaf"] += time.monotonic() - t0
 
         conjectured: dict[tuple[str, str], str] = {}
-        unsplittable: set[tuple[str, str]] = set()
         tried_statements: set[str] = set()
         undone: dict[str, list[str]] = {}
 
@@ -2581,9 +2635,9 @@ class BoardAgent(FrameworkAgent):
                            "rewritten": nxt is not None})
             await commit(nxt if nxt is not None else staged)
             left = next((g for g in board.goals if g.decl == goal.decl and "h_gen" in hypotheses(g.text)), None)
-            if left is not None and left.key not in searched:
+            if left is not None and not notes[left.key].searched:
                 # Mathlib may state the rewritten goal outright (Nat.sum_range_choose_halfway).
-                searched.add(left.key)
+                notes[left.key].searched = True
                 await library_sweep(left, force=True)
             return True
 
@@ -2609,7 +2663,7 @@ class BoardAgent(FrameworkAgent):
                     accepted = True
                     break
             if found and not accepted:
-                hints[goal.key] = ("Mathlib's `apply?` on this goal suggested: " + "; ".join(
+                notes[goal.key].hint = ("Mathlib's `apply?` on this goal suggested: " + "; ".join(
                     f"`{how} {term}`" for how, term in found[:3]) + ". Those unify with the goal; the ?_ holes are what is left to prove.")
             events.append({"kind": "library", "goal": goal.text[-120:], "found": len(found),
                            "accepted": accepted, "ms": took})
@@ -2634,7 +2688,7 @@ class BoardAgent(FrameworkAgent):
                 if head and not classify(trimmed.messages)[3]:
                     statement = head.group(1).strip()
                     events.append({"kind": "withdraw", "by": author, "decl": goal.decl,
-                                   "have": statement[:120], "tries": tries.get(goal.key, 0)})
+                                   "have": statement[:120], "tries": notes[goal.key].tries})
                     for g in graded:
                         withdrawn.setdefault(g, []).append(statement)
                     await commit(trimmed, progress=False)
@@ -2651,13 +2705,13 @@ class BoardAgent(FrameworkAgent):
                 fresh, statement = withdraw(board.text, goal)
                 trimmed, whole = await look(fresh), True
             events.append({"kind": "withdraw", "by": author, "have": statement[:120],
-                           "tries": tries.get(goal.key, 0), "whole_block": whole})
+                           "tries": notes[goal.key].tries, "whole_block": whole})
             withdrawn.setdefault(goal.decl, []).append(statement)
             await commit(trimmed, progress=False)
             back = next((g for g in reversed(board.goals) if g.decl == goal.decl
                          and g.line <= goal.line), None)
             if back is not None:
-                said[back.key] = Feedback(
+                notes[back.key].said = Feedback(
                     author, f"`{statement}` was posted here as a `have` and withdrawn "
                     f"{why}. The board is "
                     "back to before it. Do not restate that fact; prove this goal "
@@ -2724,7 +2778,7 @@ class BoardAgent(FrameworkAgent):
             events.append({"kind": "lifted", "by": author, "facts": len(lifted),
                            "dup": len(dup), "from_depth": len(chain), "to_depth": depth})
             if dup:
-                said[goal.key] = Feedback(author, "already on the board: " + ", ".join(
+                notes[goal.key].said = Feedback(author, "already on the board: " + ", ".join(
                     f"`{n}`" for _, n in dup), "lifted")
             return nxt, ""
 
@@ -2736,58 +2790,58 @@ class BoardAgent(FrameworkAgent):
                 here = board.find(goal.key)
                 if edit.kind == "probe":
                     printed = await self._probe(State(text=board.text), edit.body, services)
-                    said[goal.key] = Feedback(author, printed, "probe")
+                    notes[goal.key].said = Feedback(author, printed, "probe")
                     events.append({"kind": "probe", "by": author, "printed": printed[:80]})
                     continue
                 if edit.kind == "drop":
                     events.append({"kind": "drop", "by": author, "name": edit.name})
-                    said[goal.key] = Feedback(
+                    notes[goal.key].said = Feedback(
                         author, f"`{edit.name}` is already declared; work the goal "
                         "you were shown, do not restate it", "rejected")
-                    tries[goal.key] = tries.get(goal.key, 0) + 1
+                    notes[goal.key].tries += 1
                     continue
                 if edit.kind == "step":
                     if here is None:
                         events.append({"kind": "stale", "by": author})
                         continue
-                    if (here.key, edit.body) in refused:
+                    if edit.body in notes[here.key].refused:
                         # Measured on p10: five byte-identical replies in a row.
                         events.append({"kind": "repeat", "by": author})
-                        repeated.add((here.key, author))
-                        said[goal.key] = Feedback(
+                        notes[here.key].repeated.add(author)
+                        notes[goal.key].said = Feedback(
                             author, "that is byte for byte the step already rejected "
                             "on this goal; Lean will say the same thing. Try a "
-                            "different route: " + said[goal.key].text[:600]
-                            if goal.key in said else "that step was already rejected here")
-                        tries[goal.key] = tries.get(goal.key, 0) + 1
+                            "different route: " + notes[goal.key].said.text[:600]
+                            if notes[goal.key].said else "that step was already rejected here")
+                        notes[goal.key].tries += 1
                         continue
                     # Measured on p09: a substring match locked a worker out for 19
                     # min once `n % 3 = 0` was withdrawn and the goal read `⊢ n % 3 = 0`.
                     # Only a `have` stating the claim again is a restatement.
                     if restates(edit.body, withdrawn.get(here.decl, ())):
                         events.append({"kind": "restated", "by": author})
-                        said[goal.key] = Feedback(author, "that step restates a fact "
+                        notes[goal.key].said = Feedback(author, "that step restates a fact "
                                                   "already withdrawn from this declaration")
-                        tries[goal.key] = tries.get(goal.key, 0) + 1
+                        notes[goal.key].tries += 1
                         continue
                     present = proved_facts(board.text, here)
                     if restates(edit.body, present):
                         # Measured on p09: the same claim proved twice in one declaration.
                         names = [present[c] for c in present if restates(edit.body, [c])]
                         events.append({"kind": "restated", "by": author, "of": names[:3]})
-                        said[goal.key] = Feedback(author, "that step states a fact already "
+                        notes[goal.key].said = Feedback(author, "that step states a fact already "
                                                   "on the board as " + ", ".join(f"`{n}`" for n in names[:3])
                                                   + "; use it, do not prove it again")
-                        tries[goal.key] = tries.get(goal.key, 0) + 1
+                        notes[goal.key].tries += 1
                         continue
                     nxt, why = await lift_and_advance(board, here, edit.body, author)
                     if nxt is None:
-                        refused.add((here.key, edit.body))
+                        notes[here.key].refused.add(edit.body)
                     events.append({"kind": "step", "by": author, "accepted": nxt is not None,
                                    **({} if nxt is not None else {"why": str(why)[:160]})})
                     if nxt is None:
-                        said[goal.key] = Feedback(author, why)
-                        tries[goal.key] = tries.get(goal.key, 0) + 1
+                        notes[goal.key].said = Feedback(author, why)
+                        notes[goal.key].tries += 1
                         continue
                     await commit(nxt)
                     took = True
@@ -2802,9 +2856,9 @@ class BoardAgent(FrameworkAgent):
                     events.append({"kind": "lemma", "by": author, "name": edit.name,
                                    "accepted": kept})
                     if not kept:
-                        said[goal.key] = Feedback(
+                        notes[goal.key].said = Feedback(
                             author, bad or format_messages(lifted.messages)[:FEEDBACK_CHARS])
-                        tries[goal.key] = tries.get(goal.key, 0) + 1
+                        notes[goal.key].tries += 1
                         continue
                     await commit(lifted)
                     took = True
@@ -2816,7 +2870,7 @@ class BoardAgent(FrameworkAgent):
                         if nxt is not None:
                             await commit(nxt)
                         else:
-                            said[fresh.key] = Feedback(author, why)
+                            notes[fresh.key].said = Feedback(author, why)
                     continue
                 if edit.kind == "prove":
                     # The whole proof of a named declaration replaces what it had.
@@ -2837,8 +2891,8 @@ class BoardAgent(FrameworkAgent):
                     events.append({"kind": "step", "by": author, "accepted": nxt is not None,
                                    **({} if nxt is not None else {"why": str(why)[:160]})})
                     if nxt is None:
-                        said[goal.key] = Feedback(author, why)
-                        tries[goal.key] = tries.get(goal.key, 0) + 1
+                        notes[goal.key].said = Feedback(author, why)
+                        notes[goal.key].tries += 1
                         continue
                     await commit(nxt)
                     took = True
@@ -2853,7 +2907,7 @@ class BoardAgent(FrameworkAgent):
             # not: with two routes open both workers went to the better-ranked
             # one and the other route got 2 turns in 40 (measured on rmo_2000_6).
             busy = {b.bid for b in branches for g in b.goals
-                    if claimed.get(g.key) not in (None, model)}
+                    if notes[g.key].claimed_by not in (None, model)}
             options = []
             for rank, b in enumerate(sorted(branches, key=lambda b: b.score)):
                 for g in b.goals:
@@ -2861,11 +2915,11 @@ class BoardAgent(FrameworkAgent):
                     # rejected block is not offered to it again until the board
                     # changes (measured on rmo_2000_6: 1190 repeats in one run,
                     # runs of 125 while the other model was in a long call).
-                    if g.text and claimed.get(g.key) != model and (g.key, model) not in repeated:
-                        options.append((g.key in claimed,
+                    if g.text and notes[g.key].claimed_by != model and author_free(notes[g.key], model):
+                        options.append((notes[g.key].claimed_by is not None,
                                         b.bid in busy and len(branches) > 1, rank,
-                                        tries.get(g.key, 0) >= LAST_IN_LINE,
-                                        tries.get(g.key, 0), g.line, b, g))
+                                        notes[g.key].tries >= LAST_IN_LINE,
+                                        notes[g.key].tries, g.line, b, g))
             if not options:
                 return None
             best = min(options, key=lambda o: o[:6])
@@ -2874,16 +2928,16 @@ class BoardAgent(FrameworkAgent):
         def exhausted() -> bool:
             """Every open goal answered with a repeat by every model: nothing
             more will come from asking, so the board has to change."""
-            return bool(board.goals) and not claimed and all(
-                all((g.key, m) in repeated for m in cfg.lines) for g in board.goals)
+            return bool(board.goals) and not notes.busy() and all(
+                all(m in notes[g.key].repeated for m in cfg.lines) for g in board.goals)
 
         def all_last_in_line() -> bool:
-            return bool(board.goals) and not claimed and all(
-                tries.get(g.key, 0) >= LAST_IN_LINE for g in board.goals)
+            return bool(board.goals) and not notes.busy() and all(
+                notes[g.key].tries >= LAST_IN_LINE for g in board.goals)
 
         def stalled() -> bool:
             """Nothing accepted for STALL_SHARE of the window, no worker mid-step."""
-            return bool(board.goals) and not claimed and (
+            return bool(board.goals) and not notes.busy() and (
                 time.monotonic() - progress_at > STALL_SHARE * cfg.time_limit_s)
 
         async def unstick() -> None:
@@ -2893,18 +2947,18 @@ class BoardAgent(FrameworkAgent):
 
             nonlocal next_bid
 
-            worst = max(board.goals, key=lambda g: tries.get(g.key, 0), default=None)
+            worst = max(board.goals, key=lambda g: notes[g.key].tries, default=None)
             if worst is None or not worst.decl:
                 return
             # Measured on rmo_2000_6 (one55a 08:46→08:51): one goal left, 6 tries,
             # and the declaration went back to its statement. Goals sitting among
             # proved facts restart themselves once before the declaration does.
-            leaves = [g for g in board.goals if g.key not in leaf_restarts
+            leaves = [g for g in board.goals if not notes[g.key].leaf_restarted
                       and settled_inside(board.text, g) >= 2]
             if leaves:
                 for g in leaves:
-                    leaf_restarts.add(g.key)
-                    tries.pop(g.key, None); said.pop(g.key, None); plans.pop(g.key, None)
+                    notes[g.key].leaf_restarted = True
+                    notes.forget(g.key)
                 events.append({"kind": "leaf_restart", "by": "harness", "goals": len(leaves),
                                "settled": settled_inside(board.text, leaves[0])})
                 return
@@ -2913,7 +2967,7 @@ class BoardAgent(FrameworkAgent):
             # no open goal sits inside a `have` any more.
             inside = [g for g in board.goals if withdraw_only(board.text, g)[0]]
             if inside:
-                deepest = max(inside, key=lambda g: (len(g.indent), tries.get(g.key, 0)))
+                deepest = max(inside, key=lambda g: (len(g.indent), notes[g.key].tries))
                 # The stuck subtree is not thrown away: the board with it stays
                 # as a sibling branch and the take-back happens on a fork, so
                 # the two ways forward race, as two plans do.
@@ -2944,9 +2998,8 @@ class BoardAgent(FrameworkAgent):
                     events.append({"stage": "fork", "from": branches[0].bid if branches else 0,
                                    "to": fork.bid, "why": "reset"})
                 events.append({"stage": "reset", "cell": held.id, "decl": worst.decl,
-                               "tries": tries.get(worst.key, 0)})
-                for table in (tries, said, plans):
-                    table.pop(worst.key, None)
+                               "tries": notes[worst.key].tries})
+                notes.forget(worst.key)
                 first_line = board.text.split("\n")[held.start].strip()
                 undone.setdefault(worst.decl, []).append(first_line)
                 await commit(await look(reset_cell(board.text, held)), progress=False)
@@ -2955,32 +3008,30 @@ class BoardAgent(FrameworkAgent):
             restated[worst.decl] = restated.get(worst.decl, 0) + 1
             fresh_text, _ = restate(board.text, worst.decl)
             events.append({"stage": "restate", "decl": worst.decl,
-                           "tries": tries.get(worst.key, 0)})
-            for table in (tries, said, plans):
-                for key in [k for k in table if k[0] == worst.decl]:
-                    del table[key]
+                           "tries": notes[worst.key].tries})
+            notes.forget_decl(worst.decl)
             await commit(await look(fresh_text), progress=False)
 
         def prompt_for(goal: Goal, model: str, skeleton: bool = False,
                        plan: str | None = None) -> str:
             source, line = view(*render(board.text, board.index(goal))[:1], goal.decl)
-            plan = plans.get(goal.key) if plan is None else plan
+            plan = notes[goal.key].plan if plan is None else plan
             parts = [f"Problem: {problem.description}".strip(),
                      "File:\n" + source[-FILE_CHARS:],
                      "What Lean reports as open, with its hypotheses. The first goal "
                      f"is the active one, at `skip` on line {line}:\n"
                      f"{goal.text[:GOAL_CHARS]}"]
-            if hints.get(goal.key):
-                parts.append(hints[goal.key])
-            sheet = "\n".join(x for x in (sheet_for(goal.text), shelved.get(goal.key, "")) if x)
+            if notes[goal.key].hint:
+                parts.append(notes[goal.key].hint)
+            sheet = "\n".join(x for x in (sheet_for(goal.text), notes[goal.key].shelved) if x)
             if sheet:
                 parts.append("Names the loaded Mathlib has for this goal's vocabulary, "
                              f"as #check prints them:\n{sheet}")
             if plan:
                 parts.append("A mathematician was asked how to prove this goal and "
                              f"answered:\n{plan}")
-            if said.get(goal.key):
-                parts.append(f"{said[goal.key].lead(model)}:\n{said[goal.key].text}")
+            if notes[goal.key].said:
+                parts.append(f"{notes[goal.key].said.lead(model)}:\n{notes[goal.key].said.text}")
             if skeleton:
                 # Measured on rmo_2001_2: the plan was right at t=173 and both
                 # models then tried to write all of it in one reply, 37 times
@@ -3004,7 +3055,7 @@ class BoardAgent(FrameworkAgent):
                         idle = 0
                     else:
                         idle += 1
-                        if idle > 3 and not claimed and not board.goals:
+                        if idle > 3 and not notes.busy() and not board.goals:
                             events.append({"stage": "stop", "note": "no goal left to work on"})
                             return
                         try:
@@ -3035,38 +3086,38 @@ class BoardAgent(FrameworkAgent):
                         if drained:
                             # The board moved (or could not): the models may be
                             # asked once more, with the new feedback in front of them.
-                            repeated.clear()
+                            notes.forget_repeats()
                     picked = pick(model)
                     goal = picked[1] if picked else None
                     if picked:
                         focus(picked[0])
                     base = board
-                    if goal is not None and goal.stmt in proven and goal.key not in recalled:
-                        recalled.add(goal.key)
+                    if goal is not None and goal.stmt in proven and not notes[goal.key].recalled:
+                        notes[goal.key].recalled = True
                         nxt, _ = await judge(base, goal, proven[goal.stmt])
                         if nxt is not None:
                             events.append({"kind": "recall", "goal": goal.text[-120:]})
                             await commit(nxt)
                             return True
-                    if goal is not None and goal.key not in swept:
-                        swept.add(goal.key)
+                    if goal is not None and not notes[goal.key].swept:
+                        notes[goal.key].swept = True
                         if await sweep(goal) or await leaf_sweep(goal) or await witness_sweep(goal) \
                                 or await generalise_sweep(goal):
                             return True
-                    if goal is not None and goal.key not in searched \
-                            and tries.get(goal.key, 0) >= SEARCH_AFTER:
+                    if goal is not None and not notes[goal.key].searched \
+                            and notes[goal.key].tries >= SEARCH_AFTER:
                         # Measured over 70 runs: `apply?` and the name scan took
                         # 19% of the wall clock under the lock (601 probes, 22
                         # goals closed; 269 scans at 22 s), and Lean is busy
                         # 60-74% of a run. A goal the first step closes never pays.
-                        searched.add(goal.key)
+                        notes[goal.key].searched = True
                         if await library_sweep(goal):
                             return True
                         await consult(goal)
                     if goal is not None:
-                        claimed.setdefault(goal.key, model)
-                        wants_plan = (tries.get(goal.key, 0) >= PLAN_AFTER
-                                      and not plans.get(goal.key))
+                        notes.claim(goal.key, model)
+                        wants_plan = (notes[goal.key].tries >= PLAN_AFTER
+                                      and not notes[goal.key].plan)
                         ask = prompt_for(goal, model)
                 if goal is not None and wants_plan:
                     # The crux is where routes diverge, so it gets two: one plan
@@ -3080,7 +3131,7 @@ class BoardAgent(FrameworkAgent):
                         self._ask_plan(problem, state, services, ledger, model, avoid=avoid))
                     ask_second, fork = "", None
                     async with lock:
-                        plans[goal.key] = plan
+                        notes[goal.key].plan = plan
                         routes.setdefault(goal.decl, []).extend(
                             p for p in (plan, second) if p.strip())
                         events.append({"kind": "plan", "by": other, "chars": len(plan)})
@@ -3125,7 +3176,7 @@ class BoardAgent(FrameworkAgent):
                                 focus(main)
                     if not ask:
                         async with lock:
-                            claimed.pop(goal.key, None)
+                            notes[goal.key].claimed_by = None
                         return True
                 if goal is None:
                     return False
@@ -3137,16 +3188,16 @@ class BoardAgent(FrameworkAgent):
                 finally:
                     loose.remove(task)
                 async with lock:
-                    if claimed.get(goal.key) == model:
-                        claimed.pop(goal.key, None)
+                    if notes[goal.key].claimed_by == model:
+                        notes[goal.key].claimed_by = None
                     if why == "length":
                         reply = salvage(reply)
                         kept = reply.count("\n") + 1 if reply else 0
                         events.append({"kind": "cut", "by": model, "kept": kept})
                         if not kept:
-                            said[goal.key] = Feedback(model, said[goal.key].text
-                                                      if goal.key in said else "nothing yet", "cut")
-                            tries[goal.key] = tries.get(goal.key, 0) + 1
+                            notes[goal.key].said = Feedback(model, notes[goal.key].said.text
+                                                            if notes[goal.key].said else "nothing yet", "cut")
+                            notes[goal.key].tries += 1
                             return True
                     now = live(base.bid)
                     here = now.find(goal.key) if now else None
@@ -3180,19 +3231,19 @@ class BoardAgent(FrameworkAgent):
                     edits = interpret(reply, board, here, graded)
                     if not edits:
                         events.append({"kind": "empty", "by": model})
-                        said[goal.key] = Feedback(model, said[goal.key].text
-                                                  if goal.key in said else "nothing yet", "empty")
-                        tries[goal.key] = tries.get(goal.key, 0) + 1
+                        notes[goal.key].said = Feedback(model, notes[goal.key].said.text
+                                                        if notes[goal.key].said else "nothing yet", "empty")
+                        notes[goal.key].tries += 1
                         return True
                     await apply(model, here, edits)
                     still = board.find(goal.key)
-                    if still is not None and tries.get(goal.key, 0) >= WITHDRAW_AFTER:
-                        if settled_inside(board.text, still) >= 2 and still.key not in leaf_restarts:
+                    if still is not None and notes[goal.key].tries >= WITHDRAW_AFTER:
+                        if settled_inside(board.text, still) >= 2 and not notes[still.key].leaf_restarted:
                             # Measured on rmo_2000_6 (win54): one stuck case took the
                             # have with h2a, h5a and 2 closed cases down. The leaf
                             # restarts once before proved work is withdrawn.
-                            leaf_restarts.add(still.key)
-                            tries.pop(still.key, None); said.pop(still.key, None); plans.pop(still.key, None)
+                            notes[still.key].leaf_restarted = True
+                            notes.forget(still.key)
                             events.append({"kind": "leaf_restart", "by": model, "goal": still.text[-160:],
                                            "settled": settled_inside(board.text, still)})
                         else:
