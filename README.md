@@ -1,3 +1,37 @@
+# Two models on one Lean file
+
+**A model is the last thing this system pays for, not the first.** The file is a
+board, every open `sorry` on it is a goal, and each goal walks a ladder of
+increasingly expensive ways to close it. Lean is cheap and always right, so
+everything Lean can decide alone is tried before a token is spent.
+
+```mermaid
+flowchart LR
+    G(["an open goal"]) --> FREE["<b>six deterministic rungs</b><br/>recall · tactic cocktail · shape leaf<br/>witness search · conjecture · library search"]
+    FREE -- closed --> LEAN(["Lean decides"])
+    FREE -- "still open" --> M["<b>ask ONE model<br/>for ONE step</b>"]
+    M --> AUDIT["<b>audit the claim</b><br/>evaluate · sample · the other model"]
+    AUDIT --> LEAN
+    LEAN -- rejected --> G
+    LEAN -- accepted --> CELL["the step becomes<br/>its own theorem"]
+    CELL --> G
+
+    classDef free fill:#dfeee5,stroke:#2c6a4a,color:#14181a
+    classDef paid fill:#f6e9d3,stroke:#96600f,color:#14181a
+    class FREE,CELL free
+    class M,AUDIT paid
+```
+
+**16 of 16 sample problems · slowest 421 s against an 8 h cap · ten of the sixteen
+finish without a single model reply.**
+
+[How it works](docs/ARCHITECTURE.md) · [What the two models each contributed](docs/PART2.md) ·
+[Design notes](docs/APPROACH.md) · runs under [`outputs/board/`](outputs/board)
+
+---
+
+*Everything below is the take-home kit's own README, unchanged.*
+
 # Verified Mechanisms Take-Home Harness
 
 This repository contains the infrastructure for the Verified Mechanisms
