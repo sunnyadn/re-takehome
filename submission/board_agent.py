@@ -26,7 +26,8 @@ from submission.framework import (DECL_HEAD, axiom_probe, classify, definition_s
 from submission.framework_agent import (VACUOUS, BUDGET_RETRY, FILE_CHARS, ANSWER_TOKENS, strip_fences, GOAL_CHARS, LOOSE_DRAIN_S, RAISED_BUDGETS, SLOW_COMPILE_MS, FRAMEWORK_SYSTEM, Feedback, FrameworkAgent, State, notes_for, sheet_for)
 from submission.board.types import (Board, Edit, Goal, HAVE_HEAD, Notes, all_cell_spans, author_free, binder_names, hyp_count, hypotheses, inherit, is_root_goal, narrates, owner, shift_message, signature, split_top, step_tokens, target_of)
 from submission.board.reply import (ascribe_literals, claim_of, dialect, interpret, mine_statements, salvage, set_elements, unwrap)
-from submission.board.text import (context_grows, drop_declaration, enclosing_chain, enclosing_have, inflated, is_stated, proved_facts, put, restates, settled_inside, shed_unreferenced, split_facts, split_statement, stated_facts, view, withdraw, withdraw_only)
+from submission.run.budget import Budget
+from submission.board.text import (base_region, context_grows, drop_declaration, enclosing_chain, enclosing_have, inflated, is_stated, proved_facts, put, restates, settled_inside, shed_unreferenced, split_facts, split_statement, stated_facts, view, withdraw, withdraw_only)
 from submission.board.probes import (CHECK_TIMEOUT_CAP_S, CHECK_TIMEOUT_FLOOR_S, PROBE, UNKNOWN_NAME, WITNESS_BOUND, apply_file, audit_prompt, check_timeout_s, container_memory_bytes, counterexample_search, dump_check, existential, extract_file, fired_closer, goal_tokens, have_extract_file, is_closed, library_file, library_names, name_probe_file, read_board, read_library, read_name_probe, read_suggestions, read_witness, read_witnesses, render_all, searched_clean, statements, tagged_closers, witness_file, witness_search_file)
 
 # The cursor loop's prompt, less "give every have a body": on the board a
@@ -50,14 +51,6 @@ assert "goal on the board" in BOARD_SYSTEM
 PLAN_AFTER = 2
 # Library probes (`apply?`, the name scan) wait for one rejected step.
 SEARCH_AFTER = 1
-# What the harness's own Lean probes may take of the wall clock so far: the
-# environment scans (names, the vocabulary scan, apply?) and the leaf blocks,
-# each at this share, after a grace period. Measured on a 4-core pod
-# (rmo_2000_6, v7.85): 425 checks, Lean 2443 s of 2642 s, of which names 689 s,
-# apply? and the scan 478 s, leaves 466 s; 91 model calls in 44 minutes.
-PROBE_SHARE = 0.15
-RETRY_SHARE = 0.05
-PROBE_GRACE_S = 60.0
 # A goal this many rejections deep is still open, only last in line. Time and
 # money are the exits; a goal is never declared hopeless by count alone.
 LAST_IN_LINE = 6
@@ -557,9 +550,6 @@ class BoardAgent(FrameworkAgent):
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
         services = in_file_coordinates(services)
         cfg = self.config
-        started = time.monotonic()
-        deadline = started + cfg.last_turn_start_s
-        progress_at = started
         ledger = Ledger()
         names = answer_names(problem.challenge)
         graded = declared_names(problem.challenge)
@@ -574,27 +564,15 @@ class BoardAgent(FrameworkAgent):
         lock = asyncio.Lock()
         changed = asyncio.Event()
         notes = Notes()
-        probe_spent: dict[str, float] = {"scan": 0.0, "leaf": 0.0, "retry": 0.0}
+        budget = Budget(cfg, ledger, events)
+        progress_at = budget.started
 
-        def affordable(kind: str) -> bool:
-            """Whether this probe kind is still inside its share of the clock."""
-            elapsed = time.monotonic() - started
-            share = RETRY_SHARE if kind == "retry" else PROBE_SHARE
-            if probe_spent[kind] <= PROBE_GRACE_S or probe_spent[kind] <= share * elapsed:
-                return True
-            events.append({"stage": "probe_skipped", "kind": kind,
-                           "spent_s": round(probe_spent[kind]), "elapsed_s": round(elapsed)})
-            return False
         restated: dict[str, int] = {}
         withdrawn: dict[str, list[str]] = {}
         audited: dict[tuple[str, str], str] = {}
         finished = False
 
-        def time_left() -> float:
-            return deadline - time.monotonic()
 
-        def can_ask() -> bool:
-            return ledger.spent_usd < BUDGET_HEADROOM * cfg.budget_usd
 
         def offer(candidate: str, accepted: bool) -> None:
             nonlocal best
@@ -634,7 +612,7 @@ class BoardAgent(FrameworkAgent):
                 "solved_by": how,
                 "accepted_by_repl": accepted,
                 "spend_usd": round(ledger.spent_usd, 6),
-                "wall_s": round(time.monotonic() - started, 1),
+                "wall_s": round(budget.elapsed(), 1),
                 "turns": len(events),
                 "events": list(events),
             })
@@ -650,7 +628,7 @@ class BoardAgent(FrameworkAgent):
             return delivered
 
         async def deliver_form(text: str, how: str) -> AgentResult | None:
-            state = await self._finish(State(text=text, accepted=True), services, time_left)
+            state = await self._finish(State(text=text, accepted=True), services, budget.time_left)
             final = state.text
             if not uses_techniques(final):
                 # The judge compiles cold, 180 s on 4 cores; a proof that never
@@ -715,16 +693,6 @@ class BoardAgent(FrameworkAgent):
                     proven[stmt] = block
                     events.append({"stage": "proven", "cell": sp.id, "stmt": stmt[-80:], "lines": block.count("\n") + 1})
 
-        def base_region(base: Board, focus: int | str, edited: Goal | None) -> tuple[int, int] | None:
-            """The lines of `focus` in the base text: a cell's span, a proof's
-            span, or the one placeholder a new cell replaced."""
-            if isinstance(focus, int):
-                held = next((sp for sp in all_cell_spans(base.text) if sp.id == focus), None)
-                if held:
-                    return held.start, held.end
-                return (edited.line, edited.line) if edited else None
-            span = proof_span(base.text, focus)
-            return (line_of(base.text, span[0]), line_of(base.text, max(span[1] - 1, span[0]))) if span else None
 
         dissolved = 0
 
@@ -916,11 +884,11 @@ class BoardAgent(FrameworkAgent):
             if len(tokens) < 2:
                 return
             if tokens not in shelf:
-                if not affordable("scan"):
+                if not budget.affordable("scan"):
                     return
                 imports = "\n".join(l for l in text.split("\n") if l.startswith("import "))
                 check = await services.lean.check_file(library_file(imports, tokens), timeout_s=90)
-                probe_spent["scan"] += check.duration_ms / 1000
+                budget.spent("scan", check.duration_ms / 1000)
                 shelf[tokens] = read_library(check.messages)
                 events.append({"stage": "library", "tokens": list(tokens),
                                "lines": shelf[tokens].count("\n") + bool(shelf[tokens]),
@@ -931,10 +899,10 @@ class BoardAgent(FrameworkAgent):
             """Lean's own answer to a misspelt library name, once per name."""
             names = library_names(messages, goal.text)
             fresh = [n for n in names if n not in known_names]
-            if fresh and affordable("scan"):
+            if fresh and budget.affordable("scan"):
                 imports = "\n".join(l for l in text.split("\n") if l.startswith("import "))
                 check = await services.lean.check_file(name_probe_file(imports, fresh), timeout_s=90)
-                probe_spent["scan"] += check.duration_ms / 1000
+                budget.spent("scan", check.duration_ms / 1000)
                 found = read_name_probe(check.messages)
                 for n in fresh:
                     part = next((p for p in found.split("\n\n") if p.startswith(n + " ")), "")
@@ -1142,7 +1110,7 @@ class BoardAgent(FrameworkAgent):
                 if audited.get(sub["key"]):
                     return audited[sub["key"]]
             subjects = [sub for sub in subjects if sub["key"] not in audited]
-            if not subjects or not can_ask():
+            if not subjects or not budget.can_ask():
                 return ""
             goals = [sub for sub in subjects if "goal" in sub]
             haves = [sub for sub in subjects if "at" in sub]
@@ -1286,7 +1254,7 @@ class BoardAgent(FrameworkAgent):
                         break
                     order = order[len(order) // 2 + 1:] if len(order) > 1 else []
                 retry = hand_to_search(block)
-                if nxt is None and retry != block and affordable("retry"):
+                if nxt is None and retry != block and budget.affordable("retry"):
                     # `exact?` costs ~27 s a call here and leaves 2 GB of index in
                     # the container (measured, p10); it has a share of its own so
                     # it cannot starve `apply?` on a stuck goal (measured on
@@ -1294,7 +1262,7 @@ class BoardAgent(FrameworkAgent):
                     # `10 ≤ a * b` then waited 40 minutes for Nat.le_of_dvd).
                     t0 = time.monotonic()
                     nxt, _ = await judge(base, goal, retry)
-                    probe_spent["retry"] += time.monotonic() - t0
+                    budget.spent("retry", time.monotonic() - t0)
                     events.append({"kind": "search-retry", "by": author,
                                    "accepted": nxt is not None})
                 if nxt is None:
@@ -1379,7 +1347,7 @@ class BoardAgent(FrameworkAgent):
 
             base = board
             candidates = leaf_candidates(goal.text) if cfg.leaves else []
-            if not candidates or not affordable("leaf"):
+            if not candidates or not budget.affordable("leaf"):
                 return False
             t0 = time.monotonic()
             tried = 0
@@ -1394,14 +1362,14 @@ class BoardAgent(FrameworkAgent):
                                        "ms": int((time.monotonic() - t0) * 1000)})
                         await commit(nxt)
                         return True
-                    if why == TIMED_OUT or not affordable("leaf"):
+                    if why == TIMED_OUT or not budget.affordable("leaf"):
                         break
                 events.append({"kind": "leaf", "goal": goal.text[-120:], "accepted": False,
                                "tried": tried, "ms": int((time.monotonic() - t0) * 1000)})
                 return False
             finally:
                 heavy["leaf"] = False
-                probe_spent["leaf"] += time.monotonic() - t0
+                budget.spent("leaf", time.monotonic() - t0)
 
         conjectured: dict[tuple[str, str], str] = {}
         tried_statements: set[str] = set()
@@ -1415,7 +1383,7 @@ class BoardAgent(FrameworkAgent):
             goal rewrites by it. Measured: putnam_2020_a2, 0/32 model proposals."""
 
             target = target_of(goal.text)
-            if goal.decl.startswith("vm_conj_") or "h_gen" in hypotheses(goal.text) or not affordable("leaf"):
+            if goal.decl.startswith("vm_conj_") or "h_gen" in hypotheses(goal.text) or not budget.affordable("leaf"):
                 return False
             ks = _sum_variables(leaf_hyps(goal.text), target)
             halves = split_top(target, " = ")
@@ -1442,7 +1410,7 @@ class BoardAgent(FrameworkAgent):
                             blank_techniques(verify_file(prefix, fam, guess, fresh, k)), timeout_s=60)
                         if verified(check.messages):
                             found.append((fam, guess))
-                probe_spent["leaf"] += time.monotonic() - t0
+                budget.spent("leaf", time.monotonic() - t0)
                 events.append({"stage": "conjecture", "goal": target[:100], "families": len(fams),
                                "fits": [g for _, g in found][:3]})
             if not found:
@@ -1485,11 +1453,11 @@ class BoardAgent(FrameworkAgent):
             rest go into the prompt as the names that fit. Measured in the
             image: 4 of 4 leaf goals closed by exact, about 8 s each."""
 
-            if not force and not affordable("scan"):
+            if not force and not budget.affordable("scan"):
                 return False
             # The file's own check time plus the heartbeat-capped search.
             answered, took = await probe(apply_file(board.text, goal), goal.line, check_timeout_s(board.ms) + 30)
-            probe_spent["scan"] += took / 1000
+            budget.spent("scan", took / 1000)
             found = read_suggestions(answered, goal.line)
             accepted = False
             for how, term in found:
@@ -1885,9 +1853,8 @@ class BoardAgent(FrameworkAgent):
             return "\n\n".join(parts)
 
         async def worker(model: str) -> None:
-            nonlocal finished
             idle, faults = 0, 0
-            while time_left() > 0 and can_ask() and not finished:
+            while budget.time_left() > 0 and budget.can_ask() and not finished:
                 try:
                     if await turn(model):
                         idle = 0
@@ -2092,7 +2059,7 @@ class BoardAgent(FrameworkAgent):
             cocktail = await usable_cocktail(services)
             for candidate in sweep_files(problem.challenge, cocktail) + split_files(
                     problem.challenge, cocktail):
-                if time_left() <= 0:
+                if budget.time_left() <= 0:
                     break
                 check = await services.lean.check_file(candidate)
                 if check.accepted and not scoring_faults(candidate, names, problem.challenge):
@@ -2103,11 +2070,11 @@ class BoardAgent(FrameworkAgent):
                     offer(candidate, True)
                     return result(candidate, "deterministic_sweep", True)
 
-            if graded_theorems(problem.challenge) > 1 and can_ask():
+            if graded_theorems(problem.challenge) > 1 and budget.can_ask():
                 text = await self._share(problem, text, services, ledger, events)
-            if definition_slots(text) and can_ask():
+            if definition_slots(text) and budget.can_ask():
                 text = await self._define(problem, text, services, ledger, events)
-            if names and can_ask():
+            if names and budget.can_ask():
                 text = await self._resolve_answers(
                     problem, text, names, services, ledger, events)
 

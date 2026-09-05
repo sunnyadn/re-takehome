@@ -7,7 +7,7 @@ from submission.cells import marker, strip_markers
 from submission.techniques import strip_techniques, without_techniques
 from submission.framework import (DECLARATION, DECL_HEAD, line_of, normalise_steps, placeholders, proof_span, reindent, root_names)
 
-from submission.board.types import (OPENERS, CLOSERS, Goal, HAVE_HEAD, HAVE_NAME, INTRO_LIKE, groups, hypotheses, owner)
+from submission.board.types import (OPENERS, CLOSERS, Board, Goal, all_cell_spans, HAVE_HEAD, HAVE_NAME, INTRO_LIKE, groups, hypotheses, owner)
 from submission.board.reply import claim_of, fold_heads, unwrap
 
 
@@ -323,3 +323,15 @@ def view(source: str, decl: str) -> tuple[str, int]:
     at = next((i for i, l in enumerate(source.split("\n"), start=1) if l.strip() == "skip"), 0)
     return source, at
 
+
+
+def base_region(base: Board, cell: int | str, edited: Goal | None) -> tuple[int, int] | None:
+    """The lines of `cell` in the base text: a cell's span, a proof's
+    span, or the one placeholder a new cell replaced."""
+    if isinstance(cell, int):
+        held = next((sp for sp in all_cell_spans(base.text) if sp.id == cell), None)
+        if held:
+            return held.start, held.end
+        return (edited.line, edited.line) if edited else None
+    span = proof_span(base.text, cell)
+    return (line_of(base.text, span[0]), line_of(base.text, max(span[1] - 1, span[0]))) if span else None
