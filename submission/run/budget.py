@@ -1,5 +1,5 @@
 """What the run can still afford: the clock, the money, and each probe kind's
-share of the clock. Depends on nothing else in the run."""
+share of the clock. The first part of a run: it depends only on `context`."""
 
 from __future__ import annotations
 import time

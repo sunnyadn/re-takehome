@@ -1,6 +1,9 @@
 """A board of open goals, each known by its content, two models working two
 of them at once; Lean judges every edit against the whole file. The file is
-still the proof; a reply is read once, as a proof of whatever it names."""
+still the proof; a reply is read once, as a proof of whatever it names.
+
+`solve` below is the whole program. The seven parts it wires are listed in
+`submission/run/__init__.py`, in the order they depend on each other."""
 
 
 from __future__ import annotations
