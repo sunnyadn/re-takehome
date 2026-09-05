@@ -1,0 +1,3495 @@
+{
+  "schema_version": 1,
+  "problem_id": "putnam_2018_a1",
+  "status": "failed",
+  "passed": false,
+  "points": 0,
+  "comparator": {
+    "passed": false,
+    "exit_code": 1,
+    "timed_out": false,
+    "duration_ms": 24070,
+    "output": {
+      "passed": false,
+      "exit_code": 1,
+      "stdout": "Building Challenge\n⚠ [8655/8656] Built Challenge (2.9s)\nwarning: Challenge.lean:3:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[putnam_2018_a1, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge\nBuilding Solution\n⚠ [8655/8656] Built Solution (7.1s)\nwarning: Solution.lean:408:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[putnam_2018_a1, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution\n",
+      "stderr": "WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Challenge\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Challenge -- putnam_2018_a1 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Solution\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Solution -- putnam_2018_a1 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nuncaught exception: Illegal axiom detected: 'sorryAx'\n"
+    }
+  },
+  "answer_shape": {
+    "passed": true,
+    "errors": []
+  },
+  "budget": {
+    "limit_usd": 1.0,
+    "spent_usd": 0.11682668999999996,
+    "reserved_usd": 0,
+    "accounting_complete": true
+  },
+  "within_time": true,
+  "wall_s": 2699.205,
+  "models_used": [
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.5-flash-02-23"
+  ],
+  "both_required_models_used": true,
+  "agent_error": null,
+  "agent_metadata": {
+    "strategy": "board",
+    "solved_by": "best_effort",
+    "accepted_by_repl": false,
+    "spend_usd": 0.116827,
+    "wall_s": 2674.5,
+    "turns": 603,
+    "events": [
+      {
+        "stage": "memory",
+        "checks": 42,
+        "mb": 701
+      },
+      {
+        "stage": "memory",
+        "checks": 44,
+        "mb": 723
+      },
+      {
+        "stage": "memory",
+        "checks": 48,
+        "mb": 748
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2222
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "putnam_2018_a1"
+      },
+      {
+        "stage": "memory",
+        "checks": 52,
+        "mb": 781
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 2
+      },
+      {
+        "stage": "memory",
+        "checks": 56,
+        "mb": 893
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1570
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 0
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2131
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "fork",
+        "from": 0,
+        "to": 1,
+        "goal": "a b : ℤ\nh : 0 < a ∧ 0 < b\n⊢ 1 / ↑a + 1 / ↑b = 3 / 2018 ↔\n   "
+      },
+      {
+        "stage": "inline",
+        "cell": 3,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "stage": "memory",
+        "checks": 61,
+        "mb": 904
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1942
+      },
+      {
+        "stage": "inline",
+        "cell": 4,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 65,
+        "mb": 988
+      },
+      {
+        "kind": "library",
+        "goal": " ↑b = 3 / 2018 →\n    (a, b) ∈ {(673, 1358114), (674, 340033), (1009, 2018), (2018, 1009), (340033, 674), (1358114, 673)}",
+        "found": 207,
+        "accepted": false,
+        "ms": 48605
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "int",
+          "lt"
+        ],
+        "lines": 12,
+        "ms": 8292
+      },
+      {
+        "kind": "empty",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "library",
+        "goal": "73, 1358114), (674, 340033), (1009, 2018), (2018, 1009), (340033, 674), (1358114, 673)} →\n    1 / ↑a + 1 / ↑b = 3 / 2018",
+        "found": 207,
+        "accepted": false,
+        "ms": 2095
+      },
+      {
+        "stage": "memory",
+        "checks": 68,
+        "mb": 3255
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "case",
+          "int",
+          "lt"
+        ],
+        "lines": 12,
+        "ms": 8239
+      },
+      {
+        "stage": "inline",
+        "cell": 5,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "stage": "renew",
+        "checks": 69,
+        "mem_mb": 3255,
+        "ms": 4285
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "stage": "memory",
+        "checks": 7,
+        "mb": 701
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 700
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(0 : ℤ) < a",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(0 : ℤ) < b",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a * b - (2018 : ℤ) * a - (2018 : ℤ) * b = (0 : ℤ)",
+        "verdict": "refuted",
+        "values": {
+          "a": "1",
+          "b": "1"
+        }
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)",
+        "verdict": "refuted",
+        "values": {
+          "a": "(1 : ℤ)",
+          "b": "(1 : ℤ)"
+        }
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 416, 'column': 4}: `field_simp` made no progress at `h`"
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 836
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1469
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 633
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 2
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1467
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 845
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 0
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'have'; expected command",
+        "lines": [
+          "      simpa using this",
+          "    have hdiv : (3 * a - 2018) ∣ (2018 : ℤ) ^ 2 := by",
+          "      refine ⟨3 * b - 2018, ?_⟩"
+        ]
+      },
+      {
+        "stage": "inline",
+        "cell": 7,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'have'; expected command",
+        "lines": [
+          "        simpa using this",
+          "      have hdiv : (3 * a - 2018) ∣ (2018 : ℤ) ^ 2 := by",
+          "        refine ⟨3 * b - 2018, ?_⟩"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 439, 'column': 6}: unexpected token 'have'; expected command"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 67,
+        "elapsed_s": 290
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "memory",
+        "checks": 21,
+        "mb": 1124
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "mined",
+        "by": "openai/gpt-oss-120b",
+        "facts": 2
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 0
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 851
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 419, 'column': 2}: `field_simp` made no progress on the goal"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 788
+      },
+      {
+        "stage": "memory",
+        "checks": 7,
+        "mb": 712
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 421, 'column': 2}: Tactic `apply` failed: could not unify the conclusion of `@dvd_mul_right`\n  ?a ∣ ?a * ?b\nwith the goal\n  3 * a - 2018 ∣ 201"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 67,
+        "elapsed_s": 385
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 67,
+        "elapsed_s": 385
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 710
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "proven",
+        "cell": 14,
+        "stmt": ": ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)",
+        "lines": 4
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 67,
+        "elapsed_s": 387
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 67,
+        "elapsed_s": 387
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 13,
+        "mb": 721
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 1678
+      },
+      {
+        "kind": "collapse",
+        "tactic": "trivial",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 18,
+        "mb": 742
+      },
+      {
+        "stage": "proven",
+        "cell": 15,
+        "stmt": " : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) : (3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)",
+        "lines": 5
+      },
+      {
+        "stage": "proven",
+        "cell": 17,
+        "stmt": "8 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)) : (3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 21,
+        "mb": 753
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1862
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 67,
+        "elapsed_s": 395
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 67,
+        "elapsed_s": 395
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 417, 'column': 10}: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce\n\na b : ℤ\nh : 0 < a ∧ 0 "
+      },
+      {
+        "stage": "memory",
+        "checks": 24,
+        "mb": 751
+      },
+      {
+        "stage": "inline",
+        "cell": 19,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 3371
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 352
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 506
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 3
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 29,
+        "mb": 4854
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'with'; expected ','",
+        "lines": [
+          "    exact ⟨by exact_mod_cast this.left, by exact_mod_cast this.right⟩",
+          "  interval_cases a using ha with",
+          "  | case h0 => "
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 473, 'column': 27}: unexpected token 'with'; expected ','"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1530
+      },
+      {
+        "stage": "memory",
+        "checks": 32,
+        "mb": 5003
+      },
+      {
+        "kind": "library",
+        "goal": " (↑b)⁻¹ * 2018 = 3\n⊢ (a, b) ∈ {(673, 1358114), (674, 340033), (1009, 2018), (2018, 1009), (340033, 674), (1358114, 673)}",
+        "found": 0,
+        "accepted": false,
+        "ms": 6246
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 73,
+        "elapsed_s": 471
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 73,
+        "elapsed_s": 471
+      },
+      {
+        "stage": "renew",
+        "checks": 33,
+        "mem_mb": 5003,
+        "ms": 3846
+      },
+      {
+        "kind": "empty",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 73,
+        "elapsed_s": 484
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 714
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1677
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "inline",
+        "cell": 24,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 2
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 2
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 733
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 1522
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 25,
+        "stmt": " = (673 : ℤ) ∧ b = (1358114 : ℤ)) : (1 : ℚ) / ↑a + (1 : ℚ) / ↑b = (3 / 2018 : ℚ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 13,
+        "mb": 753
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 1859
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 26,
+        "stmt": " = (1358114 : ℤ) ∧ b = (673 : ℤ)) : (1 : ℚ) / ↑a + (1 : ℚ) / ↑b = (3 / 2018 : ℚ)",
+        "lines": 43
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 573
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1730
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 767
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 10
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(0 : ℤ) < (3 : ℤ) * a - (2018 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(0 : ℤ) < (3 : ℤ) * b - (2018 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "((3 : ℤ) * b - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) = (1 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) = (4 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) =",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "route",
+        "from": 1,
+        "to": 4,
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "stage": "prune",
+        "bid": 4,
+        "goals": 6
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "putnam_2018_a1"
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 22,
+        "mb": 777
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected identifier; expected command",
+        "lines": [
+          "  finish",
+          "  (set_option pp.numericTypes true in extract_goal *); focus skip",
+          ""
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 439, 'column': 37}: unexpected identifier; expected command"
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 11
+      },
+      {
+        "stage": "memory",
+        "checks": 26,
+        "mb": 4667
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a ≠ (0 : ℤ) ∧ b ≠ (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(2018 : ℤ) * (a + b) = (3 : ℤ) * a * b",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 2
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 434, 'column': 12}: Expected type must not contain free variables\n  a = 673 ∧ b = 1358114 ∨\n    a = 674 ∧ b = 340033 ∨ a = 1009 ∧ b = 2018 ∨ a"
+      },
+      {
+        "kind": "leaf_restart",
+        "by": "openai/gpt-oss-120b",
+        "goal": " (↑b)⁻¹ = 3 / 2018\n⊢ a = 673 ∧ b = 1358114 ∨\n    a = 674 ∧ b = 340033 ∨ a = 1009 ∧ b = 2018 ∨ a = 2018 ∧ b = 1009 ∨ a = 340033 ∧ b = 674 ∨ a = 1358114 ∧ b = 673",
+        "settled": 3
+      },
+      {
+        "stage": "memory",
+        "checks": 1,
+        "mb": 4665
+      },
+      {
+        "stage": "renew",
+        "checks": 28,
+        "mem_mb": 4667,
+        "ms": 6579
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 13254
+      },
+      {
+        "stage": "renew",
+        "checks": 2,
+        "mem_mb": 4665,
+        "ms": 4641
+      },
+      {
+        "stage": "inline",
+        "cell": 32,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 427, 'column': 4}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  e ≥ 1\n  c ≥ 1\n  c + 3*d ≤ -1\nwhere\n"
+      },
+      {
+        "kind": "library",
+        "goal": "a + b) = 3 * a * b\n⊢ (a, b) ∈ {(673, 1358114), (674, 340033), (1009, 2018), (2018, 1009), (340033, 674), (1358114, 673)}",
+        "found": 71,
+        "accepted": false,
+        "ms": 29919
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 0
+      },
+      {
+        "stage": "memory",
+        "checks": 5,
+        "mb": 2867
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 2914
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) > (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * b - (2018 : ℤ) > (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) ∈ {(1 : ℤ), (2 : ℤ), (4 : ℤ), (673 : ℤ), (1346 : ℤ), (2692 : ℤ), (2018 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "mined",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 3
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "inline",
+        "cell": 36,
+        "why": "link"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6040
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 2972
+      },
+      {
+        "stage": "inline",
+        "cell": 36,
+        "why": "link"
+      },
+      {
+        "stage": "inline",
+        "cell": 36,
+        "why": "link"
+      },
+      {
+        "stage": "inline",
+        "cell": 39,
+        "why": "link"
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 3063
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 441, 'column': 2}: linarith failed to find a contradiction\na b : ℤ\nh : 0 < a ∧ 0 < b\nhprod : (3 * a - 2018) * (3 * b - 2018) = 4072324\nhdiv : "
+      },
+      {
+        "stage": "inline",
+        "cell": 36,
+        "why": "link"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 5849
+      },
+      {
+        "stage": "memory",
+        "checks": 20,
+        "mb": 3134
+      },
+      {
+        "stage": "inline",
+        "cell": 36,
+        "why": "link"
+      },
+      {
+        "stage": "memory",
+        "checks": 24,
+        "mb": 3208
+      },
+      {
+        "stage": "inline",
+        "cell": 36,
+        "why": "link"
+      },
+      {
+        "stage": "inline",
+        "cell": 42,
+        "why": "link"
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "there are no goals left where that step was written: the goal was already closed above it"
+      },
+      {
+        "stage": "inline",
+        "cell": 43,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "stage": "memory",
+        "checks": 28,
+        "mb": 3328
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6695
+      },
+      {
+        "stage": "renew",
+        "checks": 29,
+        "mem_mb": 3328,
+        "ms": 4581
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "budget",
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 21581
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 11
+      },
+      {
+        "stage": "memory",
+        "checks": 5,
+        "mb": 779
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(2018 : ℤ) ^ (2 : ℕ) = (2 : ℤ) ^ (2 : ℕ) * (1009 : ℤ) ^ (2 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) ∈ {(1 : ℤ), (2 : ℤ), (4 : ℤ), (673 : ℤ), (1346 : ℤ), (2692 : ℤ), (2018 : ℤ)",
+        "verdict": "unverified",
+        "values": {
+          "a": "1009",
+          "b": "2018"
+        }
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 9,
+        "mb": 889
+      },
+      {
+        "stage": "inline",
+        "cell": 46,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6295
+      },
+      {
+        "kind": "cut",
+        "by": "openai/gpt-oss-120b",
+        "kept": 0
+      },
+      {
+        "kind": "library",
+        "goal": "14 ∨\n    a = 674 ∧ b = 340033 ∨ a = 1009 ∧ b = 2018 ∨ a = 2018 ∧ b = 1009 ∨ a = 340033 ∧ b = 674 ∨ a = 1358114 ∧ b = 673",
+        "found": 59,
+        "accepted": false,
+        "ms": 35860
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h_factorization"
+        ]
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 3003
+      },
+      {
+        "kind": "library",
+        "goal": " a - 2018) * (3 * b - 2018) = 4072324\nhdiv : 3 * a - 2018 ∣ 4072324\nh_eq : (↑a)⁻¹ + (↑b)⁻¹ = 3 / 2018\n⊢ 3 * a - 2018 > 0",
+        "found": 309,
+        "accepted": false,
+        "ms": 4294
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "dvd",
+          "int",
+          "lt"
+        ],
+        "lines": 12,
+        "ms": 7271
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 74,
+        "elapsed_s": 997
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 440, 'column': 39}: Unknown identifier `h3a`\n\nerror at {'line': 435, 'column': 275}: unsolved goals\na b : ℤ\nh : 0 < a ∧ 0 < b\nhprod : (3 * a -"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 151,
+        "elapsed_s": 997
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 3141
+      },
+      {
+        "stage": "renew",
+        "checks": 18,
+        "mem_mb": 3141,
+        "ms": 3590
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * b - (2018 : ℤ) > (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * b - (2018 : ℤ) > (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 4177
+      },
+      {
+        "stage": "memory",
+        "checks": 5,
+        "mb": 766
+      },
+      {
+        "kind": "collapse",
+        "tactic": "trivial",
+        "accepted": true
+      },
+      {
+        "stage": "proven",
+        "cell": 48,
+        "stmt": " (h3a : (3 : ℤ) * a - (2018 : ℤ) > (0 : ℤ)) : (3 : ℤ) * b - (2018 : ℤ) > (0 : ℤ)",
+        "lines": 9
+      },
+      {
+        "stage": "proven",
+        "cell": 50,
+        "stmt": " (h3b : (3 : ℤ) * b - (2018 : ℤ) > (0 : ℤ)) : (3 : ℤ) * b - (2018 : ℤ) > (0 : ℤ)",
+        "lines": 1
+      },
+      {
+        "kind": "library",
+        "goal": "n : 2018 ^ 2 = 2 ^ 2 * 1009 ^ 2\n⊢ 3 * a - 2018 ∈ {1, 2, 4, 673, 1346, 2692, 2018, 4036, 8072, 1358114, 2716228, 4072324}",
+        "found": 77,
+        "accepted": false,
+        "ms": 30210
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 181,
+        "elapsed_s": 1044
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 2908
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a * b - (2018 : ℤ) * a - (2018 : ℤ) * b = (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 181,
+        "elapsed_s": 1087
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 181,
+        "elapsed_s": 1097
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 74,
+        "elapsed_s": 1097
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 465, 'column': 24}: Type mismatch\n  3 * a - 2018\nhas type\n  ℤ\nbut is expected to have type\n  ℕ\n\nerror at {'line': 467, 'column': 22}: Unknown "
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 3255
+      },
+      {
+        "stage": "inline",
+        "cell": 52,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "stage": "budget",
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 3412
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 39655
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 181,
+        "elapsed_s": 1137
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 181,
+        "elapsed_s": 1137
+      },
+      {
+        "stage": "renew",
+        "checks": 17,
+        "mem_mb": 3412,
+        "ms": 4624
+      },
+      {
+        "stage": "inline",
+        "cell": 53,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 14351
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 181,
+        "elapsed_s": 1151
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 811
+      },
+      {
+        "stage": "budget",
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "stage": "budget",
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 1054
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 74,
+        "elapsed_s": 1178
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that step left a goal open inside a branch nothing can get back to. A step that splits the goal gives every branch its own `sorry`, or closes it outright"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 74,
+        "elapsed_s": 1182
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 447, 'column': 4}: Type mismatch: After simplification, term\n  h_factor\n has type\n  (a * 3 - 2018) * (b * 3 - 2018) = 4072324\nbut is expected "
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 13,
+        "mb": 1059
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 541
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 709
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1556
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 732
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 444, 'column': 8}: Unknown identifier `h3a_pos`\n\nerror at {'line': 445, 'column': 38}: No goals to be solved\n(a fact stated inside `have h3a :"
+      },
+      {
+        "kind": "lemma",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "name": "factor_congruence",
+        "accepted": true
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that step left the goal exactly as it was"
+      },
+      {
+        "stage": "memory",
+        "checks": 17,
+        "mb": 1076
+      },
+      {
+        "kind": "lemma",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "name": "factor_bounds",
+        "accepted": true
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that step left the goal exactly as it was"
+      },
+      {
+        "kind": "lemma",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "name": "divisors_of_2018_sq",
+        "accepted": true
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that step left the goal exactly as it was"
+      },
+      {
+        "stage": "memory",
+        "checks": 21,
+        "mb": 1087
+      },
+      {
+        "kind": "lemma",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "name": "congruence_filter",
+        "accepted": true
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that step left the goal exactly as it was"
+      },
+      {
+        "kind": "lemma",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "name": "solve_for_ab",
+        "accepted": true
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that step left the goal exactly as it was"
+      },
+      {
+        "stage": "memory",
+        "checks": 25,
+        "mb": 1105
+      },
+      {
+        "kind": "lemma",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "name": "putnam_2018_a1_case_mp",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 28,
+        "mb": 1116
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "((3 : ℤ) * b - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) > (-2018 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * b - (2018 : ℤ) > (-2018 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * b - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) = (1 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) = (4 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) =",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "3 * b - 2018 = 2018 ^ 2",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = 673",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "b = 1358114",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "3 * b - 2018 = 1009 ^ 2",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = 674",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "b = 340033",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "3 * b - 2018 = 4",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = 340033",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "b = 674",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "3 * b - 2018 = 1",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = 1358114",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "b = 673",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 4
+      },
+      {
+        "stage": "memory",
+        "checks": 32,
+        "mb": 1122
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(0 : ℤ) < (2018 : ℤ) ^ (2 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(0 : ℤ) < ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ))",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) > (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 36,
+        "mb": 1212
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 3738
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 56,
+        "stmt": ") ^ (2 : ℕ)) : (0 : ℤ) < ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ))",
+        "lines": 43
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 462
+      },
+      {
+        "kind": "collapse",
+        "tactic": "norm_num",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 43,
+        "mb": 1229
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 697
+      },
+      {
+        "kind": "collapse",
+        "tactic": "omega",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 45,
+        "mb": 1241
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1815
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 2528
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1396
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "divisors_of_2018_sq"
+      },
+      {
+        "stage": "memory",
+        "checks": 48,
+        "mb": 1371
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "Nat.ord_proj_dvd_pow",
+          "Nat.support",
+          "Nat.factorization_eq_prod_pow"
+        ],
+        "ms": 3847,
+        "found": true
+      },
+      {
+        "stage": "budget",
+        "decl": "divisors_of_2018_sq"
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 9
+      },
+      {
+        "stage": "memory",
+        "checks": 52,
+        "mb": 1561
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(2018 : ℤ) ^ (2 : ℕ) = (2 : ℤ) ^ (2 : ℕ) * (1009 : ℤ) ^ (2 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 3048
+      },
+      {
+        "stage": "memory",
+        "checks": 58,
+        "mb": 1470
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) ∈ {(1 : ℤ), (2 : ℤ), (4 : ℤ), (673 : ℤ), (1346 : ℤ), (2692 : ℤ), (2018 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "lifted",
+        "by": "openai/gpt-oss-120b",
+        "facts": 1,
+        "dup": 0,
+        "from_depth": 1,
+        "to_depth": 1
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "route",
+        "from": 1,
+        "to": 6,
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "stage": "prune",
+        "bid": 0,
+        "goals": 27
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "divisors_of_2018_sq"
+      },
+      {
+        "stage": "memory",
+        "checks": 60,
+        "mb": 1571
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "Nat.factorization_eq_factors_multiplicity",
+          "Int.eq_or_neg_of_dvd"
+        ],
+        "ms": 3655,
+        "found": true
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 9
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "fork",
+        "from": 0,
+        "to": 7,
+        "goal": "d : ℤ\nhd : d ∣ 2018 ^ 2\nh2018 : 2018 = 2 * 1009\nh2018_sq : 2"
+      },
+      {
+        "stage": "prune",
+        "bid": 7,
+        "goals": 27
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 4052
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 58,
+        "stmt": " ℤ) * b - (2018 : ℤ) > (0 : ℤ)) : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 66,
+        "mb": 1577
+      },
+      {
+        "stage": "inline",
+        "cell": 59,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "stage": "memory",
+        "checks": 68,
+        "mb": 1598
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6623
+      },
+      {
+        "kind": "library",
+        "goal": "n : 2018 ^ 2 = 2 ^ 2 * 1009 ^ 2\n⊢ 3 * a - 2018 ∈ {1, 2, 4, 673, 1346, 2692, 2018, 4036, 8072, 1358114, 2716228, 4072324}",
+        "found": 73,
+        "accepted": false,
+        "ms": 33253
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 222,
+        "elapsed_s": 1407
+      },
+      {
+        "stage": "memory",
+        "checks": 72,
+        "mb": 3701
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "the step exceeded Lean's elaboration budget even at a raised budget; make it cheaper\n(a fact stated inside `have hdivisors : 3 * a - 2018 ∈ ({1, 2, 4, 673, 1346"
+      },
+      {
+        "stage": "inline",
+        "cell": 60,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 11019
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 222,
+        "elapsed_s": 1427
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 222,
+        "elapsed_s": 1427
+      },
+      {
+        "stage": "memory",
+        "checks": 0,
+        "mb": 3678
+      },
+      {
+        "stage": "renew",
+        "checks": 76,
+        "mem_mb": 3701,
+        "ms": 4816
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1353
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 606
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "hmod"
+        ]
+      },
+      {
+        "stage": "renew",
+        "checks": 0,
+        "mem_mb": 3678,
+        "ms": 3858
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) = (1 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) = (4 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) =",
+        "verdict": "unverified",
+        "values": {
+          "a": "673",
+          "b": "673"
+        }
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 791
+      },
+      {
+        "stage": "inline",
+        "cell": 61,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6450
+      },
+      {
+        "kind": "empty",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token ')'; expected '}'",
+        "lines": [
+          "      (try { exact Or.inr (Or.inr (Or.inr (Or.inl (by omega)))) }) <;>",
+          "      (try { exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl (by omega)))))) }) <;>",
+          "      (try { exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl (by omega))))))) }) <;>"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 570, 'column': 72}: unexpected token ')'; expected '}'"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 222,
+        "elapsed_s": 1463
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 222,
+        "elapsed_s": 1463
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 74,
+        "elapsed_s": 1468
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that step re-declared a name the context already has (Lean shows the old one as `h✝`); use the existing hypothesis instead of stating it again"
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 888
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 0
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 2497
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that step re-declared a name the context already has (Lean shows the old one as `h✝`); use the existing hypothesis instead of stating it again"
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 2800
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1588
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "hmod"
+        ]
+      },
+      {
+        "kind": "withdraw",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "have": "have hX : 3 * a - 2018 = 1 ∨ 3 * a - 2018 = 4 ∨ 3 * a - 2018 = 673 ∨ 3 * a - 2018 = 1346 ∨ 3 * a - 2018 = 2692 ∨ 3 * a -",
+        "tries": 4,
+        "whole_block": true
+      },
+      {
+        "stage": "memory",
+        "checks": 6,
+        "mb": 798
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 7136
+      },
+      {
+        "stage": "memory",
+        "checks": 10,
+        "mb": 838
+      },
+      {
+        "kind": "collapse",
+        "tactic": "nlinarith",
+        "accepted": true
+      },
+      {
+        "stage": "proven",
+        "cell": 55,
+        "stmt": ") (h_eq : (↑a)⁻¹ + (↑b)⁻¹ = (3 / 2018 : ℚ)) : (3 : ℤ) * a - (2018 : ℤ) > (0 : ℤ)",
+        "lines": 51
+      },
+      {
+        "stage": "proven",
+        "cell": 63,
+        "stmt": "- (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ))) : (3 : ℤ) * a - (2018 : ℤ) > (0 : ℤ)",
+        "lines": 1
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 868
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 23
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "¬(673 : ℕ) ∣ (4072324 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 967
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "¬(1346 : ℕ) ∣ (4072324 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "¬(2692 : ℕ) ∣ (4072324 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "¬(8072 : ℕ) ∣ (4072324 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "¬(1358114 : ℕ) ∣ (4072324 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "stage": "memory",
+        "checks": 20,
+        "mb": 1196
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "¬(2716228 : ℕ) ∣ (4072324 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) ∈ {(1 : ℤ), (2 : ℤ), (4 : ℤ), (673 : ℤ), (1346 : ℤ), (2692 : ℤ), (2018 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "inline",
+        "cell": 64,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6980
+      },
+      {
+        "stage": "memory",
+        "checks": 24,
+        "mb": 1457
+      },
+      {
+        "kind": "library",
+        "goal": "4\nh2716228 : ¬2716228 ∣ 4072324\n⊢ 3 * a - 2018 ∈ {1, 2, 4, 673, 1346, 2692, 2018, 4036, 8072, 1358114, 2716228, 4072324}",
+        "found": 73,
+        "accepted": false,
+        "ms": 37192
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 259,
+        "elapsed_s": 1609
+      },
+      {
+        "stage": "memory",
+        "checks": 28,
+        "mb": 3504
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) = (1 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) = (2 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) =",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (673 : ℤ) ∧ b = (1358114 : ℤ)",
+        "verdict": "unverified",
+        "values": {
+          "a": "673",
+          "b": "1358114"
+        }
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (674 : ℤ) ∧ b = (340033 : ℤ)",
+        "verdict": "unverified",
+        "values": {
+          "a": "673",
+          "b": "1358114"
+        }
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (1009 : ℤ) ∧ b = (2018 : ℤ)",
+        "verdict": "unverified",
+        "values": {
+          "a": "673",
+          "b": "1358114"
+        }
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (2018 : ℤ) ∧ b = (1009 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (340033 : ℤ) ∧ b = (674 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (1358114 : ℤ) ∧ b = (673 : ℤ)",
+        "verdict": "unverified",
+        "values": {
+          "a": "673",
+          "b": "1358114"
+        }
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (673 : ℤ) ∧ b = (1358114 : ℤ) ∨ a = (674 : ℤ) ∧ b = (340033 : ℤ) ∨ a = (1009 : ℤ) ∧ b = (2018 : ",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "route",
+        "from": 1,
+        "to": 10,
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "stage": "prune",
+        "bid": 10,
+        "goals": 10
+      },
+      {
+        "stage": "memory",
+        "checks": 1,
+        "mb": 3748
+      },
+      {
+        "stage": "renew",
+        "checks": 32,
+        "mem_mb": 3504,
+        "ms": 5427
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 104,
+        "elapsed_s": 1654
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 738
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(673 : ℕ) ∣ (4072324 : ℕ)",
+        "verdict": "refuted",
+        "values": {}
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 829
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(1346 : ℕ) ∣ (4072324 : ℕ)",
+        "verdict": "refuted",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 584, 'column': 12}: Tactic `decide` proved that the proposition\n  False\nis false\n\nerror at {'line': 588, 'column': 12}: Tactic `decide` proved"
+      },
+      {
+        "kind": "leaf_restart",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "goal": "2 ∣ 4072324\nh1358114 : ¬1358114 ∣ 4072324\nh2716228 : ¬2716228 ∣ 4072324\n⊢ 3 * a - 2018 ∈ {1, 2, 4, 673, 1346, 2692, 2018, 4036, 8072, 1358114, 2716228, 4072324}",
+        "settled": 6
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 916
+      },
+      {
+        "stage": "inline",
+        "cell": 65,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 4211
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 947
+      },
+      {
+        "kind": "collapse",
+        "tactic": "trivial",
+        "accepted": false
+      },
+      {
+        "stage": "inline",
+        "cell": 67,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "stage": "memory",
+        "checks": 20,
+        "mb": 1076
+      },
+      {
+        "stage": "budget",
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 40748
+      },
+      {
+        "kind": "library",
+        "goal": "14 ∨\n    a = 674 ∧ b = 340033 ∨ a = 1009 ∧ b = 2018 ∨ a = 2018 ∧ b = 1009 ∨ a = 340033 ∧ b = 674 ∨ a = 1358114 ∧ b = 673",
+        "found": 59,
+        "accepted": false,
+        "ms": 36403
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 4
+      },
+      {
+        "stage": "memory",
+        "checks": 24,
+        "mb": 3299
+      },
+      {
+        "stage": "budget",
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "stage": "renew",
+        "checks": 27,
+        "mem_mb": 3299,
+        "ms": 7964
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "Nat.Prime (673 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) ∈ {(1 : ℤ), (2 : ℤ), (4 : ℤ), (673 : ℤ), (1346 : ℤ), (2692 : ℤ), (2018 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 1111
+      },
+      {
+        "stage": "inline",
+        "cell": 68,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 9809
+      },
+      {
+        "stage": "inline",
+        "cell": 69,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 1275
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 8475
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 295,
+        "elapsed_s": 1804
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 295,
+        "elapsed_s": 1804
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 3
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(4072324 : ℕ) = (2 : ℕ) ^ (2 : ℕ) * (1009 : ℕ) ^ (2 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) ∈ {(1 : ℤ), (2 : ℤ), (4 : ℤ), (673 : ℤ), (1346 : ℤ), (2692 : ℤ), (2018 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 13,
+        "mb": 1426
+      },
+      {
+        "stage": "inline",
+        "cell": 70,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 9842
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'have'; expected command",
+        "lines": [
+          "            simpa using this",
+          "          have hb : b = 1358114 := by",
+          "            have hY : 3 * b - 2018 = 4072324 := by"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 567, 'column': 10}: unexpected token 'have'; expected command"
+      },
+      {
+        "stage": "memory",
+        "checks": 17,
+        "mb": 1517
+      },
+      {
+        "stage": "memory",
+        "checks": 21,
+        "mb": 1513
+      },
+      {
+        "kind": "recall",
+        "goal": " : (↑a)⁻¹ + (↑b)⁻¹ = 3 / 2018\nhpos_rhs : 0 < 2018 ^ 2\nhpos_prod : 0 < (3 * a - 2018) * (3 * b - 2018)\n⊢ 3 * a - 2018 > 0"
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 0
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 295,
+        "elapsed_s": 1891
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 295,
+        "elapsed_s": 1891
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) = (1 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) = (2 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) =",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 24,
+        "mb": 1575
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 104,
+        "elapsed_s": 1899
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 594, 'column': 12}: Tactic `rewrite` failed: Did not find an occurrence of the pattern\n  4072324\nin the target expression\n  Int.divisors 40723"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 9689
+      },
+      {
+        "kind": "empty",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 295,
+        "elapsed_s": 1913
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 295,
+        "elapsed_s": 1913
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1738
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 1252
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 593, 'column': 12}: Unknown identifier `h_divisors`\n\nerror at {'line': 594, 'column': 42}: No goals to be solved\n(a fact stated inside `have h"
+      },
+      {
+        "stage": "memory",
+        "checks": 28,
+        "mb": 1650
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 597, 'column': 12}: Unknown identifier `h_final`\n\nerror at {'line': 598, 'column': 42}: No goals to be solved\n(a fact stated inside `have hdiv"
+      },
+      {
+        "kind": "leaf_restart",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "goal": "73_prime : Nat.Prime 673\nh4072324_divisors : 4072324 = 2 ^ 2 * 1009 ^ 2\n⊢ 3 * a - 2018 ∈ {1, 2, 4, 673, 1346, 2692, 2018, 4036, 8072, 1358114, 2716228, 4072324}",
+        "settled": 8
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 0
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token '...'; expected term",
+        "lines": [
+          "            -- and check each case",
+          "           ......",
+          "            -- This is getting too long, let's just use the fact that we've already computed the divisors"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 733, 'column': 14}: unexpected token '...'; expected term"
+      },
+      {
+        "kind": "cut",
+        "by": "openai/gpt-oss-120b",
+        "kept": 0
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 2566
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1591
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1150
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 2715
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "hmod",
+          "h3a_pos",
+          "h673"
+        ]
+      },
+      {
+        "kind": "restated",
+        "by": "openai/gpt-oss-120b",
+        "of": [
+          "h3a_pos"
+        ]
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 0
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that step left a goal open inside a branch nothing can get back to. A step that splits the goal gives every branch its own `sorry`, or closes it outright"
+      },
+      {
+        "kind": "leaf_restart",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "goal": " 2716228, 4072324}\n⊢ a = 673 ∧ b = 1358114 ∨\n    a = 674 ∧ b = 340033 ∨ a = 1009 ∧ b = 2018 ∨ a = 2018 ∧ b = 1009 ∨ a = 340033 ∧ b = 674 ∨ a = 1358114 ∧ b = 673",
+        "settled": 22
+      },
+      {
+        "stage": "memory",
+        "checks": 32,
+        "mb": null
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 516, 'column': 58}: Unknown identifier `hdivisors`\n\nerror at {'line': 517, 'column': 38}: No goals to be solved"
+      },
+      {
+        "kind": "leaf_restart",
+        "by": "openai/gpt-oss-120b",
+        "goal": " = 2018 ∨\n                3 * a - 2018 = 4036 ∨\n                  3 * a - 2018 = 8072 ∨ 3 * a - 2018 = 1358114 ∨ 3 * a - 2018 = 2716228 ∨ 3 * a - 2018 = 4072324",
+        "settled": 3
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 134,
+        "elapsed_s": 2188
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 602, 'column': 8}: omega could not prove the goal:\nNo usable constraints found. You may need to unfold definitions so `omega` can see linear a"
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 908
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 134,
+        "elapsed_s": 2194
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that step left a goal open inside a branch nothing can get back to. A step that splits the goal gives every branch its own `sorry`, or closes it outright"
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 2103
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 2345
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "hmod"
+        ]
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) = (4 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) = (1009 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 894
+      },
+      {
+        "stage": "inline",
+        "cell": 74,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6651
+      },
+      {
+        "kind": "cut",
+        "by": "openai/gpt-oss-120b",
+        "kept": 0
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 134,
+        "elapsed_s": 2287
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 608, 'column': 10}: omega could not prove the goal:\nNo usable constraints found. You may need to unfold definitions so `omega` can see linear "
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 996
+      },
+      {
+        "stage": "inline",
+        "cell": 75,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 23874
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'at'; expected command",
+        "lines": [
+          "        (try { exact Or.inr (Or.inr (Or.inr (Or.inr h))) })",
+          "      <;> simp_all [Set.mem_insert_iff, Set.mem_singleton_iff] at *",
+          "      <;> omega"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 608, 'column': 63}: unexpected token 'at'; expected command"
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 1092
+      },
+      {
+        "stage": "inline",
+        "cell": 76,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 6865
+      },
+      {
+        "stage": "memory",
+        "checks": 20,
+        "mb": 1177
+      },
+      {
+        "kind": "collapse",
+        "tactic": "trivial",
+        "accepted": false
+      },
+      {
+        "kind": "library",
+        "goal": "072324}\n⊢ 3 * a - 2018 = 4 ∨ 3 * a - 2018 = 1009 ∨ 3 * a - 2018 = 4036 ∨ 3 * a - 2018 = 1018081 ∨ 3 * a - 2018 = 4072324",
+        "found": 58,
+        "accepted": false,
+        "ms": 33362
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "dvd",
+          "mod",
+          "int",
+          "lt"
+        ],
+        "lines": 12,
+        "ms": 7415
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 134,
+        "elapsed_s": 2376
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 608, 'column': 10}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  c ≥ 673\nwhere\n c := b\n\nerror at {'"
+      },
+      {
+        "stage": "memory",
+        "checks": 24,
+        "mb": 3386
+      },
+      {
+        "kind": "library",
+        "goal": "14 ∨\n    a = 674 ∧ b = 340033 ∨ a = 1009 ∧ b = 2018 ∨ a = 2018 ∧ b = 1009 ∨ a = 340033 ∧ b = 674 ∨ a = 1358114 ∧ b = 673",
+        "found": 59,
+        "accepted": false,
+        "ms": 1405
+      },
+      {
+        "stage": "renew",
+        "checks": 25,
+        "mem_mb": 3386,
+        "ms": 3982
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (674 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "b = (340033 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (1009 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "b = (2018 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (2018 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "b = (1009 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (340033 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "b = (674 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "a = (1358114 : ℤ)",
+        "verdict": "unverified",
+        "values": {
+          "a": "1",
+          "b": "1"
+        }
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "b = (673 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "cut",
+        "by": "openai/gpt-oss-120b",
+        "kept": 0
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 892
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 2005
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 768
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 1096
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1702
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 522, 'column': 8}: Unknown identifier `hX_cases`\n\nerror at {'line': 523, 'column': 38}: No goals to be solved\n(a fact stated inside `have hdiv"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 528, 'column': 8}: Unknown identifier `hX_cases_final`\n\nerror at {'line': 529, 'column': 38}: No goals to be solved\n(a fact stated inside `hav"
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 966
+      },
+      {
+        "kind": "withdraw",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "have": "have hdivisors : 3 * a - 2018 ∈ ({1, 2, 4, 673, 1346, 2692, 2018, 4036, 8072, 1358114, 2716228, 4072324} : Set ℤ)",
+        "tries": 4,
+        "whole_block": true
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 1163
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 7
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) = (4 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ) = (1009 : ℤ) ∨ (3 : ℤ) * a - (2018 : ℤ",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 9744
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 1126
+      },
+      {
+        "stage": "inline",
+        "cell": 81,
+        "decl": "putnam_2018_a1"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 7145
+      },
+      {
+        "stage": "memory",
+        "checks": 20,
+        "mb": 1297
+      },
+      {
+        "kind": "collapse",
+        "tactic": "trivial",
+        "accepted": false
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "Nat.dvd_prime_pow_iff_factorization_le"
+        ],
+        "ms": 2125,
+        "found": true
+      },
+      {
+        "stage": "memory",
+        "checks": 25,
+        "mb": 1522
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 6
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(3 : ℤ) * a - (2018 : ℤ) ≤ (4072324 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 28,
+        "mb": 1518
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 9464
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 134,
+        "elapsed_s": 2519
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 611, 'column': 18}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  c ≥ 673\nwhere\n c := b\n\nerror at {'"
+      },
+      {
+        "kind": "empty",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "library",
+        "goal": "14 ∨\n    a = 674 ∧ b = 340033 ∨ a = 1009 ∧ b = 2018 ∨ a = 2018 ∧ b = 1009 ∨ a = 340033 ∧ b = 674 ∨ a = 1358114 ∧ b = 673",
+        "found": 59,
+        "accepted": false,
+        "ms": 26723
+      },
+      {
+        "stage": "memory",
+        "checks": 32,
+        "mb": 3889
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "dvd",
+          "int",
+          "le",
+          "lt"
+        ],
+        "lines": 12,
+        "ms": 7832
+      },
+      {
+        "stage": "renew",
+        "checks": 33,
+        "mem_mb": 3889,
+        "ms": 5694
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 134,
+        "elapsed_s": 2570
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 598, 'column': 85}: unsolved goals\ncase inl\na b : ℤ\nh✝ : 0 < a ∧ 0 < b\nhprod : (3 * a - 2018) * (3 * b - 2018) = 4072324\nhdiv : 3 * a - 2018 ∣"
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 1027
+      },
+      {
+        "kind": "withdraw",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "have": "have hX_cases : 3 * a - 2018 = 4 ∨ 3 * a - 2018 = 1009 ∨ 3 * a - 2018 = 4036 ∨ 3 * a - 2018 = 1018081 ∨ 3 * a - 2018 = 4",
+        "tries": 4,
+        "whole_block": true
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 0
+      },
+      {
+        "kind": "empty",
+        "by": "openai/gpt-oss-120b"
+      }
+    ]
+  }
+}

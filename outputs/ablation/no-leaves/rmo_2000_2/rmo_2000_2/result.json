@@ -1,0 +1,5119 @@
+{
+  "schema_version": 1,
+  "problem_id": "rmo_2000_2",
+  "status": "failed",
+  "passed": false,
+  "points": 0,
+  "comparator": {
+    "passed": false,
+    "exit_code": 1,
+    "timed_out": false,
+    "duration_ms": 23105,
+    "output": {
+      "passed": false,
+      "exit_code": 1,
+      "stdout": "Building Challenge\n⚠ [8655/8656] Built Challenge (2.8s)\nwarning: Challenge.lean:3:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[rmo_2000_2, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge\nBuilding Solution\n⚠ [8655/8656] Built Solution (6.9s)\nwarning: Solution.lean:408:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[rmo_2000_2, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution\n",
+      "stderr": "WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Challenge\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Challenge -- rmo_2000_2 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Solution\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Solution -- rmo_2000_2 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nuncaught exception: Illegal axiom detected: 'sorryAx'\n"
+    }
+  },
+  "answer_shape": {
+    "passed": true,
+    "errors": []
+  },
+  "budget": {
+    "limit_usd": 1.0,
+    "spent_usd": 0.08097338199999991,
+    "reserved_usd": 0,
+    "accounting_complete": true
+  },
+  "within_time": true,
+  "wall_s": 2618.194,
+  "models_used": [
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.5-flash-02-23"
+  ],
+  "both_required_models_used": true,
+  "agent_error": null,
+  "agent_metadata": {
+    "strategy": "board",
+    "solved_by": "best_effort",
+    "accepted_by_repl": false,
+    "spend_usd": 0.080973,
+    "wall_s": 2594.6,
+    "turns": 880,
+    "events": [
+      {
+        "stage": "memory",
+        "checks": 43,
+        "mb": 707
+      },
+      {
+        "stage": "memory",
+        "checks": 45,
+        "mb": 718
+      },
+      {
+        "stage": "memory",
+        "checks": 49,
+        "mb": 728
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1081
+      },
+      {
+        "stage": "memory",
+        "checks": 52,
+        "mb": 845
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "Nat.lt_of_pow_lt_pow_left"
+        ],
+        "ms": 2329,
+        "found": true
+      },
+      {
+        "stage": "memory",
+        "checks": 56,
+        "mb": 855
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 866
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 1105
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) < y ^ (3 : ℕ)",
+        "verdict": "refuted",
+        "values": {
+          "x": "9",
+          "y": "11"
+        }
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 1197
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x + (2 : ℕ) < y",
+        "verdict": "refuted",
+        "values": {
+          "x": "9",
+          "y": "11"
+        }
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 423, 'column': 8}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  f ≥ 0\n  e ≥ 0\n  d ≥ 0\n  c ≥ 0\n  b ≥"
+      },
+      {
+        "stage": "memory",
+        "checks": 17,
+        "mb": 1503
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 416, 'column': 4}: `dsimp` made no progress"
+      },
+      {
+        "kind": "library",
+        "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ x = 9 ∧ y = 11",
+        "found": 58,
+        "accepted": false,
+        "ms": 41055
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "pow",
+          "nat",
+          "lt"
+        ],
+        "lines": 12,
+        "ms": 8262
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 746
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1330
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 2469
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 1606
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "rmo_2000_2"
+      },
+      {
+        "stage": "memory",
+        "checks": 5,
+        "mb": 3156
+      },
+      {
+        "stage": "renew",
+        "checks": 6,
+        "mem_mb": 3156,
+        "ms": 4198
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) ≤ y ^ (3 : ℕ) ∨ y ^ (3 : ℕ) < (x + (2 : ℕ)) ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x < (9 : ℕ) → False",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x = (9 : ℕ) → y = (11 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x > (9 : ℕ) → False",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x = (9 : ℕ) ∧ y = (11 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "route",
+        "from": 0,
+        "to": 2,
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "prune",
+        "bid": 2,
+        "goals": 7
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 816
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 1041
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 1267
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ^ (3 : ℕ) < y ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x < y",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y < x + (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y = x + (1 : ℕ) ∨ y = x + (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (1 : ℕ)) ^ (3 : ℕ) = x ^ (3 : ℕ) + (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(5 : ℤ) * ↑x ^ (2 : ℕ) - (9 : ℤ) * ↑x + (7 : ℤ) = (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "False",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) = x ^ (3 : ℕ) + (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x = (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y = (11 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "route",
+        "from": 0,
+        "to": 1,
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "rmo_2000_2"
+      },
+      {
+        "stage": "memory",
+        "checks": 17,
+        "mb": 1333
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x % (9 : ℕ) = (0 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ≥ (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ≤ (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "restated",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "stale",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1275
+      },
+      {
+        "stage": "memory",
+        "checks": 21,
+        "mb": 1470
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1683
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 284
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 438, 'column': 8}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  i ≥ 0\n  c ≥ 0\n  0 ≤ c - 9*d ≤ 8\n  0"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 285
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 419, 'column': 10}: Function expected at\n  Nat.lt_add_of_pos_right ?m.184\nbut this term has type\n  ?m.183 < ?m.183 + ?m.182\n\nNote: Expected a "
+      },
+      {
+        "stage": "memory",
+        "checks": 27,
+        "mb": 1529
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 678
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 6,
+        "stmt": " (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ)) (h_mod9 : x % (9 : ℕ) = (0 : ℕ)) : x ≥ (9 : ℕ)",
+        "lines": 43
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1634
+      },
+      {
+        "stage": "memory",
+        "checks": 29,
+        "mb": 1530
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 4438
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 8,
+        "stmt": ": ℕ)) (hlt1 : x ^ (3 : ℕ) < y ^ (3 : ℕ)) : y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 32,
+        "mb": 1540
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1587
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 295
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 469, 'column': 6}: Type mismatch\n  h4\nhas type\n  x ≠ 0\nbut is expected to have type\n  3 ≠ 0\n\nerror at {'line': 470, 'column': 4}: No goals to "
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2196
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "pow_squeeze"
+        ],
+        "ms": 1611,
+        "found": true
+      },
+      {
+        "stage": "memory",
+        "checks": 37,
+        "mb": 1704
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 308
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 468, 'column': 17}: Unknown identifier `pow_squeeze`\n\nerror at {'line': 471, 'column': 2}: Type mismatch\n  h_cases\nhas type\n  y = x + 1 ∨ y = "
+      },
+      {
+        "stage": "memory",
+        "checks": 40,
+        "mb": 1707
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 1422
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 14,
+        "stmt": ": ℕ)) (hxy : x < y) (hyx3 : y < x + (3 : ℕ)) : y = x + (1 : ℕ) ∨ y = x + (2 : ℕ)",
+        "lines": 43
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 5449
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "stage": "memory",
+        "checks": 44,
+        "mb": 1717
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(5 : ℤ) * ↑x ^ (2 : ℕ) - (9 : ℤ) * ↑x + (7 : ℤ) = (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 16658
+      },
+      {
+        "stage": "memory",
+        "checks": 48,
+        "mb": 1814
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ≤ (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h_eq"
+        ]
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 3909
+      },
+      {
+        "stage": "memory",
+        "checks": 53,
+        "mb": 1871
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 2977
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 21,
+        "stmt": "ℕ)) (h_quad : (5 : ℤ) * ↑x ^ (2 : ℕ) - (9 : ℤ) * ↑x + (7 : ℤ) = (0 : ℤ)) : False",
+        "lines": 43
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 3525
+      },
+      {
+        "stage": "memory",
+        "checks": 57,
+        "mb": 1898
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 2
+      },
+      {
+        "stage": "memory",
+        "checks": 60,
+        "mb": 1924
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) = x ^ (3 : ℕ) + (6 : ℕ) * x ^ (2 : ℕ) + (12 : ℕ) * x + (8 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x = (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "inline",
+        "cell": 17,
+        "why": "link"
+      },
+      {
+        "stage": "memory",
+        "checks": 64,
+        "mb": 2051
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 16729
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 465, 'column': 2}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  d ≥ 0\n  c ≥ 0\n  b ≥ 2\n  54*b - c - "
+      },
+      {
+        "stage": "memory",
+        "checks": 68,
+        "mb": 2094
+      },
+      {
+        "stage": "inline",
+        "cell": 17,
+        "why": "link"
+      },
+      {
+        "stage": "inline",
+        "cell": 29,
+        "why": "link"
+      },
+      {
+        "stage": "inline",
+        "cell": 26,
+        "why": "link"
+      },
+      {
+        "stage": "memory",
+        "checks": 72,
+        "mb": 2174
+      },
+      {
+        "stage": "inline",
+        "cell": 17,
+        "why": "link"
+      },
+      {
+        "stage": "inline",
+        "cell": 30,
+        "why": "link"
+      },
+      {
+        "stage": "inline",
+        "cell": 26,
+        "why": "link"
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 7
+      },
+      {
+        "stage": "memory",
+        "checks": 76,
+        "mb": 2249
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ^ (3 : ℕ) + (6 : ℕ) * x ^ (2 : ℕ) + (12 : ℕ) * x + (8 : ℕ) = x ^ (3 : ℕ) + (8 : ℕ) * x ^ (2 : ℕ) -",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(2 : ℕ) * x ^ (2 : ℕ) - (18 : ℕ) * x = (0 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x > (0 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x = (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 80,
+        "mb": 2469
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1560
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 4891
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 16
+      },
+      {
+        "stage": "memory",
+        "checks": 85,
+        "mb": 2525
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x * ((2 : ℕ) * x - (18 : ℕ)) = (0 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(2 : ℤ) * (x : ℤ) ^ 2 - 18 * (x : ℤ) = 0",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(x : ℤ) * (2 * (x : ℤ) - 18) = 0",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x * (2 * x - 18) = 0",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x = (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 88,
+        "mb": 2647
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 20104
+      },
+      {
+        "stage": "memory",
+        "checks": 93,
+        "mb": 2708
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y ^ (3 : ℕ) = (11 : ℕ) ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "proven",
+        "cell": 36,
+        "stmt": ": ℕ) = (0 : ℕ)) (h_x_ge_9 : x ≥ (9 : ℕ)) (h_x_le_9 : x ≤ (9 : ℕ)) : y = (11 : ℕ)",
+        "lines": 6
+      },
+      {
+        "stage": "memory",
+        "checks": 97,
+        "mb": 2805
+      },
+      {
+        "stage": "inline",
+        "cell": 38,
+        "why": "link"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 509
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 604, 'column': 4}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  c ≥ 8\n  c ≥ 8\n  b ≥ 0\n  b - c ≥ 1\n "
+      },
+      {
+        "kind": "library",
+        "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ x % 9 = 0",
+        "found": 227,
+        "accepted": false,
+        "ms": 35860
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 89,
+        "elapsed_s": 544
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 89,
+        "elapsed_s": 544
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 89,
+        "elapsed_s": 544
+      },
+      {
+        "stage": "memory",
+        "checks": 100,
+        "mb": 5063
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 548
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 426, 'column': 8}: No goals to be solved\n\nerror at {'line': 429, 'column': 8}: Function expected at\n  Nat.lt_add_of_pos_right ?m.230\nbut this "
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 89,
+        "elapsed_s": 548
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 89,
+        "elapsed_s": 548
+      },
+      {
+        "stage": "renew",
+        "checks": 102,
+        "mem_mb": 5063,
+        "ms": 5518
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 554
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 463, 'column': 8}: Unknown constant `Nat.lt_of_pow_lt_pow_left`\n\nerror at {'line': 464, 'column': 38}: No goals to be solved\nNat.lt_of_pow_lt_"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 89,
+        "elapsed_s": 554
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 89,
+        "elapsed_s": 554
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 89,
+        "elapsed_s": 555
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 555
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 470, 'column': 12}: Unknown constant `Nat.pow_le_pow_of_le_left`\n\nerror at {'line': 473, 'column': 38}: No goals to be solved"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 89,
+        "elapsed_s": 555
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 745
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(5 : ℤ) * ↑x ^ (2 : ℕ) - (9 : ℤ) * ↑x + (7 : ℤ) = (0 : ℤ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 17014
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 89,
+        "elapsed_s": 579
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 889
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(9 : ℕ) ∣ x",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 590
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 524, 'column': 4}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  c ≥ 1\n  b ≥ 0\n  b - 42*c ≥ -28\n  b "
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2253
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 89,
+        "elapsed_s": 593
+      },
+      {
+        "stage": "memory",
+        "checks": 13,
+        "mb": 967
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 418, 'column': 31}: Unknown identifier `h_mod9`\n\nerror at {'line': 419, 'column': 38}: No goals to be solved\n\nwarning at {'line': 417, 'column"
+      },
+      {
+        "kind": "library",
+        "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ 9 ∣ x",
+        "found": 99,
+        "accepted": false,
+        "ms": 31405
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 121,
+        "elapsed_s": 626
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h_factor"
+        ]
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 3037
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 446
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 968
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "memory",
+        "checks": 20,
+        "mb": 3297
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(0 : ℕ) < x",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y ^ (3 : ℕ) - x ^ (3 : ℕ) = (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ) > (0 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ^ (3 : ℕ) < y ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x < y",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y < x + (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "lifted",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 3,
+        "dup": 1,
+        "from_depth": 1,
+        "to_depth": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "route",
+        "from": 1,
+        "to": 4,
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "prune",
+        "bid": 4,
+        "goals": 8
+      },
+      {
+        "stage": "memory",
+        "checks": 0,
+        "mb": 265
+      },
+      {
+        "stage": "renew",
+        "checks": 24,
+        "mem_mb": 3297,
+        "ms": 4785
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ^ (3 : ℕ) < y ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x < y",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y < x + (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "lifted",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 1,
+        "dup": 1,
+        "from_depth": 1,
+        "to_depth": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 6,
+        "mb": 930
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 2430
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 50,
+        "stmt": "(6 : ℕ) * x + (8 : ℕ)) : (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ) > (0 : ℕ)",
+        "lines": 43
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2834
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 121,
+        "elapsed_s": 728
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 121,
+        "elapsed_s": 728
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 945
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 121,
+        "elapsed_s": 731
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 731
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 466, 'column': 6}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  d ≥ 0\n  c ≥ 0\n  b ≥ 1\n  a ≥ 1\n  1 ≤"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2517
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 121,
+        "elapsed_s": 733
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 121,
+        "elapsed_s": 733
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 651
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 926
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "cut",
+        "by": "openai/gpt-oss-120b",
+        "kept": 0
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 121,
+        "elapsed_s": 741
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 121,
+        "elapsed_s": 741
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 741
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 512, 'column': 4}: Type mismatch\n  h1\nhas type\n  x ^ 3 < y ^ 3\nbut is expected to have type\n  x ^ x < y ^ x\n\nerror at {'line': 514, 'column': "
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 970
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 510, 'column': 8}: Unknown identifier `hxy_from_pow`\n\nerror at {'line': 511, 'column': 38}: No goals to be solved\n(a fact stated inside `have "
+      },
+      {
+        "kind": "withdraw",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "have": "have hxy : x < y",
+        "tries": 4,
+        "whole_block": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2824
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 1062
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 774
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 509, 'column': 12}: Unknown constant `Nat.lt_of_pow_lt_pow_left`\n\nerror at {'line': 510, 'column': 6}: No goals to be solved\n\nerror at {'line'"
+      },
+      {
+        "kind": "cut",
+        "by": "openai/gpt-oss-120b",
+        "kept": 3
+      },
+      {
+        "stage": "memory",
+        "checks": 21,
+        "mb": 1067
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "False",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 3355
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 121,
+        "elapsed_s": 782
+      },
+      {
+        "stage": "memory",
+        "checks": 24,
+        "mb": 1132
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 121,
+        "elapsed_s": 789
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 121,
+        "elapsed_s": 792
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 121,
+        "elapsed_s": 793
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 793
+      },
+      {
+        "stage": "memory",
+        "checks": 30,
+        "mb": 1171
+      },
+      {
+        "stage": "memory",
+        "checks": 33,
+        "mb": 1183
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ^ (3 : ℕ) + (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) < x ^ (3 : ℕ) + (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "False",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "mined",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 3
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 36,
+        "mb": 1313
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 8966
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 66,
+        "stmt": "3 : ℕ) + (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 40,
+        "mb": 1326
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 11491
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "Nat.eq_of_sub_eq_zero_or_eq"
+        ],
+        "ms": 2275,
+        "found": true
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 8
+      },
+      {
+        "stage": "memory",
+        "checks": 45,
+        "mb": 1451
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y ≤ x + (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 49,
+        "mb": 1471
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 841
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 520, 'column': 4}: linarith failed to find a contradiction\nx y : ℕ\nhx : 0 < x\nhy : 0 < y\nh_mod9 : x % 9 = 0\nh_x_ge_9 : x ≥ 9\nh9d : 9 ∣ x\nhgt :"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 8328
+      },
+      {
+        "stage": "memory",
+        "checks": 52,
+        "mb": 1594
+      },
+      {
+        "kind": "library",
+        "goal": " 3 < y ^ 3\nhlt2 : y ^ 3 < (x + 3) ^ 3\nhxy : x < y\nhy_lt : y < x + 3\nhy_le : y ≤ x + 2\nhy_ge : x + 1 ≤ y\n⊢ x = 9 ∧ y = 11",
+        "found": 58,
+        "accepted": false,
+        "ms": 31947
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 155,
+        "elapsed_s": 881
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 9030
+      },
+      {
+        "stage": "memory",
+        "checks": 56,
+        "mb": 3950
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 155,
+        "elapsed_s": 898
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 155,
+        "elapsed_s": 901
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 901
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 524, 'column': 13}: Unknown identifier `le_or_lt`\n\nerror at {'line': 524, 'column': 6}: Tactic `cases` failed: major premise type is not an in"
+      },
+      {
+        "kind": "cut",
+        "by": "openai/gpt-oss-120b",
+        "kept": 0
+      },
+      {
+        "stage": "renew",
+        "checks": 59,
+        "mem_mb": 3950,
+        "ms": 4656
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 8059
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 76,
+        "stmt": ": ℕ) + (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ)) (h_contra : False) : False",
+        "lines": 43
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1260
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 1022
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 155,
+        "elapsed_s": 909
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 155,
+        "elapsed_s": 909
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 726
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "route",
+        "from": 1,
+        "to": 6,
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "prune",
+        "bid": 6,
+        "goals": 5
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 740
+      },
+      {
+        "stage": "memory",
+        "checks": 13,
+        "mb": 771
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 4
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y - x = (1 : ℕ) ∨ y - x = (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 17,
+        "mb": 849
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 3208
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 81,
+        "stmt": ": y ≤ x + (2 : ℕ)) (hy_ge : x + (1 : ℕ) ≤ y) : y - x = (1 : ℕ) ∨ y - x = (2 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 20,
+        "mb": 863
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 7650
+      },
+      {
+        "stage": "memory",
+        "checks": 25,
+        "mb": 909
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 8
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y = x + (1 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "y = x + 1",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected identifier; expected command",
+        "lines": [
+          "      simpa [hdiff, add_comm, add_left_comm, add_assoc] using this",
+          "    exact this",
+          "  (set_option pp.numericTypes true in extract_goal *); focus skip"
+        ]
+      },
+      {
+        "stage": "memory",
+        "checks": 29,
+        "mb": 1011
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected identifier; expected command",
+        "lines": [
+          "      simpa [hdiff, add_comm, add_left_comm, add_assoc] using this",
+          "    exact this",
+          "  (set_option pp.numericTypes true in extract_goal *); focus skip"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 529, 'column': 4}: unexpected identifier; expected command"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 155,
+        "elapsed_s": 960
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 155,
+        "elapsed_s": 960
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 9074
+      },
+      {
+        "stage": "memory",
+        "checks": 32,
+        "mb": 1044
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 155,
+        "elapsed_s": 976
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 2
+      },
+      {
+        "stage": "memory",
+        "checks": 36,
+        "mb": 1126
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "False",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 7270
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 155,
+        "elapsed_s": 990
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 155,
+        "elapsed_s": 990
+      },
+      {
+        "stage": "memory",
+        "checks": 40,
+        "mb": 1183
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 572, 'column': 2}: linarith failed to find a contradiction\nx y : ℕ\nhx : 0 < x\nhy : 0 < y\nh_pos : 8 * x ^ 2 - 6 * x + 8 > 0\nhlt1 : x ^ 3 < y ^ "
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 155,
+        "elapsed_s": 993
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 155,
+        "elapsed_s": 993
+      },
+      {
+        "stage": "memory",
+        "checks": 44,
+        "mb": 1252
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 1009
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 524, 'column': 61}: unsolved goals\nx y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\nh_mod9 : x % 9 = 0\nh_x_ge_9 : x ≥ 9"
+      },
+      {
+        "stage": "memory",
+        "checks": 48,
+        "mb": 1286
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 1016
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 572, 'column': 6}: Tactic `rewrite` failed: Did not find an occurrence of the pattern\n  y\nin the target expression\n  1 + x * 3 + x ^ 2 * 3 + x"
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 1282
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1325
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1262
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 808
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "memory",
+        "checks": 52,
+        "mb": 1305
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 418, 'column': 31}: Unknown identifier `h_mod9`\n\nerror at {'line': 419, 'column': 38}: No goals to be solved\n\nwarning at {'line': 417, 'column"
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 608
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 735
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "memory",
+        "checks": 56,
+        "mb": 1435
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ^ (3 : ℕ) + (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ) - (x + (2 : ℕ)) ^ (3 : ℕ) = (2 : ℕ) * x ",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(0 : ℕ) < (2 : ℕ) * x * (x - (9 : ℕ))",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) < x ^ (3 : ℕ) + (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "lifted",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 2,
+        "dup": 2,
+        "from_depth": 2,
+        "to_depth": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'have'; expected command",
+        "lines": [
+          "      linarith",
+          "    have hpos : 0 < 5 * x ^ 2 - 9 * x + 7 := by",
+          "      nlinarith"
+        ]
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'have'; expected command",
+        "lines": [
+          "      linarith",
+          "    have hpos : 0 < 5 * x ^ 2 - 9 * x + 7 := by",
+          "      nlinarith"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 576, 'column': 4}: unexpected token 'have'; expected command"
+      },
+      {
+        "stage": "memory",
+        "checks": 60,
+        "mb": 1557
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 20187
+      },
+      {
+        "stage": "memory",
+        "checks": 65,
+        "mb": 1600
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(8 : ℕ) + (x ^ (2 : ℕ) * (8 : ℕ) + x ^ (3 : ℕ) - x * (6 : ℕ)) - ((8 : ℕ) + x * (12 : ℕ) + x ^ (2 : ℕ",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 68,
+        "mb": 1680
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 18588
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'have'; expected command",
+        "lines": [
+          "      simpa [h_sub] using h",
+          "    have h2 : 5 * x ^ 2 - 9 * x + 7 = 0 := by",
+          "      (set_option pp.numericTypes true in extract_goal *); focus skip"
+        ]
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'have'; expected command",
+        "lines": [
+          "      simpa [h_sub] using h",
+          "    have h2 : 5 * x ^ 2 - 9 * x + 7 = 0 := by",
+          "      (set_option pp.numericTypes true in extract_goal *); focus skip"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 574, 'column': 4}: unexpected token 'have'; expected command"
+      },
+      {
+        "kind": "leaf_restart",
+        "by": "openai/gpt-oss-120b",
+        "goal": " : x + 1 ≤ y\nh_y_minus_x : y - x = 1 ∨ y - x = 2\nhdiff : y - x = 1\nh_sub : y = x + 1\nh : 1 + x * 3 + x ^ 2 * 3 + x ^ 3 = 8 + (x ^ 2 * 8 + x ^ 3 - x * 6)\n⊢ False",
+        "settled": 2
+      },
+      {
+        "stage": "memory",
+        "checks": 72,
+        "mb": 1718
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 521, 'column': 6}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  f ≥ 0\n  e ≥ 0\n  d ≥ 0\n  c ≥ 0\n  b ≥"
+      },
+      {
+        "stage": "memory",
+        "checks": 76,
+        "mb": 1764
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 8784
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 105,
+        "stmt": "^ (3 : ℕ) = (2 : ℕ) * x * (x - (9 : ℕ))) : (0 : ℕ) < (2 : ℕ) * x * (x - (9 : ℕ))",
+        "lines": 43
+      },
+      {
+        "kind": "library",
+        "goal": "* x ^ 2 - 6 * x + 8 < (x + 3) ^ 3\n⊢ 8 + (x ^ 2 * 8 + x ^ 3 - x * 6) - (8 + x * 12 + x ^ 2 * 6 + x ^ 3) = x * (x - 9) * 2",
+        "found": 134,
+        "accepted": false,
+        "ms": 46385
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 201,
+        "elapsed_s": 1177
+      },
+      {
+        "stage": "memory",
+        "checks": 80,
+        "mb": 3955
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 61,
+        "elapsed_s": 1188
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 522, 'column': 8}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  f ≥ 0\n  e ≥ 0\n  d ≥ 0\n  c ≥ 0\n  b ≥"
+      },
+      {
+        "stage": "memory",
+        "checks": 0,
+        "mb": 3957
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 542
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 973
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "renew",
+        "checks": 84,
+        "mem_mb": 3955,
+        "ms": 4742
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 522, 'column': 8}: Unknown identifier `h_contra.elim`\n\nerror at {'line': 523, 'column': 38}: No goals to be solved\n(a fact stated inside `have"
+      },
+      {
+        "stage": "renew",
+        "checks": 1,
+        "mem_mb": 3957,
+        "ms": 3481
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 524, 'column': 8}: Unknown identifier `h_main`\n\nerror at {'line': 525, 'column': 38}: No goals to be solved\n\nwarning at {'line': 523, 'column'"
+      },
+      {
+        "kind": "withdraw",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "have": "have h_diff : x ^ 3 + 8 * x ^ 2 - 6 * x + 8 - (x + 2) ^ 3 = 2 * x * (x - 9)",
+        "tries": 4,
+        "whole_block": true
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 780
+      },
+      {
+        "stage": "memory",
+        "checks": 9,
+        "mb": 834
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 821
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(5 : ℕ) * x ^ (2 : ℕ) - (9 : ℕ) * x + (7 : ℕ) = (0 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(5 : ℕ) * x ^ (2 : ℕ) - (9 : ℕ) * x + (7 : ℕ) ≠ (0 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "mined",
+        "by": "openai/gpt-oss-120b",
+        "facts": 2
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6687
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 892
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 21562
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h_bound"
+        ]
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 201,
+        "elapsed_s": 1332
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 201,
+        "elapsed_s": 1332
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1339
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 520, 'column': 6}: linarith failed to find a contradiction\ncase inl\nx y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\nh_"
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 973
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 602
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 942
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y ≥ x + (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "False",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "route",
+        "from": 0,
+        "to": 9,
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "prune",
+        "bid": 9,
+        "goals": 5
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h_bound"
+        ]
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "rmo_2000_2"
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 1024
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "Nat.pow_le_pow_of_le_left"
+        ],
+        "ms": 1882,
+        "found": true
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1402
+      },
+      {
+        "kind": "mined",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 5
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 22,
+        "mb": 1345
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 574, 'column': 2}: Type mismatch: After simplification, term\n  h\n has type\n  1 + x * 3 + x ^ 2 * 3 + x ^ 3 = 8 + (x ^ 2 * 8 + x ^ 3 - x * 6)\nb"
+      },
+      {
+        "stage": "memory",
+        "checks": 24,
+        "mb": 1354
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 3699
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 120,
+        "stmt": "x + (7 : ℕ) = (0 : ℕ)) : (5 : ℕ) * x ^ (2 : ℕ) - (9 : ℕ) * x + (7 : ℕ) ≠ (0 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 28,
+        "mb": 1344
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 3644
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 121,
+        "stmt": "0 : ℕ)) (h_ne : (5 : ℕ) * x ^ (2 : ℕ) - (9 : ℕ) * x + (7 : ℕ) ≠ (0 : ℕ)) : False",
+        "lines": 43
+      },
+      {
+        "kind": "library",
+        "goal": " x = 1\nh_sub : y = x + 1\nh : 1 + x * 3 + x ^ 2 * 3 + x ^ 3 = 8 + (x ^ 2 * 8 + x ^ 3 - x * 6)\n⊢ 5 * x ^ 2 - 9 * x + 7 = 0",
+        "found": 246,
+        "accepted": false,
+        "ms": 42739
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 246,
+        "elapsed_s": 1455
+      },
+      {
+        "kind": "recall",
+        "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\nh_mod9 : x % 9 = 0\n⊢ x ≥ 9"
+      },
+      {
+        "stage": "memory",
+        "checks": 35,
+        "mb": 3785
+      },
+      {
+        "stage": "memory",
+        "checks": 36,
+        "mb": 3809
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1463
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 576, 'column': 4}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  d ≥ 1\n  c ≥ 0\n  c - 42*d ≥ -28\n  c "
+      },
+      {
+        "stage": "renew",
+        "checks": 39,
+        "mem_mb": 3809,
+        "ms": 4259
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1119
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 438
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 584, 'column': 8}: Unknown identifier `h_contra.elim`\n\nerror at {'line': 585, 'column': 38}: No goals to be solved\n\nwarning at {'line': 583, '"
+      },
+      {
+        "stage": "memory",
+        "checks": 5,
+        "mb": 792
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1483
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 576, 'column': 4}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  d ≥ 1\n  c ≥ 0\n  c - 42*d ≥ -28\n  c "
+      },
+      {
+        "kind": "withdraw",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "have": "have h_eq : 5 * x ^ 2 - 9 * x + 7 = 0",
+        "tries": 4,
+        "whole_block": true
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 828
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 574, 'column': 2}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  d ≥ 1\n  c ≥ 0\n  c - 42*d ≥ -28\n  c "
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 859
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1505
+      },
+      {
+        "stage": "memory",
+        "checks": 17,
+        "mb": 907
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(1 : ℕ) + x * (3 : ℕ) + x ^ (2 : ℕ) * (3 : ℕ) = (8 : ℕ) + x ^ (2 : ℕ) * (8 : ℕ) - x * (6 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "mined",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 2
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 20,
+        "mb": 991
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 14818
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1534
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 577, 'column': 6}: linarith failed to find a contradiction\nx y : ℕ\nhx : 0 < x\nhy : 0 < y\nh_pos : 8 * x ^ 2 - 6 * x + 8 > 0\nhlt1 : x ^ 3 < y ^ "
+      },
+      {
+        "stage": "memory",
+        "checks": 24,
+        "mb": 1051
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 10550
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1552
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 578, 'column': 4}: linarith failed to find a contradiction\ncase h1\nx y : ℕ\nhx : 0 < x\nhy : 0 < y\nh_pos : 8 * x ^ 2 - 6 * x + 8 > 0\nhlt1 : x ^ "
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 463, 'column': 2}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  d ≥ 0\n  c ≥ 0\n  b ≥ 2\n  54*b - c - "
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 877
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 138,
+        "stmt": " : ℕ) = (0 : ℕ)) (h_x_ge_9 : x ≥ (9 : ℕ)) (h_x_le_9 : x ≤ (9 : ℕ)) : x = (9 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 32,
+        "mb": 1104
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1315
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 4349
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 140,
+        "stmt": ": ℕ) = (8 : ℕ) + x ^ (2 : ℕ) * (8 : ℕ) - x * (6 : ℕ)) (h_contra : False) : False",
+        "lines": 43
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 246,
+        "elapsed_s": 1558
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 246,
+        "elapsed_s": 1558
+      },
+      {
+        "stage": "memory",
+        "checks": 37,
+        "mb": 1147
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1563
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 577, 'column': 2}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  d ≥ 0\n  c ≥ 0\n  b ≥ 0\n  b - c ≤ -1\n"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 246,
+        "elapsed_s": 1563
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 246,
+        "elapsed_s": 1563
+      },
+      {
+        "stage": "memory",
+        "checks": 40,
+        "mb": 1192
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1575
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 580, 'column': 4}: linarith failed to find a contradiction\nx y : ℕ\nhx : 0 < x\nhy : 0 < y\nh_pos : 8 * x ^ 2 - 6 * x + 8 > 0\nhlt1 : x ^ 3 < y ^ "
+      },
+      {
+        "stage": "memory",
+        "checks": 47,
+        "mb": 1258
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y ^ (3 : ℕ) = (1331 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "proven",
+        "cell": 144,
+        "stmt": " : x ≥ (9 : ℕ)) (h_x_le_9 : x ≤ (9 : ℕ)) (h_x_eq_9 : x = (9 : ℕ)) : y = (11 : ℕ)",
+        "lines": 7
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 600
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 789
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 593
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 145,
+        "stmt": "(h_x_eq_9 : x = (9 : ℕ)) (h_y_eq_11 : y = (11 : ℕ)) : x = (9 : ℕ) ∧ y = (11 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 51,
+        "mb": 1314
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 577, 'column': 8}: Unknown identifier `h_contra`\n\nerror at {'line': 578, 'column': 38}: No goals to be solved\n(a fact stated inside `have h_ca"
+      },
+      {
+        "stage": "memory",
+        "checks": 52,
+        "mb": 1323
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 575, 'column': 8}: Unknown identifier `h_eq`\n\nerror at {'line': 576, 'column': 38}: No goals to be solved\n(a fact stated inside `have h_case_1"
+      },
+      {
+        "kind": "withdraw",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "have": "have h_eq : 1 + x * 3 + x ^ 2 * 3 = 8 + x ^ 2 * 8 - x * 6",
+        "tries": 4,
+        "whole_block": true
+      },
+      {
+        "stage": "memory",
+        "checks": 56,
+        "mb": 1382
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1612
+      },
+      {
+        "stage": "memory",
+        "checks": 61,
+        "mb": 1441
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(1 : ℕ) + x * (3 : ℕ) + x ^ (2 : ℕ) * (3 : ℕ) = (8 : ℕ) + (x ^ (2 : ℕ) * (8 : ℕ) - x * (6 : ℕ))",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "mined",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 2
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 416, 'column': 2}: interval_cases failed: could not find upper bound on x % 9"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 246,
+        "elapsed_s": 1620
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 246,
+        "elapsed_s": 1620
+      },
+      {
+        "stage": "memory",
+        "checks": 65,
+        "mb": 1513
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 15647
+      },
+      {
+        "stage": "memory",
+        "checks": 69,
+        "mb": 1629
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1647
+      },
+      {
+        "stage": "memory",
+        "checks": 72,
+        "mb": 1675
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ^ (2 : ℕ) = x / (9 : ℕ) * (x / (9 : ℕ)) * (81 : ℕ) + x % (9 : ℕ) * (x % (9 : ℕ)) + (2 : ℕ) * (x / ",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) ≤ y ^ (3 : ℕ) ∧ y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ≤ (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "mined",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 2
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "cut",
+        "by": "openai/gpt-oss-120b",
+        "kept": 0
+      },
+      {
+        "stage": "memory",
+        "checks": 76,
+        "mb": 1796
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 5133
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 10107
+      },
+      {
+        "stage": "memory",
+        "checks": 81,
+        "mb": 1839
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 2
+      },
+      {
+        "stage": "memory",
+        "checks": 85,
+        "mb": 1857
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x = (9 : ℕ) * (x / (9 : ℕ)) + x % (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ^ (2 : ℕ) = x / (9 : ℕ) * (x / (9 : ℕ)) * (81 : ℕ) + x % (9 : ℕ) * (x % (9 : ℕ)) + (2 : ℕ) * (x / ",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 89,
+        "mb": 2007
+      },
+      {
+        "stage": "memory",
+        "checks": 93,
+        "mb": 2025
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 5821
+      },
+      {
+        "stage": "memory",
+        "checks": 97,
+        "mb": 2040
+      },
+      {
+        "kind": "collapse",
+        "tactic": "nlinarith",
+        "accepted": true
+      },
+      {
+        "stage": "proven",
+        "cell": 161,
+        "stmt": " x % (9 : ℕ) * (x % (9 : ℕ)) + (2 : ℕ) * (x / (9 : ℕ)) * (x % (9 : ℕ)) * (9 : ℕ)",
+        "lines": 3
+      },
+      {
+        "stage": "proven",
+        "cell": 163,
+        "stmt": " x % (9 : ℕ) * (x % (9 : ℕ)) + (2 : ℕ) * (x / (9 : ℕ)) * (x % (9 : ℕ)) * (9 : ℕ)",
+        "lines": 1
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6574
+      },
+      {
+        "stage": "memory",
+        "checks": 100,
+        "mb": 2082
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1708
+      },
+      {
+        "stage": "memory",
+        "checks": 105,
+        "mb": 2151
+      },
+      {
+        "stage": "memory",
+        "checks": 108,
+        "mb": 2256
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) ≤ y ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) ≤ y ^ (3 : ℕ) ∧ y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "mined",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 2
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6884
+      },
+      {
+        "stage": "memory",
+        "checks": 112,
+        "mb": 2316
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1730
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 479, 'column': 6}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  g ≥ 0\n  f ≥ 0\n  e ≥ 0\n  d ≥ 0\n  c ≥"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 9326
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 170,
+        "stmt": ": (x + (2 : ℕ)) ^ (3 : ℕ) ≤ y ^ (3 : ℕ)) : y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 118,
+        "mb": 2378
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 4698
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 171,
+        "stmt": " : (x + (2 : ℕ)) ^ (3 : ℕ) ≤ y ^ (3 : ℕ) ∧ y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 121,
+        "mb": 2443
+      },
+      {
+        "kind": "library",
+        "goal": "x_ge_9 : x ≥ 9\nh_x_sq : x ^ 2 = x / 9 * (x / 9) * 81 + x % 9 * (x % 9) + 2 * (x / 9) * (x % 9) * 9\n⊢ (x + 2) ^ 3 ≤ y ^ 3",
+        "found": 410,
+        "accepted": false,
+        "ms": 43493
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 289,
+        "elapsed_s": 1787
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'have'; expected command",
+        "lines": [
+          "      linarith",
+          "    have hpos : 0 < 5 * x ^ 2 - 9 * x + 7 := by",
+          "      nlinarith [hx]"
+        ]
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'have'; expected command",
+        "lines": [
+          "      linarith",
+          "    have hpos : 0 < 5 * x ^ 2 - 9 * x + 7 := by",
+          "      nlinarith [hx]"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 582, 'column': 4}: unexpected token 'have'; expected command"
+      },
+      {
+        "stage": "memory",
+        "checks": 125,
+        "mb": 4870
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 289,
+        "elapsed_s": 1797
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 289,
+        "elapsed_s": 1802
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1802
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 475, 'column': 13}: Unknown identifier `le_or_lt`\n\nerror at {'line': 475, 'column': 6}: Tactic `cases` failed: major premise type is not an in"
+      },
+      {
+        "stage": "memory",
+        "checks": 128,
+        "mb": 4919
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 10196
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 289,
+        "elapsed_s": 1812
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 289,
+        "elapsed_s": 1812
+      },
+      {
+        "stage": "renew",
+        "checks": 130,
+        "mem_mb": 4919,
+        "ms": 9638
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 13236
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 176,
+        "stmt": "ℕ) = (8 : ℕ) + (x ^ (2 : ℕ) * (8 : ℕ) - x * (6 : ℕ))) (h_contra : False) : False",
+        "lines": 43
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 289,
+        "elapsed_s": 1825
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 289,
+        "elapsed_s": 1825
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 1050
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1833
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 578, 'column': 2}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  d ≥ 0\n  c ≥ 0\n  b ≥ 0\n  b - c ≤ -1\n"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 289,
+        "elapsed_s": 1833
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 289,
+        "elapsed_s": 1833
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'at'; expected command",
+        "lines": [
+          "theorem vm_cell_178 (x y : ℕ) (hx : (0 : ℕ) < x) (hy : (0 : ℕ) < y) (h_pos : (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ) > (0 : ℕ)) (hlt1 : x ^ (3 : ℕ) < y ^ (3 : ℕ)) (hlt2 : y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)) (hxy : x < y) (hy_lt : y < x + (3 : ℕ)) (hy_le : y ≤ x + (2 : ℕ)) (hy_ge : x + (1 : ℕ) ≤ y) (h_y_minus_x : y - x = (1 : ℕ) ∨ y - x = (2 : ℕ)) (hdiff : y - x = (1 : ℕ)) (h_sub : y = x + (1 : ℕ)) (h : (1 : ℕ) + x * (3 : ℕ) + x ^ (2 : ℕ) * (3 : ℕ) + x ^ (3 : ℕ) = (8 : ℕ) + (x ^ (2 : ℕ) * (8 : ℕ) + x ^ (3 : ℕ) - x * (6 : ℕ))) (h_eq : (1 : ℕ) + x * (3 : ℕ) + x ^ (2 : ℕ) * (3 : ℕ) = (8 : ℕ) + (x ^ (2 : ℕ) * (8 : ℕ) - x * (6 : ℕ))) : False := by",
+          "  nlinarith at h_eq",
+          "  (set_option pp.numericTypes true in extract_goal *); focus skip"
+        ]
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'at'; expected command",
+        "lines": [
+          "theorem vm_cell_178 (x y : ℕ) (hx : (0 : ℕ) < x) (hy : (0 : ℕ) < y) (h_pos : (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ) > (0 : ℕ)) (hlt1 : x ^ (3 : ℕ) < y ^ (3 : ℕ)) (hlt2 : y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)) (hxy : x < y) (hy_lt : y < x + (3 : ℕ)) (hy_le : y ≤ x + (2 : ℕ)) (hy_ge : x + (1 : ℕ) ≤ y) (h_y_minus_x : y - x = (1 : ℕ) ∨ y - x = (2 : ℕ)) (hdiff : y - x = (1 : ℕ)) (h_sub : y = x + (1 : ℕ)) (h : (1 : ℕ) + x * (3 : ℕ) + x ^ (2 : ℕ) * (3 : ℕ) + x ^ (3 : ℕ) = (8 : ℕ) + (x ^ (2 : ℕ) * (8 : ℕ) + x ^ (3 : ℕ) - x * (6 : ℕ))) (h_eq : (1 : ℕ) + x * (3 : ℕ) + x ^ (2 : ℕ) * (3 : ℕ) = (8 : ℕ) + (x ^ (2 : ℕ) * (8 : ℕ) - x * (6 : ℕ))) : False := by",
+          "  nlinarith at h_eq",
+          "  (set_option pp.numericTypes true in extract_goal *); focus skip"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 578, 'column': 12}: unexpected token 'at'; expected command"
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 1127
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 674
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 562
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 563, 'column': 2}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  i ≥ 0\n  g ≥ 0\n  f ≥ 0\n  e ≥ 0\n  d ≥"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 578, 'column': 8}: Unknown identifier `h_contra`\n\nerror at {'line': 579, 'column': 38}: No goals to be solved\n(a fact stated inside `have h_ca"
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 1192
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 576, 'column': 8}: Unknown identifier `h_eq_simplified`\n\nerror at {'line': 577, 'column': 38}: No goals to be solved\n(a fact stated inside `ha"
+      },
+      {
+        "kind": "withdraw",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "have": "have h_eq : 1 + x * 3 + x ^ 2 * 3 = 8 + (x ^ 2 * 8 - x * 6)",
+        "tries": 4,
+        "whole_block": true
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 1261
+      },
+      {
+        "stage": "memory",
+        "checks": 20,
+        "mb": 1309
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 2
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(1 : ℕ) + x * (3 : ℕ) + x ^ (2 : ℕ) * (3 : ℕ) + x ^ (3 : ℕ) = (8 : ℕ) + (x ^ (2 : ℕ) * (8 : ℕ) + x ^",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 573
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1584
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "stage": "memory",
+        "checks": 24,
+        "mb": 1396
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 8841
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 289,
+        "elapsed_s": 1897
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 289,
+        "elapsed_s": 1897
+      },
+      {
+        "stage": "memory",
+        "checks": 28,
+        "mb": 1468
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1907
+      },
+      {
+        "stage": "memory",
+        "checks": 32,
+        "mb": 1531
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(3 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (1 : ℕ) = (8 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "mined",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 2
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 15515
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token '<;>'; expected ','",
+        "lines": [
+          "    exact Nat.mod_lt _ this",
+          "  interval_cases hxr : x % 9 using hx_mod_lt <;>",
+          "    simp [h_mod_eq, h_y_cubes, h_expr_simp] at * <;> omega"
+        ]
+      },
+      {
+        "stage": "memory",
+        "checks": 36,
+        "mb": 1624
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token '<;>'; expected ','",
+        "lines": [
+          "    exact Nat.mod_lt _ this",
+          "  interval_cases hxr : x % 9 using hx_mod_lt <;>",
+          "    simp [h_mod_eq, h_y_cubes, h_expr_simp] at * <;> omega"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 425, 'column': 44}: unexpected token '<;>'; expected ','\n(a fact stated insid"
+      },
+      {
+        "stage": "memory",
+        "checks": 40,
+        "mb": 1707
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1947
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 581, 'column': 43}: Unknown identifier `h_simplified`\n\nerror at {'line': 618, 'column': 25}: No goals to be solved\n\nerror at {'line': 618, 'co"
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 416, 'column': 9}: Unknown identifier `hx9`\n\nerror at {'line': 416, 'column': 2}: Type mismatch: After simplification, term\n  Nat.mod_self 9\n "
+      },
+      {
+        "kind": "withdraw",
+        "by": "openai/gpt-oss-120b",
+        "have": "have h_mod9 : x % 9 = 0",
+        "tries": 4,
+        "whole_block": true
+      },
+      {
+        "stage": "memory",
+        "checks": 45,
+        "mb": 1754
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 4151
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 194,
+        "stmt": "(h_simplified : (3 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (1 : ℕ) = (8 : ℕ)) : False",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 48,
+        "mb": 1787
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "Nat.pow_lt_pow_left.mpr"
+        ],
+        "ms": 1959,
+        "found": true
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 1961
+      },
+      {
+        "stage": "memory",
+        "checks": 54,
+        "mb": 1853
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) < y ^ (3 : ℕ) ∧ y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "verdict": "refuted",
+        "values": {
+          "x": "9",
+          "y": "11"
+        }
+      },
+      {
+        "kind": "mined",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 2
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 57,
+        "mb": 1933
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 914
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 3868
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 196,
+        "stmt": "x ^ (2 : ℕ) - (6 : ℕ) * x + (1 : ℕ) = (8 : ℕ)) (h_contradiction : False) : False",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 62,
+        "mb": 2041
+      },
+      {
+        "kind": "library",
+        "goal": "1\nh_sub : y = x + 1\nh h_eq : 1 + x * 3 + x ^ 2 * 3 + x ^ 3 = 8 + (x ^ 2 * 8 + x ^ 3 - x * 6)\n⊢ 3 * x ^ 2 - 6 * x + 1 = 8",
+        "found": 131,
+        "accepted": false,
+        "ms": 34631
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 326,
+        "elapsed_s": 2008
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token '·'; expected ','",
+        "lines": [
+          "  intro hx9",
+          "  interval_cases x using Nat.lt_of_lt_of_le hx9 (by decide)",
+          "  · exact (Nat.not_lt_zero _ hx).elim"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 417, 'column': 59}: unexpected token '·'; expected ','"
+      },
+      {
+        "stage": "memory",
+        "checks": 64,
+        "mb": 4170
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1368
+      },
+      {
+        "stage": "renew",
+        "checks": 65,
+        "mem_mb": 4170,
+        "ms": 4439
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 2020
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 583, 'column': 4}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  d ≥ 1\n  c ≥ 0\n  c - 42*d ≥ -28\n  c "
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 791
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 928
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 1017
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 2042
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 582, 'column': 4}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  d ≥ 1\n  c ≥ 0\n  c - 42*d ≥ -28\n  c "
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 856
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 580, 'column': 8}: Unknown identifier `h_ring`\n\nerror at {'line': 581, 'column': 38}: No goals to be solved\n\nwarning at {'line': 579, 'column'"
+      },
+      {
+        "kind": "withdraw",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "have": "have h_simplified : 3 * x ^ 2 - 6 * x + 1 = 8",
+        "tries": 4,
+        "whole_block": true
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 920
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 2060
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 581, 'column': 4}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  d ≥ 1\n  c ≥ 0\n  c - 42*d ≥ -28\n  c "
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 969
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1342
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 536
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 585, 'column': 8}: Unknown identifier `h_no_sol`\n\nerror at {'line': 586, 'column': 38}: No goals to be solved\n\nwarning at {'line': 584, 'colum"
+      },
+      {
+        "stage": "memory",
+        "checks": 20,
+        "mb": 1040
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(3 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (1 : ℕ) = (0 : ℕ)",
+        "verdict": "refuted",
+        "values": {
+          "x": "9",
+          "y": "11"
+        }
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "`have h_simplified : 3 * x ^ 2 - 6 * x + 1 = 0` is false, so the step was not posted: with x = 9, y = 11 every hypothesis in scope holds and it fails (Lean chec"
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "False",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "lemma",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "name": "no_positive_solution_quadratic",
+        "accepted": true
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'have'; expected command",
+        "lines": [
+          "",
+          "  have h_contradiction : False := by",
+          "    (set_option pp.numericTypes true in extract_goal *); focus skip"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 411, 'column': 2}: unexpected token 'have'; expected command"
+      },
+      {
+        "kind": "leaf_restart",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "goal": "+ 1 ≤ y\nh_y_minus_x : y - x = 1 ∨ y - x = 2\nhdiff : y - x = 1\nh_sub : y = x + 1\nh h_eq : 1 + x * 3 + x ^ 2 * 3 + x ^ 3 = 8 + (x ^ 2 * 8 + x ^ 3 - x * 6)\n⊢ False",
+        "settled": 3
+      },
+      {
+        "kind": "cut",
+        "by": "openai/gpt-oss-120b",
+        "kept": 0
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 326,
+        "elapsed_s": 2090
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 326,
+        "elapsed_s": 2090
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 525
+      },
+      {
+        "stage": "memory",
+        "checks": 27,
+        "mb": 1230
+      },
+      {
+        "kind": "collapse",
+        "tactic": "trivial",
+        "accepted": true
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token ','; expected command",
+        "lines": [
+          "theorem vm_cell_207 (x y : ℕ) (hx : (0 : ℕ) < x) (hy : (0 : ℕ) < y) (h : y ^ (3 : ℕ) = x ^ (3 : ℕ) + (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ)) : x < (9 : ℕ) → False := by",
+          "  intro hx9,",
+          "    have h1 : (x + 2) ^ 3 < y ^ 3 := by"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 416, 'column': 11}: unexpected token ','; expected command"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 326,
+        "elapsed_s": 2092
+      },
+      {
+        "stage": "memory",
+        "checks": 29,
+        "mb": 1231
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 326,
+        "elapsed_s": 2094
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 2094
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 420, 'column': 4}: linarith failed to find a contradiction\nx y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\nh_x_lt_9 : "
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1025
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 659
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x < (9 : ℕ) → False",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x > (9 : ℕ) → False",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "lifted",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 3,
+        "dup": 0,
+        "from_depth": 1,
+        "to_depth": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "route",
+        "from": 0,
+        "to": 16,
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "prune",
+        "bid": 16,
+        "goals": 6
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'have'; expected command",
+        "lines": [
+          "      linarith",
+          "    have hpos : 5 * x ^ 2 - 9 * x + 7 > 0 := by",
+          "      have : (x : ℤ) ≥ 1 := by"
+        ]
+      },
+      {
+        "stage": "memory",
+        "checks": 32,
+        "mb": 1260
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected token 'have'; expected command",
+        "lines": [
+          "      linarith",
+          "    have hpos : 5 * x ^ 2 - 9 * x + 7 > 0 := by",
+          "      have : (x : ℤ) ≥ 1 := by"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 590, 'column': 4}: unexpected token 'have'; expected command"
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "rmo_2000_2"
+      },
+      {
+        "stage": "memory",
+        "checks": 36,
+        "mb": 1318
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (1 : ℕ)) ^ (3 : ℕ) < y ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "y ^ (3 : ℕ) < (x + (2 : ℕ)) ^ (3 : ℕ)",
+        "verdict": "refuted",
+        "values": {
+          "x": "9",
+          "y": "11"
+        }
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "`have h_upper : y ^ 3 < (x + 2) ^ 3` is false, so the step was not posted: with x = 9, y = 11 every hypothesis in scope holds and it fails (Lean checked this). "
+      },
+      {
+        "stage": "memory",
+        "checks": 41,
+        "mb": 1531
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 536
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1077
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 2597
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 630
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "memory",
+        "checks": 44,
+        "mb": 1573
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 2154
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 583, 'column': 53}: unsolved goals\nx y : ℕ\nhx : 0 < x\nhy : 0 < y\nh_pos : 8 * x ^ 2 - 6 * x + 8 > 0\nhlt1 : x ^ 3 < y ^ 3\nhlt2 : y ^ 3 < (x + 3)"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 9948
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 326,
+        "elapsed_s": 2163
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 326,
+        "elapsed_s": 2163
+      },
+      {
+        "stage": "memory",
+        "checks": 48,
+        "mb": 1645
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 326,
+        "elapsed_s": 2172
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 2172
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 593, 'column': 6}: Type mismatch\n  h\nhas type\n  8 + x * 12 + x ^ 2 * 6 + x ^ 3 = 8 + (x ^ 2 * 8 + x ^ 3 - x * 6)\nbut is expected to have type\n"
+      },
+      {
+        "kind": "restated",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 2175
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 468, 'column': 6}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  d ≥ 0\n  c ≥ 0\n  b ≥ 1\n  a ≥ 1\n  3*a"
+      },
+      {
+        "kind": "withdraw",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "have": "have hlt1 : x ^ 3 < y ^ 3",
+        "tries": 4,
+        "whole_block": true
+      },
+      {
+        "stage": "memory",
+        "checks": 53,
+        "mb": 1691
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1871
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "library",
+        "goal": "y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\nh_pos : 8 * x ^ 2 - 6 * x + 8 > 0\n⊢ x = 9 ∧ y = 11",
+        "found": 58,
+        "accepted": false,
+        "ms": 29080
+      },
+      {
+        "kind": "restated",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "withdraw",
+        "by": "openai/gpt-oss-120b",
+        "have": "have h_x_gt_9 : x > 9 → False",
+        "tries": 4,
+        "whole_block": false
+      },
+      {
+        "stage": "memory",
+        "checks": 56,
+        "mb": 3793
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1184
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "renew",
+        "checks": 57,
+        "mem_mb": 3793,
+        "ms": 4253
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1008
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 762
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 10
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x < (9 : ℕ) ∨ x = (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "route",
+        "from": 1,
+        "to": 18,
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "prune",
+        "bid": 18,
+        "goals": 6
+      },
+      {
+        "stage": "memory",
+        "checks": 4,
+        "mb": 768
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "rmo_2000_2"
+      },
+      {
+        "stage": "memory",
+        "checks": 8,
+        "mb": 804
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x ≥ (9 : ℕ) ∨ x < (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x ≥ (9 : ℕ) → (x + (2 : ℕ)) ^ (3 : ℕ) < y ^ (3 : ℕ) ∧ y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "verdict": "refuted",
+        "values": {
+          "x": "9",
+          "y": "11"
+        }
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "`have h_case_large : x ≥ 9 → (x + 2) ^ 3 < y ^ 3 ∧ y ^ 3 < (x + 3) ^ 3` is false, so the step was not posted: with x = 9, y = 11 every hypothesis in scope holds"
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 907
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 355,
+        "elapsed_s": 2284
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 355,
+        "elapsed_s": 2285
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 4
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(9 : ℕ) ≤ x",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 17,
+        "mb": 929
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2608
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "memory",
+        "checks": 20,
+        "mb": 963
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 355,
+        "elapsed_s": 2318
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 355,
+        "elapsed_s": 2321
+      },
+      {
+        "stage": "memory",
+        "checks": 24,
+        "mb": 1000
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 355,
+        "elapsed_s": 2324
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 355,
+        "elapsed_s": 2325
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 2325
+      },
+      {
+        "stage": "memory",
+        "checks": 28,
+        "mb": 1002
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x + (2 : ℕ) ≤ y",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "y = x + (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "mined",
+        "by": "openai/gpt-oss-120b",
+        "facts": 6
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "restate",
+        "decl": "rmo_2000_2",
+        "tries": 13
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 2339
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 424, 'column': 6}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  e ≥ 0\n  d ≥ 0\n  c ≥ 0\n  0 ≤ b ≤ 7\n "
+      },
+      {
+        "stage": "memory",
+        "checks": 32,
+        "mb": 1010
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 4231
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 2348
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 432, 'column': 4}: linarith failed to find a contradiction\nx y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\nh_x_lt_9 : "
+      },
+      {
+        "stage": "memory",
+        "checks": 36,
+        "mb": 1018
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 6673
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 235,
+        "stmt": ": (x + (2 : ℕ)) ^ (3 : ℕ) ≤ y ^ (3 : ℕ)) : y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 40,
+        "mb": 1033
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6280
+      },
+      {
+        "stage": "memory",
+        "checks": 46,
+        "mb": 1057
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x + (2 : ℕ) ≤ y",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "proven",
+        "cell": 237,
+        "stmt": ") ≤ y ^ (3 : ℕ)) (hlt : y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)) : x + (2 : ℕ) ≤ y",
+        "lines": 7
+      },
+      {
+        "stage": "memory",
+        "checks": 48,
+        "mb": 1166
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "Nat.eq_of_mul_eq_zero_left",
+          "Nat.sub_eq_iff_eq_add.mp"
+        ],
+        "ms": 3304,
+        "found": true
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 2388
+      },
+      {
+        "stage": "memory",
+        "checks": 53,
+        "mb": 1165
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(0 : ℕ) < x + (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "x + (1 : ℕ) < y",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "mined",
+        "by": "openai/gpt-oss-120b",
+        "facts": 6
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 56,
+        "mb": 1222
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 6426
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 1037
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 239,
+        "stmt": "(3 : ℕ) + (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ)) : (0 : ℕ) < x + (3 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 61,
+        "mb": 1228
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1833
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "proven",
+        "cell": 241,
+        "stmt": " ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)) (hle' : x + (2 : ℕ) ≤ y) : y < x + (3 : ℕ)",
+        "lines": 8
+      },
+      {
+        "stage": "memory",
+        "checks": 66,
+        "mb": 1241
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 3252
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 242,
+        "stmt": ") ^ (3 : ℕ)) (hle' : x + (2 : ℕ) ≤ y) (hlt' : y < x + (3 : ℕ)) : y = x + (2 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 70,
+        "mb": 1273
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "ring_nf"
+        ],
+        "ms": 1388,
+        "found": true
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 4
+      },
+      {
+        "stage": "memory",
+        "checks": 74,
+        "mb": 1323
+      },
+      {
+        "stage": "memory",
+        "checks": 76,
+        "mb": 1434
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(0 : ℕ) < (5 : ℕ) * x ^ (2 : ℕ) - (9 : ℕ) * x + (7 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (1 : ℕ)) ^ (3 : ℕ) < (x + (1 : ℕ)) ^ (3 : ℕ) + ((5 : ℕ) * x ^ (2 : ℕ) - (9 : ℕ) * x + (7 : ℕ))",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(x + (1 : ℕ)) ^ (3 : ℕ) < y ^ (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 8785
+      },
+      {
+        "stage": "memory",
+        "checks": 80,
+        "mb": 1486
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 7317
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "hy_eq"
+        ]
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 3256
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 247,
+        "stmt": ": ℕ)) (hy_eq : y = x + (2 : ℕ)) (hx9 : x = (9 : ℕ)) : x = (9 : ℕ) ∧ y = (11 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 85,
+        "mb": 1515
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 125,
+        "elapsed_s": 2447
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 430, 'column': 6}: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  a ≥ 1\nwhere\n a := ↑y\n\nerror at {'li"
+      },
+      {
+        "kind": "library",
+        "goal": " 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\nh_x_lt_9 : x < 9 → False\nhxge9 : 9 ≤ x\n⊢ (x + 2) ^ 3 ≤ y ^ 3",
+        "found": 411,
+        "accepted": false,
+        "ms": 36284
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 396,
+        "elapsed_s": 2483
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 469, 'column': 2}: Type mismatch: After simplification, term\n  this\n has type\n  True\nbut is expected to have type\n  (x + 1) * ((x + 1) * (x + "
+      },
+      {
+        "stage": "memory",
+        "checks": 89,
+        "mb": 3998
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 4803
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 250,
+        "stmt": ": (x + (1 : ℕ)) ^ (3 : ℕ) < y ^ (3 : ℕ)) : y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 93,
+        "mb": 4035
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 396,
+        "elapsed_s": 2493
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 4
+      },
+      {
+        "stage": "memory",
+        "checks": 0,
+        "mb": 262
+      },
+      {
+        "stage": "renew",
+        "checks": 96,
+        "mem_mb": 4035,
+        "ms": 3863
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) ≤ y ^ (3 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 5209
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 396,
+        "elapsed_s": 2507
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 396,
+        "elapsed_s": 2507
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1734
+      },
+      {
+        "stage": "memory",
+        "checks": 6,
+        "mb": 831
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "proven",
+        "cell": 257,
+        "stmt": "ℕ) < y ^ (3 : ℕ)) (h2 : y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)) : y < x + (3 : ℕ)",
+        "lines": 2
+      },
+      {
+        "stage": "memory",
+        "checks": 10,
+        "mb": 2851
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 430, 'column': 4}: linarith failed to find a contradiction\nx y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\nh_x_lt_9 : "
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 396,
+        "elapsed_s": 2539
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 396,
+        "elapsed_s": 2539
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2025
+      },
+      {
+        "stage": "memory",
+        "checks": 12,
+        "mb": 2877
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 4
+      },
+      {
+        "stage": "memory",
+        "checks": 16,
+        "mb": 3051
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "x = (9 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 152,
+        "elapsed_s": 2568
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 521, 'column': 17}: don't know how to synthesize implicit argument `b`\n  @Nat.pow_lt_pow_iff_left ?m.133 ?m.134 3 (of_decide_eq_true (id (Eq.r"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 8722
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 396,
+        "elapsed_s": 2577
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 396,
+        "elapsed_s": 2577
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 621
+      },
+      {
+        "kind": "collapse",
+        "tactic": null,
+        "accepted": false
+      },
+      {
+        "stage": "proven",
+        "cell": 265,
+        "stmt": "^ (3 : ℕ)) (hy_lt : y < x + (3 : ℕ)) (hx_lt : x + (1 : ℕ) < y) : y ≤ x + (2 : ℕ)",
+        "lines": 43
+      },
+      {
+        "stage": "memory",
+        "checks": 23,
+        "mb": 3105
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2180
+      },
+      {
+        "stage": "memory",
+        "checks": 0,
+        "mb": 3124
+      },
+      {
+        "stage": "renew",
+        "checks": 24,
+        "mem_mb": 3105,
+        "ms": 4956
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "retry",
+        "spent_s": 152,
+        "elapsed_s": 2594
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "error at {'line': 553, 'column': 6}: linarith failed to find a contradiction\ncase h2\nx y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : x ^ 3 + 6 * x ^ 2 + 12 * x + 8 = x ^ 3 + "
+      },
+      {
+        "kind": "cut",
+        "by": "openai/gpt-oss-120b",
+        "kept": 0
+      }
+    ]
+  }
+}

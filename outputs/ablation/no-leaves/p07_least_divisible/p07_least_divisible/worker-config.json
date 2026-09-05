@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "problem_id": "p07_least_divisible",
+  "description": "# p07_least_divisible\n\nFind the least positive integer $n$ such that $77$ divides $(n+2)(n+3)$.\n\nFill in `p07_answer` with a numeric literal and prove the theorem. `IsLeast S a`\nmeans `a ∈ S` and `a` is a lower bound of `S`, so the proof has two parts:\nyour `n` works, and nothing smaller does.\n",
+  "challenge": "import Mathlib\n\n/-- The least positive integer `n` such that `77` divides `(n + 2) * (n + 3)`.\nMust be a numeric literal. -/\nabbrev p07_answer : ℕ := sorry\n\n/-- `p07_answer` is the least element of the set of positive `n` with\n`77 ∣ (n + 2) * (n + 3)`. -/\ntheorem p07_least_divisible :\n    IsLeast {n : ℕ | 0 < n ∧ 77 ∣ (n + 2) * (n + 3)} p07_answer := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "p07_least_divisible"
+  ],
+  "definition_names": [
+    "p07_answer"
+  ],
+  "numeric_answer_names": [
+    "p07_answer"
+  ],
+  "out_dir": "/home/sunny/frame132/out/p07_least_divisible/board_agent/20260905T100459Z/p07_least_divisible",
+  "budget_usd": 1.0,
+  "time_limit_s": 1800.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.board_agent:create_agent",
+  "session_id": "78233896d95a4fa489e827e03fe34adb"
+}

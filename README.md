@@ -205,7 +205,7 @@ See `RULES.md` for the complete assignment rules.
 
 ## This submission
 
-The agent is in `submission/`, entry point `submission.agent:create_agent` (the harness default). How it works, what it measures and what it does not do is in [docs/APPROACH.md](docs/APPROACH.md). The Part 2 note is [docs/PART2.md](docs/PART2.md), the board runs it cites are under `outputs/board/` (one run directory per problem, `result.json`, `transcript.json`, `solution.lean`, `events.jsonl`) and its ablation matrix under `outputs/matrix/`.
+The agent is in `submission/`, entry point `submission.agent:create_agent` (the harness default). How it works, what it measures and what it does not do is in [docs/APPROACH.md](docs/APPROACH.md). The Part 2 note is [docs/PART2.md](docs/PART2.md), the board runs it cites are under `outputs/board/` (one run directory per problem, `result.json`, `transcript.json`, `solution.lean`, `events.jsonl`) its ablation matrix under `outputs/matrix/` and the leaves-off runs under `outputs/ablation/`.
 
 The harness (`src/re_harness`, `run.py`, the Docker image and the scripts) is the take-home kit as provided. The changes outside `submission/` are `scripts/judge_check.sh`, which takes the problem from `JUDGE_CHECK_PROBLEM` (default `p06_pow_mod`, a problem the agent cannot close without a model call), and a `notes/` line in `.gitignore`. The two-model coordination layer, the tests under `tests/test_board_agent.py`, `tests/test_framework*.py`, `tests/test_submission_agent.py`, and `tools/replay.py`, `tools/account.py` (per-run accounting from a run directory) are my own work.
 

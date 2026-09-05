@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "problem_id": "rmo_2000_2",
+  "description": "# rmo_2000_2\n\nSolve the equation\n\n$$y^3 = x^3 + 8x^2 - 6x + 8$$\n\nfor positive integers $x$ and $y$.\n",
+  "challenge": "import Mathlib\n\ntheorem rmo_2000_2\n  (x y : ℕ)\n  (hx : 0 < x)\n  (hy : 0 < y)\n  (h : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8) :\n  x = 9 ∧ y = 11 := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "rmo_2000_2"
+  ],
+  "definition_names": [],
+  "numeric_answer_names": [],
+  "out_dir": "/home/sunny/frame132/out/rmo_2000_2/board_agent/20260905T100032Z/rmo_2000_2",
+  "budget_usd": 1.0,
+  "time_limit_s": 3600.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.board_agent:create_agent",
+  "session_id": "2a91dcfdf55740bc971fedd7465b096f"
+}

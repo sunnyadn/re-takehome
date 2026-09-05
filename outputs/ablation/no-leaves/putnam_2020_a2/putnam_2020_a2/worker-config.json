@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "problem_id": "putnam_2020_a2",
+  "description": "# putnam_2020_a2\n\nLet $k$ be a nonnegative integer. Prove that\n\n$$\\sum_{j=0}^k 2^{k-j}\\binom{k+j}{j} = 4^k.$$\n\nFill in the proof of `putnam_2020_a2`.\n",
+  "challenge": "import Mathlib\n\ntheorem putnam_2020_a2\n  (k : ℕ) :\n  (∑ j ∈ Finset.Icc 0 k, 2 ^ (k - j) * Nat.choose (k + j) j) = 4 ^ k := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "putnam_2020_a2"
+  ],
+  "definition_names": [],
+  "numeric_answer_names": [],
+  "out_dir": "/home/sunny/frame132/out/putnam_2020_a2/board_agent/20260905T101325Z/putnam_2020_a2",
+  "budget_usd": 1.0,
+  "time_limit_s": 1800.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.board_agent:create_agent",
+  "session_id": "16192d46d12e4f1095012d98c7d9babc"
+}

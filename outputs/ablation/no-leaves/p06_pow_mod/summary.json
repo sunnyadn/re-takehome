@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "set": "sample",
+  "problems": [
+    {
+      "problem_id": "p06_pow_mod",
+      "status": "passed",
+      "passed": true,
+      "points": 1,
+      "actual_cost_usd": 0.0,
+      "wall_s": 99.71,
+      "models_used": [],
+      "failure_reason": null
+    }
+  ],
+  "total_points": 1,
+  "max_points": 1,
+  "actual_cost_usd": 0.0,
+  "wall_s_sum": 99.71,
+  "run_id": "a7831b08d04f4f54aacd8e8639386573",
+  "wall_s": 99.938,
+  "finished_at": "2026-09-05T10:04:59.406370+00:00"
+}

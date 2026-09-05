@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "set": "sample",
+  "problems": [
+    {
+      "problem_id": "p05_gcd_mersenne",
+      "status": "passed",
+      "passed": true,
+      "points": 1,
+      "actual_cost_usd": 0.0,
+      "wall_s": 27.101,
+      "models_used": [],
+      "failure_reason": null
+    }
+  ],
+  "total_points": 1,
+  "max_points": 1,
+  "actual_cost_usd": 0.0,
+  "wall_s_sum": 27.101,
+  "run_id": "f9d00d1d21a04405a0ba5e7d57d4849b",
+  "wall_s": 27.273,
+  "finished_at": "2026-09-05T10:03:19.320113+00:00"
+}

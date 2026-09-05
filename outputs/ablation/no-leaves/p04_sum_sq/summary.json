@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "set": "sample",
+  "problems": [
+    {
+      "problem_id": "p04_sum_sq",
+      "status": "passed",
+      "passed": true,
+      "points": 1,
+      "actual_cost_usd": 0.0,
+      "wall_s": 42.707,
+      "models_used": [],
+      "failure_reason": null
+    }
+  ],
+  "total_points": 1,
+  "max_points": 1,
+  "actual_cost_usd": 0.0,
+  "wall_s_sum": 42.707,
+  "run_id": "b7764408a0e1423085c86a8b7a26ce5c",
+  "wall_s": 42.852,
+  "finished_at": "2026-09-05T10:02:51.869661+00:00"
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "set": "sample",
+  "problems": [
+    {
+      "problem_id": "p07_least_divisible",
+      "status": "passed",
+      "passed": true,
+      "points": 1,
+      "actual_cost_usd": 0.00057434,
+      "wall_s": 37.399,
+      "models_used": [
+        "qwen/qwen3.5-flash-02-23"
+      ],
+      "failure_reason": null
+    }
+  ],
+  "total_points": 1,
+  "max_points": 1,
+  "actual_cost_usd": 0.00057434,
+  "wall_s_sum": 37.399,
+  "run_id": "b339d510aabf47a9a1bf53ece465c4ff",
+  "wall_s": 37.599,
+  "finished_at": "2026-09-05T10:05:37.151965+00:00"
+}

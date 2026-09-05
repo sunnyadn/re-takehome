@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "problem_id": "p03_sq_ge_two_ab",
+  "description": "# p03_sq_ge_two_ab\n\nFor any two real numbers $a$ and $b$, show that $a^2 + b^2 \\ge 2ab$.\n",
+  "challenge": "import Mathlib\n\n/-- For any two real numbers `a` and `b`, show that `a ^ 2 + b ^ 2 ≥ 2 * a * b`. -/\ntheorem p03_sq_ge_two_ab (a b : ℝ) : a ^ 2 + b ^ 2 ≥ 2 * a * b := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "p03_sq_ge_two_ab"
+  ],
+  "definition_names": [],
+  "numeric_answer_names": [],
+  "out_dir": "/home/sunny/frame132/out/p03_sq_ge_two_ab/board_agent/20260905T100132Z/p03_sq_ge_two_ab",
+  "budget_usd": 1.0,
+  "time_limit_s": 1800.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.board_agent:create_agent",
+  "session_id": "8b62526461334d7990aeb96f0d210210"
+}
