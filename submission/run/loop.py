@@ -219,180 +219,170 @@ class Loop:
     async def turn(self, model: str) -> bool:
         """One turn for one worker: False when there was no goal to take."""
 
-        if True:
-            async with self.lock:
-                if any(self.delivery.done_text(b) is not None for b in self.bb.branches):
-                    self.finished = True
+        async with self.lock:
+            if any(self.delivery.done_text(b) is not None for b in self.bb.branches):
+                self.finished = True
+                return True
+            if self.bb.all_last_in_line() or self.bb.stalled() or self.bb.exhausted():
+                drained = self.bb.exhausted()
+                await self.ladder.unstick()
+                if drained:
+                    # The board moved (or could not): the models may be
+                    # asked once more, with the new feedback in front of them.
+                    self.run.notes.forget_repeats()
+            picked = self.bb.pick(model)
+            goal = picked[1] if picked else None
+            if picked:
+                self.bb.focus(picked[0])
+            base = self.bb.board
+            if goal is not None and goal.stmt in self.bb.proven and not self.run.notes[goal.key].recalled:
+                self.run.notes[goal.key].recalled = True
+                nxt, _ = await self.asking.judge(base, goal, self.bb.proven[goal.stmt])
+                if nxt is not None:
+                    self.run.events.append({"kind": "recall", "goal": goal.text[-120:]})
+                    await self.bb.commit(nxt)
                     return True
-                if self.bb.all_last_in_line() or self.bb.stalled() or self.bb.exhausted():
-                    drained = self.bb.exhausted()
-                    await self.ladder.unstick()
-                    if drained:
-                        # The board moved (or could not): the models may be
-                        # asked once more, with the new feedback in front of them.
-                        self.run.notes.forget_repeats()
-                picked = self.bb.pick(model)
-                goal = picked[1] if picked else None
-                if picked:
-                    self.bb.focus(picked[0])
-                base = self.bb.board
-                if goal is not None and goal.stmt in self.bb.proven and not self.run.notes[goal.key].recalled:
-                    self.run.notes[goal.key].recalled = True
-                    nxt, _ = await self.asking.judge(base, goal, self.bb.proven[goal.stmt])
-                    if nxt is not None:
-                        self.run.events.append({"kind": "recall", "goal": goal.text[-120:]})
-                        await self.bb.commit(nxt)
-                        return True
-                if goal is not None and not self.run.notes[goal.key].swept:
-                    self.run.notes[goal.key].swept = True
-                    if await self.ladder.sweep(goal) or await self.ladder.leaf_sweep(goal) or await self.ladder.witness_sweep(goal) \
-                            or await self.ladder.generalise_sweep(goal):
-                        return True
-                if goal is not None and not self.run.notes[goal.key].searched \
-                        and self.run.notes[goal.key].tries >= SEARCH_AFTER:
-                    # Measured over 70 runs: `apply?` and the name scan took
-                    # 19% of the wall clock under the lock (601 probes, 22
-                    # goals closed; 269 scans at 22 s), and Lean is busy
-                    # 60-74% of a run. A goal the first step closes never pays.
-                    self.run.notes[goal.key].searched = True
-                    if await self.ladder.library_sweep(goal):
-                        return True
-                    await self.asking.consult(goal)
-                if goal is not None:
-                    self.run.notes.claim(goal.key, model)
-                    wants_plan = (self.run.notes[goal.key].tries >= PLAN_AFTER
-                                  and not self.run.notes[goal.key].plan)
-                    prompt = self.prompt_for(goal, model)
-            if goal is not None and wants_plan:
-                # The crux is where routes diverge, so it gets two: one plan
-                # from each model, the second written as a skeleton onto a
-                # sibling branch. Lean's progress on each decides between them.
-                other = next((m for m in self.run.models if m != model), model)
-                state = State(text=self.bb.board.text, goal=goal.text)
-                avoid = list(self.routes.get(goal.decl, []))
-                plan, second = await asyncio.gather(
-                    self.agent._ask_plan(self.run.problem, state, self.run.services, self.run.ledger, other, avoid=avoid),
-                    self.agent._ask_plan(self.run.problem, state, self.run.services, self.run.ledger, model, avoid=avoid))
-                ask_second, fork = "", None
-                async with self.lock:
-                    self.run.notes[goal.key].plan = plan
-                    self.routes.setdefault(goal.decl, []).extend(
-                        p for p in (plan, second) if p.strip())
-                    self.run.events.append({"kind": "plan", "by": other, "chars": len(plan)})
-                    self.run.events.append({"kind": "plan", "by": model, "chars": len(second)})
-                    now = self.bb.live(base.bid)
-                    moved = now.find(goal.key) if now else None
-                    if moved:
-                        self.bb.focus(now)
-                        goal = moved
-                    prompt = self.prompt_for(goal, model, skeleton=True) if moved else ""
-                    if prompt:
-                        self.run.events.append({"kind": "skeleton", "by": model})
-                    if moved and second.strip() and second.strip() != plan.strip() \
-                            and len(self.bb.branches) < BEAM + 1:
-                        fork = Board(now.text, list(now.goals), list(now.messages),
-                                     now.accepted, self.ladder.next_bid)
-                        self.ladder.next_bid += 1
-                        self.bb.sound[fork.bid] = self.bb.sound.get(now.bid, now.text)
-                        self.bb.branches.append(fork)
-                        self.bb.focus(fork)
-                        ask_second = self.prompt_for(goal, model, skeleton=True, plan=second)
-                        self.bb.focus(now)
-                if ask_second and fork is not None:
-                    reply_b, _ = await self.agent._call(model, ask_second, step_tokens(model),
-                                                  self.run.services, self.run.ledger, system=BOARD_SYSTEM)
-                    async with self.lock:
-                        side = self.bb.live(fork.bid)
-                        there = side.find(goal.key) if side else None
-                        took = False
-                        if there is not None:
-                            self.bb.focus(side)
-                            edits = interpret(reply_b, self.bb.board, there, self.run.graded)
-                            took = await self.apply(model, there, edits) if edits else False
-                        if took and self.bb.live(fork.bid):
-                            self.run.events.append({"stage": "route", "from": base.bid,
-                                           "to": fork.bid, "by": model})
-                            self.bb.prune()
-                        elif self.bb.live(fork.bid):
-                            self.bb.branches.remove(self.bb.live(fork.bid))
-                        main = self.bb.live(base.bid)
-                        if main:
-                            self.bb.focus(main)
-                if not prompt:
-                    async with self.lock:
-                        self.run.notes[goal.key].claimed_by = None
+            if goal is not None and not self.run.notes[goal.key].swept:
+                self.run.notes[goal.key].swept = True
+                if await self.ladder.sweep(goal) or await self.ladder.leaf_sweep(goal) or await self.ladder.witness_sweep(goal) \
+                        or await self.ladder.generalise_sweep(goal):
                     return True
-            if goal is None:
-                return False
-            task = asyncio.ensure_future(
-                self.agent._call(model, prompt, step_tokens(model), self.run.services, self.run.ledger, system=BOARD_SYSTEM))
-            self.asking.loose.append(task)
-            try:
-                reply, why = await task
-            finally:
-                self.asking.loose.remove(task)
+            if goal is not None and not self.run.notes[goal.key].searched \
+                    and self.run.notes[goal.key].tries >= SEARCH_AFTER:
+                # Measured over 70 runs: `apply?` and the name scan took
+                # 19% of the wall clock under the lock (601 probes, 22
+                # goals closed; 269 scans at 22 s), and Lean is busy
+                # 60-74% of a run. A goal the first step closes never pays.
+                self.run.notes[goal.key].searched = True
+                if await self.ladder.library_sweep(goal):
+                    return True
+                await self.asking.consult(goal)
+            if goal is not None:
+                self.run.notes.claim(goal.key, model)
+                wants_plan = (self.run.notes[goal.key].tries >= PLAN_AFTER
+                              and not self.run.notes[goal.key].plan)
+                prompt = self.prompt_for(goal, model)
+        if goal is not None and wants_plan:
+            # The crux is where routes diverge, so it gets two: one plan
+            # from each model, the second written as a skeleton onto a
+            # sibling branch. Lean's progress on each decides between them.
+            other = next((m for m in self.run.models if m != model), model)
+            state = State(text=self.bb.board.text, goal=goal.text)
+            avoid = list(self.routes.get(goal.decl, []))
+            plan, second = await asyncio.gather(
+                self.agent._ask_plan(self.run.problem, state, self.run.services, self.run.ledger, other, avoid=avoid),
+                self.agent._ask_plan(self.run.problem, state, self.run.services, self.run.ledger, model, avoid=avoid))
+            ask_second, fork = "", None
             async with self.lock:
-                if self.run.notes[goal.key].claimed_by == model:
-                    self.run.notes[goal.key].claimed_by = None
-                if why == "length":
-                    reply = salvage(reply)
-                    kept = reply.count("\n") + 1 if reply else 0
-                    self.run.events.append({"kind": "cut", "by": model, "kept": kept})
-                    if not kept:
-                        self.run.notes[goal.key].said = Feedback(model, self.run.notes[goal.key].said.text
-                                                        if self.run.notes[goal.key].said else "nothing yet", "cut")
-                        self.run.notes[goal.key].tries += 1
-                        return True
+                self.run.notes[goal.key].plan = plan
+                self.routes.setdefault(goal.decl, []).extend(
+                    p for p in (plan, second) if p.strip())
+                self.run.events.append({"kind": "plan", "by": other, "chars": len(plan)})
+                self.run.events.append({"kind": "plan", "by": model, "chars": len(second)})
                 now = self.bb.live(base.bid)
-                here = now.find(goal.key) if now else None
-                if here is not None:
+                moved = now.find(goal.key) if now else None
+                if moved:
                     self.bb.focus(now)
-                elif base.find(goal.key) is not None and len(self.bb.branches) < BEAM + 1:
-                    # The goal moved on under this reply. Judged against the
-                    # file it was asked about, an accepted answer is a second
-                    # way forward, and a second way is a branch, not waste.
-                    fork = Board(base.text, list(base.goals), list(base.messages),
-                                 base.accepted, self.ladder.next_bid)
-                    self.ladder.next_bid += 1
-                    self.bb.sound[fork.bid] = self.bb.sound.get(base.bid, base.text)
-                    self.bb.branches.append(fork)
-                    self.bb.focus(fork)
-                    here = fork.find(goal.key)
-                    edits = interpret(reply, self.bb.board, here, self.run.graded)
-                    took = await self.apply(model, here, edits) if edits else False
+                    goal = moved
+                prompt = self.prompt_for(goal, model, skeleton=True) if moved else ""
+                if prompt:
+                    self.run.events.append({"kind": "skeleton", "by": model})
+                if moved and second.strip() and second.strip() != plan.strip() \
+                        and len(self.bb.branches) < BEAM + 1:
+                    fork = self.bb.fork(now)
+                    if fork is not None:
+                        ask_second = self.prompt_for(goal, model, skeleton=True, plan=second)
+                    self.bb.focus(now)
+            if ask_second and fork is not None:
+                reply_b, _ = await self.agent._call(model, ask_second, step_tokens(model),
+                                              self.run.services, self.run.ledger, system=BOARD_SYSTEM)
+                async with self.lock:
+                    side = self.bb.live(fork.bid)
+                    there = side.find(goal.key) if side else None
+                    took = False
+                    if there is not None:
+                        self.bb.focus(side)
+                        edits = interpret(reply_b, self.bb.board, there, self.run.graded)
+                        took = await self.apply(model, there, edits) if edits else False
                     if took and self.bb.live(fork.bid):
-                        self.run.events.append({"stage": "fork", "from": base.bid, "to": fork.bid,
-                                       "goal": goal.text[:60]})
+                        self.run.events.append({"stage": "route", "from": base.bid,
+                                       "to": fork.bid, "by": model})
                         self.bb.prune()
-                    else:
-                        if self.bb.live(fork.bid):
-                            self.bb.branches.remove(self.bb.live(fork.bid))
-                        self.run.events.append({"kind": "stale", "by": model})
-                    return True
-                if here is None:
-                    self.run.events.append({"kind": "stale", "by": model})
-                    return True
-                edits = interpret(reply, self.bb.board, here, self.run.graded)
-                if not edits:
-                    self.run.events.append({"kind": "empty", "by": model})
+                    elif self.bb.live(fork.bid):
+                        self.bb.branches.remove(self.bb.live(fork.bid))
+                    main = self.bb.live(base.bid)
+                    if main:
+                        self.bb.focus(main)
+            if not prompt:
+                async with self.lock:
+                    self.run.notes[goal.key].claimed_by = None
+                return True
+        if goal is None:
+            return False
+        task = asyncio.ensure_future(
+            self.agent._call(model, prompt, step_tokens(model), self.run.services, self.run.ledger, system=BOARD_SYSTEM))
+        self.asking.loose.append(task)
+        try:
+            reply, why = await task
+        finally:
+            self.asking.loose.remove(task)
+        async with self.lock:
+            if self.run.notes[goal.key].claimed_by == model:
+                self.run.notes[goal.key].claimed_by = None
+            if why == "length":
+                reply = salvage(reply)
+                kept = reply.count("\n") + 1 if reply else 0
+                self.run.events.append({"kind": "cut", "by": model, "kept": kept})
+                if not kept:
                     self.run.notes[goal.key].said = Feedback(model, self.run.notes[goal.key].said.text
-                                                    if self.run.notes[goal.key].said else "nothing yet", "empty")
+                                                    if self.run.notes[goal.key].said else "nothing yet", "cut")
                     self.run.notes[goal.key].tries += 1
                     return True
-                await self.apply(model, here, edits)
-                still = self.bb.board.find(goal.key)
-                if still is not None and self.run.notes[goal.key].tries >= WITHDRAW_AFTER:
-                    if settled_inside(self.bb.board.text, still) >= 2 and not self.run.notes[still.key].leaf_restarted:
-                        # Measured on rmo_2000_6 (win54): one stuck case took the
-                        # have with h2a, h5a and 2 closed cases down. The leaf
-                        # restarts once before proved work is withdrawn.
-                        self.run.notes[still.key].leaf_restarted = True
-                        self.run.notes.forget(still.key)
-                        self.run.events.append({"kind": "leaf_restart", "by": model, "goal": still.text[-160:],
-                                       "settled": settled_inside(self.bb.board.text, still)})
-                    else:
-                        await self.bb.take_back(model, still)
-            return True
+            now = self.bb.live(base.bid)
+            here = now.find(goal.key) if now else None
+            if here is not None:
+                self.bb.focus(now)
+            elif base.find(goal.key) is not None:
+                # The goal moved on under this reply. Judged against the
+                # file it was asked about, an accepted answer is a second
+                # way forward, and a second way is a branch, not waste.
+                fork = self.bb.fork(base)
+                here = fork.find(goal.key) if fork is not None else None
+                edits = interpret(reply, self.bb.board, here, self.run.graded)
+                took = await self.apply(model, here, edits) if edits else False
+                if took and self.bb.live(fork.bid):
+                    self.run.events.append({"stage": "fork", "from": base.bid, "to": fork.bid,
+                                   "goal": goal.text[:60]})
+                    self.bb.prune()
+                else:
+                    if self.bb.live(fork.bid):
+                        self.bb.branches.remove(self.bb.live(fork.bid))
+                    self.run.events.append({"kind": "stale", "by": model})
+                return True
+            if here is None:
+                self.run.events.append({"kind": "stale", "by": model})
+                return True
+            edits = interpret(reply, self.bb.board, here, self.run.graded)
+            if not edits:
+                self.run.events.append({"kind": "empty", "by": model})
+                self.run.notes[goal.key].said = Feedback(model, self.run.notes[goal.key].said.text
+                                                if self.run.notes[goal.key].said else "nothing yet", "empty")
+                self.run.notes[goal.key].tries += 1
+                return True
+            await self.apply(model, here, edits)
+            still = self.bb.board.find(goal.key)
+            if still is not None and self.run.notes[goal.key].tries >= WITHDRAW_AFTER:
+                if settled_inside(self.bb.board.text, still) >= 2 and not self.run.notes[still.key].leaf_restarted:
+                    # Measured on rmo_2000_6 (win54): one stuck case took the
+                    # have with h2a, h5a and 2 closed cases down. The leaf
+                    # restarts once before proved work is withdrawn.
+                    self.run.notes[still.key].leaf_restarted = True
+                    self.run.notes.forget(still.key)
+                    self.run.events.append({"kind": "leaf_restart", "by": model, "goal": still.text[-160:],
+                                   "settled": settled_inside(self.bb.board.text, still)})
+                else:
+                    await self.bb.take_back(model, still)
+        return True
 
     async def worker(self, model: str) -> None:
         idle, faults = 0, 0

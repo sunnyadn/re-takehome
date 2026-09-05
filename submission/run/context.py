@@ -1,8 +1,8 @@
 """What one problem's run settles before the board opens.
 
 Everything here is fixed for the run, or is an object the parts share by
-reference. Each part of the run takes this and reads what it needs, so no
-part carries a constructor of nine arguments."""
+reference. Each part takes this rather than a list of the six or seven
+things it happens to read out of it."""
 
 from __future__ import annotations
 from typing import Any

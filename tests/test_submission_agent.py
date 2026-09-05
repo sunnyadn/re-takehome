@@ -185,14 +185,6 @@ class _SlowSearchLean(_SearchLean):
         )
 
 
-def test_the_search_budget_scales_with_the_time_limit():
-    # A count cap measures the wrong thing, so the guard is cumulative seconds.
-    small = agent_mod.Config(time_limit_s=1.0)
-    big = agent_mod.Config(time_limit_s=100.0)
-    assert (agent_mod.SEARCH_BUDGET_FRACTION * big.time_limit_s
-            > agent_mod.SEARCH_BUDGET_FRACTION * small.time_limit_s)
-
-
 _MIXED_ERRORS = [   # file coordinates, as FileCoordinates hands them on
     {"severity": "error", "pos": {"line": 4}, "data": "linarith failed to find a contradiction"},
     {"severity": "error", "pos": {"line": 8}, "data": "Unknown constant `Nat.made_up`"},

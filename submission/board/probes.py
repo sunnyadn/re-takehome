@@ -125,7 +125,7 @@ def extract_file(text: str, goals: Sequence[Goal]) -> str:
 APPLY_PROBE = "set_option maxHeartbeats 40000 in apply?"
 
 
-TRY_THIS = re.compile(r"Try this:\s*(?:\[apply\]\s*)?(exact|refine)\s+(.+)", re.S)
+TRY_THIS_STEP = re.compile(r"Try this:\s*(?:\[apply\]\s*)?(exact|refine)\s+(.+)", re.S)
 
 
 def apply_file(text: str, goal: Goal) -> str:
@@ -141,7 +141,7 @@ def read_suggestions(messages: Sequence[dict[str, Any]], line: int) -> list[tupl
     for m in messages:
         if m.get("severity") not in INFO or message_line(m) != line:
             continue
-        for found in TRY_THIS.finditer(message_text(m)):
+        for found in TRY_THIS_STEP.finditer(message_text(m)):
             term = " ".join(found.group(2).split())
             if (found.group(1), term) not in out:
                 out.append((found.group(1), term))
@@ -215,7 +215,7 @@ def name_premises(stmt: str, goal_text: str) -> str:
     return " ".join(groups + named) + f" : {rest}"
 
 
-UNKNOWN_NAME = re.compile(r"(?:[Uu]nknown (?:constant|identifier)|environment does not contain) `([^`]+)`")
+UNKNOWN_NAME_QUOTED = re.compile(r"(?:[Uu]nknown (?:constant|identifier)|environment does not contain) `([^`]+)`")
 
 
 # Lean lists, for each misspelt library name, the declarations whose last
@@ -333,7 +333,7 @@ def library_names(messages: Sequence[dict[str, Any]], goal_text: str) -> list[st
     local = set(hypotheses(goal_text))
     out: list[str] = []
     for m in messages:
-        for name in UNKNOWN_NAME.findall(str(m.get("data", ""))):
+        for name in UNKNOWN_NAME_QUOTED.findall(str(m.get("data", ""))):
             head = name.split(".")[0]
             if ("." in name or "_" in name) and head not in local and not name.startswith("h") \
                     and name not in out:

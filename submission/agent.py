@@ -1,6 +1,8 @@
-"""Two lines of attack, one per model, arbitrated by the Lean compiler.
+"""What the graded run loads, and the pieces both agents share.
 
-A stalled line is handed to the other model. Rationale is in the writeup."""
+`create_agent` at the bottom is the entry point the harness resolves. Above it
+are the configuration, the model ledger, the grading predicates, and the
+deterministic sweep files, all used by `submission/board_agent.py`."""
 
 from __future__ import annotations
 
@@ -27,7 +29,6 @@ RETRY_BACKOFF_S = (5.0, 20.0, 60.0)
 # A per-problem pool shared by both lines. Eight suited a 30-minute run of
 # about 8 calls; a graded run makes roughly 35x that, so it scales.
 RETRIES_PER_1800S = 8
-PLAN_TOKENS = 16000
 FEEDBACK_CHARS = 6000
 # Stop launching while a round still fits, since overshooting the ledger
 # scores zero however good the proof is.
@@ -49,11 +50,6 @@ class Config:
     """Which models get a line. One model listed twice is the solo control."""
 
     lines: tuple[str, ...] = (MODEL_A, MODEL_B)
-    # A runaway backstop, not the intended stop. Round 2 ended every run on
-    # this cap while using about an eighth of the clock and the money, so it
-    # is set past anything the deadline and budget can actually allow.
-    max_turns_per_line: int = 500
-    stall_before_handoff: int = 1
     budget_usd: float = 1.00
     time_limit_s: float = 28800.0
     # Research switch: VM_AUDIT=off lets every statement in unaudited (the
@@ -189,7 +185,7 @@ def strip_fences(block: str) -> str:
 
 
 BANNED = re.compile(r"\b(sorry|sorryAx|admit|native_decide|unsafe)\b|^\s*axiom\s", re.MULTILINE)
-ANSWER_SLOT = re.compile(r"^\s*abbrev\s+([A-Za-z_][\w']*)\s*:\s*\u2115\s*:=", re.MULTILINE)
+NAT_ANSWER_SLOT = re.compile(r"^\s*abbrev\s+([A-Za-z_][\w']*)\s*:\s*\u2115\s*:=", re.MULTILINE)
 DECL = re.compile(r"^\s*(?:theorem|lemma|abbrev|def)\s+([A-Za-z_][\w']*)", re.MULTILINE)
 AXIOM_LINE = re.compile(r"'([^']+)' depends on axioms: \[([^\]]*)\]")
 PERMITTED_AXIOMS = frozenset({"propext", "Classical.choice", "Quot.sound"})
@@ -262,7 +258,7 @@ def forbidden_axioms(messages: Sequence[dict[str, Any]]) -> list[str]:
 def answer_names(challenge: str) -> tuple[str, ...]:
     """Nat answer slots, which must end up as plain decimal literals."""
 
-    return tuple(ANSWER_SLOT.findall(challenge))
+    return tuple(NAT_ANSWER_SLOT.findall(challenge))
 
 
 def scoring_faults(source: str, names: Sequence[str], challenge: str = "") -> list[str]:
@@ -397,12 +393,11 @@ def split_files(source: str, cocktail: Sequence[str] = COCKTAIL) -> list[str]:
     return files
 
 
-IMPORT_LINE = re.compile(r"^\s*import\s")
-NO_GOALS = "no goals to be solved"
+IMPORT_HEAD = re.compile(r"^\s*import\s")
 
 
 def import_lines(source: str) -> int:
-    return sum(1 for l in source.splitlines() if IMPORT_LINE.match(l))
+    return sum(1 for l in source.splitlines() if IMPORT_HEAD.match(l))
 
 
 class FileCoordinates:
@@ -443,14 +438,9 @@ def in_file_coordinates(services: Any) -> Any:
     return services
 
 
-DECL_HEAD = re.compile(r"^(theorem|lemma|abbrev|def|example|noncomputable|private|@\[)")
 TRY_THIS = "Try this"
-# Counting searches measures the wrong thing: 30 of them is about 1% of the
-# graded clock, yet 27 of 33 recorded runs would have wanted more than 30.
-SEARCH_BUDGET_FRACTION = 0.05
 
 
-UNSOLVED = "unsolved goals"
 
 
 TRY_LINE = re.compile(r"^\s*\[[a-z]+\]\s*(\S.*?)\s*$")
@@ -506,19 +496,6 @@ def format_messages(messages: Sequence[dict[str, Any]]) -> str:
     return "\n\n".join(chunks)[:FEEDBACK_CHARS] if chunks else ""
 
 
-PLANNER_SYSTEM = """You are a competition mathematician preparing a proof for formalisation in Lean 4 with Mathlib.
-
-Produce, in this order:
-1. ANSWER: if the challenge file has any `abbrev NAME := sorry` slot, state the exact value each one must take. A numeric answer must be a plain decimal literal with no arithmetic.
-2. PROOF: a complete, rigorous argument in English. Every step must be justified and no case may be skipped.
-3. LEAN NOTES: the Mathlib lemma names and tactics the formalisation will need, and any step you expect to be hard in Lean.
-
-Choose a plan Lean can check cheaply:
-- Reduce the infinite to the finite. Bound the unknown between two explicit values, or use periodicity modulo a small number, or induct. State the bound.
-- Leave the finite part to interval_cases, decide, or omega. Do not hand-prove what enumeration closes.
-- Stay in the type the statement uses. Changing the ambient type costs one cast lemma at every later step, so take that route only if no omega or nlinarith route exists.
-
-Be concrete. The reader writes Lean directly from this and cannot consult you again."""
 
 
 def create_agent():

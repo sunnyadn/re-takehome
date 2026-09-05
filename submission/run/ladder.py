@@ -21,7 +21,7 @@ from submission.framework import (classify, insert_preamble, proof_span, reinden
 from submission.framework_agent import Feedback
 from submission.leaves import _hyps as leaf_hyps, _sum_variables, leaf_candidates
 from submission.techniques import blank_techniques
-from submission.board.probes import (UNKNOWN_NAME, WITNESS_BOUND, apply_file, check_timeout_s,
+from submission.board.probes import (UNKNOWN_NAME_QUOTED, WITNESS_BOUND, apply_file, check_timeout_s,
                                      existential, fired_closer, read_suggestions,
                                      read_witnesses, tagged_closers, witness_search_file)
 from submission.board.reply import claim_of
@@ -42,7 +42,6 @@ class Ladder:
         self.bb, self.asking = bb, asking
         self.restated: dict[str, int] = {}
         self.conjectured: dict[tuple[str, str], str] = {}
-        self.next_bid = 1
         self.cocktail: tuple[str, ...] = ()
 
     async def sweep(self, goal: Goal) -> bool:
@@ -284,7 +283,7 @@ class Ladder:
                     bad = await self.asking.audit(author, base, nxt)
                     if bad:
                         nxt, why = None, bad
-            if nxt is not None or not any(n in local for n in UNKNOWN_NAME.findall(why)):
+            if nxt is not None or not any(n in local for n in UNKNOWN_NAME_QUOTED.findall(why)):
                 break
         else:
             depth = 0
@@ -331,15 +330,10 @@ class Ladder:
             # The stuck subtree is not thrown away: the board with it stays
             # as a sibling branch and the take-back happens on a fork, so
             # the two ways forward race, as two plans do.
-            if len(self.bb.branches) < BEAM + 1:
-                fork = Board(self.bb.board.text, list(self.bb.board.goals), list(self.bb.board.messages),
-                             self.bb.board.accepted, self.next_bid)
-                self.next_bid += 1
-                self.bb.sound[fork.bid] = self.bb.sound.get(self.bb.board.bid, self.bb.board.text)
-                self.bb.branches.append(fork)
-                self.bb.focus(fork)
-                self.run.events.append({"stage": "fork", "from": self.bb.branches[0].bid if self.bb.branches else 0,
-                               "to": fork.bid, "why": "stall"})
+            fork = self.bb.fork(self.bb.board)
+            if fork is not None:
+                self.run.events.append({"stage": "fork", "why": "stall",
+                                        "from": self.bb.branches[0].bid, "to": fork.bid})
             if await self.bb.take_back("harness", deepest,
                                "after the board made no progress for a while"):
                 self.bb.prune()
@@ -348,15 +342,10 @@ class Ladder:
         # (its block was one step's answer), the rest of the proof stays.
         held = enclosing(self.bb.board.text, worst.line)
         if held is not None:
-            if len(self.bb.branches) < BEAM + 1:
-                fork = Board(self.bb.board.text, list(self.bb.board.goals), list(self.bb.board.messages),
-                             self.bb.board.accepted, self.next_bid)
-                self.next_bid += 1
-                self.bb.sound[fork.bid] = self.bb.sound.get(self.bb.board.bid, self.bb.board.text)
-                self.bb.branches.append(fork)
-                self.bb.focus(fork)
-                self.run.events.append({"stage": "fork", "from": self.bb.branches[0].bid if self.bb.branches else 0,
-                               "to": fork.bid, "why": "reset"})
+            fork = self.bb.fork(self.bb.board)
+            if fork is not None:
+                self.run.events.append({"stage": "fork", "why": "reset",
+                                        "from": self.bb.branches[0].bid, "to": fork.bid})
             self.run.events.append({"stage": "reset", "cell": held.id, "decl": worst.decl,
                            "tries": self.run.notes[worst.key].tries})
             self.run.notes.forget(worst.key)

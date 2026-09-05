@@ -61,12 +61,26 @@ class Blackboard:
         self.withdrawn: dict[str, list[str]] = {}
         self.undone: dict[str, list[str]] = {}
         self.dissolved = 0
+        self.next_bid = 1
 
     def focus(self, b: Board) -> None:
         self.board = b
 
     def live(self, bid: int) -> Board | None:
         return next((b for b in self.branches if b.bid == bid), None)
+
+    def fork(self, base: Board) -> Board | None:
+        """A sibling branch from `base`, made current, or None if the beam is
+        full. Every branch bid comes from here, so no two can collide."""
+        if len(self.branches) >= BEAM + 1:
+            return None
+        fresh = Board(base.text, list(base.goals), list(base.messages),
+                      base.accepted, self.next_bid)
+        self.next_bid += 1
+        self.sound[fresh.bid] = self.sound.get(base.bid, base.text)
+        self.branches.append(fresh)
+        self.focus(fresh)
+        return fresh
 
     def prune(self) -> None:
         while len(self.branches) > BEAM:

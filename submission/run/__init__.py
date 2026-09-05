@@ -4,4 +4,4 @@
 
 Each imports only from its left. This is where the run's state lives.
 `submission/board/` below holds the functions they call; `board_agent.py`
-above holds `solve`, which wires these seven together and is the program."""
+above holds `solve`, the spine that wires these seven together."""

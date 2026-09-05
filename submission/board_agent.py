@@ -2,8 +2,9 @@
 of them at once; Lean judges every edit against the whole file. The file is
 still the proof; a reply is read once, as a proof of whatever it names.
 
-`solve` below is the whole program. The seven parts it wires are listed in
-`submission/run/__init__.py`, in the order they depend on each other."""
+`solve` below is the spine: it wires the seven parts listed in
+`submission/run/__init__.py` and calls four things it inherits from
+`FrameworkAgent` (`_share`, `_define`, `_resolve_answers`, `_finish`)."""
 
 
 from __future__ import annotations
@@ -35,10 +36,6 @@ from submission.board.text import (drop_declaration, inflated, restates, settled
 from submission.board.probes import (CHECK_TIMEOUT_CAP_S, CHECK_TIMEOUT_FLOOR_S, PROBE, audit_prompt, container_memory_bytes, counterexample_search, existential, extract_file, goal_tokens, is_closed, library_names, read_board, read_witness, read_witnesses, render_all, searched_clean, statements, witness_file, witness_search_file)
 
 
-
-
-
-
 # The REPL keeps every command's state. Measured in the harness image: a real
 # board leaves 46–77 MB behind per check (a trivial file leaves nothing), the
 # container's cap is 5 GiB, so the kernel killed the REPL every 55–90 checks,
@@ -57,8 +54,6 @@ from submission.board.probes import (CHECK_TIMEOUT_CAP_S, CHECK_TIMEOUT_FLOOR_S,
 RENEW_AT_BYTES = int(3.0 * 2 ** 30)
 RENEW_AFTER_CHECKS = 200
 MEMORY_SAMPLE_EVERY = 4
-
-
 
 
 class RenewingLean:
@@ -118,190 +113,13 @@ class RenewingLean:
         self.task = asyncio.ensure_future(run())
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # There is no refutation probe. Proving `¬ target` from the context by
 # decide/omega only refutes the goal when the context is consistent, and a
 # proof by contradiction lives in an inconsistent one: on p09 the probe
 # "refuted" six true goals (`h1 : n % 3 = 1 ... ⊢ False`) and undid the proof.
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 TUPLE_IN = re.compile(r"[⟨(]\s*([A-Za-z_][\w']*(?:\s*,\s*[A-Za-z_][\w']*)+)\s*[⟩)]\s*∈")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 class BoardAgent(FrameworkAgent):
