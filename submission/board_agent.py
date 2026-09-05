@@ -31,6 +31,7 @@ from submission.run.context import Run
 from submission.run.delivery import Delivery
 from submission.run.blackboard import BEAM, WITHDRAW_AFTER, Blackboard
 from submission.run.asking import AUDIT_SYSTEM, AUDIT_TOKENS, TIMED_OUT, Asking
+from submission.run.ladder import Ladder
 from submission.board.text import (base_region, context_grows, drop_declaration, enclosing_chain, enclosing_have, inflated, is_stated, proved_facts, put, restates, settled_inside, shed_unreferenced, split_facts, split_statement, stated_facts, view, withdraw, withdraw_only)
 from submission.board.probes import (CHECK_TIMEOUT_CAP_S, CHECK_TIMEOUT_FLOOR_S, PROBE, UNKNOWN_NAME, WITNESS_BOUND, apply_file, audit_prompt, check_timeout_s, container_memory_bytes, counterexample_search, dump_check, existential, extract_file, fired_closer, goal_tokens, have_extract_file, is_closed, library_file, library_names, name_probe_file, read_board, read_library, read_name_probe, read_suggestions, read_witness, read_witnesses, render_all, searched_clean, statements, tagged_closers, witness_file, witness_search_file)
 
@@ -507,8 +508,8 @@ class BoardAgent(FrameworkAgent):
         delivery = Delivery(self, run, budget)
         bb = Blackboard(run, budget, delivery)
         asking = Asking(self, run, budget, bb)
+        ladder = Ladder(self, run, budget, bb, asking)
 
-        restated: dict[str, int] = {}
         finished = False
 
 
@@ -519,12 +520,10 @@ class BoardAgent(FrameworkAgent):
 
 
 
-        next_bid = 1
 
 
 
 
-        cells = run.cells
         # Statement → the block that closed a cell stating it. A closed cell is
         # a proof of a theorem; withdrawing what enclosed it does not unprove
         # it (measured on rmo_2001_2: the final goal, closed at 67 s, came back
@@ -550,264 +549,13 @@ class BoardAgent(FrameworkAgent):
 
 
 
-        async def sweep(goal: Goal) -> bool:
-            """The free closers, once per goal. (`exact?` used to follow: measured
-            1 of 51 goals closed over 24 runs, and a slow one restarts the container.)"""
-
-            base = bb.board
-            block = tagged_closers(cocktail)
-            t0 = time.monotonic()
-            nxt, _ = await asking.judge(base, goal, block)
-            events.append({"kind": "closers", "by": "harness", "accepted": nxt is not None,
-                           "ms": int((time.monotonic() - t0) * 1000)})
-            if nxt is None:
-                return False
-            tactic = fired_closer(nxt.messages, asking.last_span, cocktail)
-            flat = None
-            if tactic:
-                cell_id = cells.new(goal.stmt) if goal.stmt and not is_root_goal(base.text, goal) else None
-                flat = await bb.look(put(base.text, goal, tactic, trailing=False, cell_id=cell_id)[0],
-                                  base, cell_id if cell_id is not None else (goal.cell or goal.decl), goal)
-            if flat is not None and flat.find(goal.key) is None and not any(
-                    classify(flat.messages)[2:]):
-                nxt = flat
-            events.append({"kind": "collapse", "tactic": tactic, "accepted": nxt is flat})
-            await bb.commit(nxt)
-            return True
-
-        async def witness_sweep(goal: Goal) -> bool:
-            """An existential with a decidable body: Lean enumerates the witnesses
-            and the first tuple that closes the goal is written, no model asked.
-            Measured on rmo_2000_6: both models guessed `use 10, 1` and `use 2, 4`
-            for 12 minutes; the only small witness is a = 1, b = 10."""
-
-            parsed = existential(goal.text)
-            if not parsed:
-                return False
-            names, body = parsed
-            imports = "\n".join(l for l in text.split("\n") if l.startswith("import "))
-            check = await services.lean.check_file(witness_search_file(imports, names, body), timeout_s=60)
-            found = read_witnesses(check.messages)
-            accepted = False
-            for row in found:
-                for closer in ("norm_num", "decide"):
-                    block = f"exact ⟨{', '.join(row)}, by {closer}⟩"
-                    nxt, _ = await asking.judge(bb.board, goal, block)
-                    if nxt is not None:
-                        await bb.commit(nxt)
-                        accepted = True
-                        break
-                if accepted:
-                    break
-            if found:
-                # Kept even when the goal closed: the same goal on a sibling
-                # branch is not swept again (same key) and reads it from the prompt.
-                notes[goal.key].hint = ("Evaluation over 0 ≤ " + ", ".join(names) + f" < {WITNESS_BOUND} found "
-                                   "these values satisfy the body: " + "; ".join(
-                                       ", ".join(f"{n} = {v}" for n, v in zip(names, row)) for row in found)
-                                   + (f". `{block}` closed it." if accepted else ""))
-            events.append({"kind": "witnesses", "goal": goal.text[-160:], "found": found,
-                           "accepted": accepted, "ms": check.duration_ms})
-            return accepted
-
-        async def leaf_sweep(goal: Goal) -> bool:
-            """Tactic blocks built from the goal's shape (leaves.py), each one
-            check, no model asked. Measured on 3 September: three of the four
-            unsolved problems were lost on leaves of these shapes after the
-            models had found the route."""
-
-            base = bb.board
-            candidates = leaf_candidates(goal.text) if cfg.leaves else []
-            if not candidates or not budget.affordable("leaf"):
-                return False
-            t0 = time.monotonic()
-            tried = 0
-            budget.heavy_leaf = True
-            try:
-                for block in candidates:
-                    tried += 1
-                    nxt, why = await asking.judge(base, goal, block)
-                    if nxt is not None:
-                        events.append({"kind": "leaf", "goal": goal.text[-120:],
-                                       "block": block.split("\n")[-1][:80], "accepted": True,
-                                       "ms": int((time.monotonic() - t0) * 1000)})
-                        await bb.commit(nxt)
-                        return True
-                    if why == TIMED_OUT or not budget.affordable("leaf"):
-                        break
-                events.append({"kind": "leaf", "goal": goal.text[-120:], "accepted": False,
-                               "tried": tried, "ms": int((time.monotonic() - t0) * 1000)})
-                return False
-            finally:
-                budget.heavy_leaf = False
-                budget.spent("leaf", time.monotonic() - t0)
-
-        conjectured: dict[tuple[str, str], str] = {}
-
-        async def generalise_sweep(goal: Goal) -> bool:
-            """A sum identity in one variable that its own induction did not
-            close: the variable's other occurrences are generalised, each family
-            tabulated in Lean and fitted to a shape, a fit that holds below
-            VERIFY is posted as a lemma (the induction leaf proves it) and the
-            goal rewrites by it. Measured: putnam_2020_a2, 0/32 model proposals."""
-
-            target = target_of(goal.text)
-            if goal.decl.startswith("vm_conj_") or "h_gen" in hypotheses(goal.text) or not budget.affordable("leaf"):
-                return False
-            ks = _sum_variables(leaf_hyps(goal.text), target)
-            halves = split_top(target, " = ")
-            if not ks or halves is None or "=" in halves[0] or "=" in halves[1]:
-                return False
-            k, lhs = ks[0], halves[0].strip()
-            taken = set(hypotheses(goal.text)) | set(re.findall(r"[A-Za-z_][\w']*", target))
-            fresh = next((c for c in ("n", "m", "t", "a", "b") if c not in taken), "vm_n")
-            fams = families(lhs, k, fresh)
-            roots = root_names(bb.board.text)
-            first = proof_span(bb.board.text, roots[0]) if roots else None
-            prefix = bb.board.text[:first[0]] if first else ""
-            found = [(f, g) for (f, g) in conjectured if f in fams]
-            if not found:
-                t0 = time.monotonic()
-                for i, fam in enumerate(fams[:6]):
-                    check = await services.lean.check_file(
-                        blank_techniques(table_file(prefix, fam, fresh, k, i)), timeout_s=60)
-                    table = read_table(check.messages)
-                    if not table:
-                        continue
-                    for guess in fits(table, fresh, k, fam)[:2]:
-                        check = await services.lean.check_file(
-                            blank_techniques(verify_file(prefix, fam, guess, fresh, k)), timeout_s=60)
-                        if verified(check.messages):
-                            found.append((fam, guess))
-                budget.spent("leaf", time.monotonic() - t0)
-                events.append({"stage": "conjecture", "goal": target[:100], "families": len(fams),
-                               "fits": [g for _, g in found][:3]})
-            if not found:
-                return False
-            fam, guess = found[0]
-            name = conjectured.setdefault((fam, guess), f"vm_conj_{len(conjectured) + 1}")
-            text = bb.board.text
-            if name not in root_names(text):
-                text = insert_preamble(text, lemma_text(name, fresh, k, fam, guess))
-            staged = await bb.look(text) if text != bb.board.text else bb.board
-            moved = staged.find(goal.key)
-            if moved is None or classify(staged.messages)[3]:
-                return False
-            sub = lambda t: re.sub(rf"(?<![\w'.]){fresh}(?![\w'])", k, t)
-            # `k + k` reads as `2 * k` (the form Mathlib's lemmas are stated in).
-            spec = re.sub(rf"(?<![\w'.]){k} \+ {k}(?![\w'])", f"2 * {k}", sub(guess))
-            facts = [f"have h_gen : {sub(fam)} = {spec} := by simpa only [← two_mul] using {name} {k} {k}"] \
-                if spec != sub(guess) else []
-            facts.append(f"have h_gen : {sub(fam)} = {sub(guess)} := {name} {k} {k}")
-            nxt = None
-            for fact in facts:
-                nxt, _ = await asking.judge(staged, moved, f"{fact}\nrw [h_gen]")
-                if nxt is None:
-                    nxt, _ = await asking.judge(staged, moved, fact)
-                if nxt is not None:
-                    break
-            events.append({"stage": "generalise", "lemma": name, "guess": guess,
-                           "rewritten": nxt is not None})
-            await bb.commit(nxt if nxt is not None else staged)
-            left = next((g for g in bb.board.goals if g.decl == goal.decl and "h_gen" in hypotheses(g.text)), None)
-            if left is not None and not notes[left.key].searched:
-                # Mathlib may state the rewritten goal outright (Nat.sum_range_choose_halfway).
-                notes[left.key].searched = True
-                await library_sweep(left, force=True)
-            return True
-
-        async def library_sweep(goal: Goal, force: bool = False) -> bool:
-            """Mathlib asked what unifies with the goal (`apply?`), after the
-            closers failed. An `exact` answer is written, no model asked; the
-            rest go into the prompt as the names that fit. Measured in the
-            image: 4 of 4 leaf goals closed by exact, about 8 s each."""
-
-            if not force and not budget.affordable("scan"):
-                return False
-            # The file's own check time plus the heartbeat-capped search.
-            answered, took = await asking.probe(apply_file(bb.board.text, goal), goal.line, check_timeout_s(bb.board.ms) + 30)
-            budget.spent("scan", took / 1000)
-            found = read_suggestions(answered, goal.line)
-            accepted = False
-            for how, term in found:
-                if how != "exact":
-                    continue
-                nxt, _ = await asking.judge(bb.board, goal, f"exact {term}")
-                if nxt is not None:
-                    await bb.commit(nxt)
-                    accepted = True
-                    break
-            if found and not accepted:
-                notes[goal.key].hint = ("Mathlib's `apply?` on this goal suggested: " + "; ".join(
-                    f"`{how} {term}`" for how, term in found[:3]) + ". Those unify with the goal; the ?_ holes are what is left to prove.")
-            events.append({"kind": "library", "goal": goal.text[-120:], "found": len(found),
-                           "accepted": accepted, "ms": took})
-            return accepted
 
 
-        async def lift_and_advance(base: Board, goal: Goal, block: str,
-                                   author: str) -> tuple[Board | None, str]:
-            """A fact posted with `sorry` inside a `have` goes above the outermost
-            `have`: facts live at the shallowest scope. Measured on rmo_2000_2:
-            skeletons nested 7 deep, 25 open goals, withdraw never firing."""
 
-            lines = base.text.split("\n")
-            chain = enclosing_chain(lines, goal)
-            facts, rest = split_facts(block)
-            if not chain or not facts:
-                return await asking.advance(base, goal, block, author)
-            known = stated_facts(base.text, goal.decl)
-            fresh, dup = [], []
-            for f in facts:
-                head = HAVE_HEAD.match(f.split("\n")[0])
-                claim = " ".join(claim_of(head.group(2).strip()).split())
-                (dup if claim in known else fresh).append((f, known.get(claim)))
-            if dup and not fresh and not rest:
-                names = ", ".join(f"`{n}`" for _, n in dup)
-                return None, (f"every fact in that step is already on the board ({names}); "
-                              "prove this goal from those facts, or close it directly")
-            # Outermost first; a target where Lean does not know one of the
-            # goal's own names is too far out, and the next `have` in is tried.
-            # Measured on rmo_2000_6: the crux sat under `have h_minimal : ∀ n, ...
-            # := by intro n h; rcases h with ⟨a, b, ...⟩`, and every fact about
-            # a and b was lifted to where they do not exist.
-            local = set(hypotheses(goal.text))
-            nxt, why, depth, head = None, "", 0, None
-            for depth in range(len(chain), 0, -1):
-                outer, head = chain[depth - 1]
-                if context_grows(lines, chain, depth, goal):
-                    continue
-                lifted = [reindent(f, head.group(1)) for f, _ in fresh]
-                text = "\n".join(lines[:outer] + lifted + lines[outer:])
-                shift = sum(f.count("\n") + 1 for f in lifted)
-                moved = Goal(goal.line + shift, goal.indent, goal.decl, goal.text, goal.stmt, goal.cell)
-                staged = Board(text, base.goals, base.messages, base.accepted, base.bid, base.ms)
-                if rest:
-                    nxt, why = await asking.advance(staged, moved, rest, author)
-                else:
-                    nxt, why = await bb.look(text, base), ""
-                    if classify(nxt.messages)[3]:
-                        nxt, why = None, format_messages(classify(nxt.messages)[3])[:FEEDBACK_CHARS]
-                    elif nxt is not None:
-                        bad = await asking.audit(author, base, nxt)
-                        if bad:
-                            nxt, why = None, bad
-                if nxt is not None or not any(n in local for n in UNKNOWN_NAME.findall(why)):
-                    break
-            else:
-                depth = 0
-            if nxt is None and depth == 0:
-                return await asking.advance(base, goal, block, author)
-            if nxt is None:
-                return None, (why + f"\n(a fact stated inside `{head.group(2).strip()[:60]}` "
-                              "is posted before that `have`, at the top of the proof; it can "
-                              "only use the theorem's variables and the facts above it)")
-            events.append({"kind": "lifted", "by": author, "facts": len(lifted),
-                           "dup": len(dup), "from_depth": len(chain), "to_depth": depth})
-            if dup:
-                notes[goal.key].said = Feedback(author, "already on the board: " + ", ".join(
-                    f"`{n}`" for _, n in dup), "lifted")
-            return nxt, ""
+
+
+
+
 
         async def apply(author: str, goal: Goal, edits: list[Edit]) -> bool:
             """Every edit a reply asked for, each against the board as it stands."""
@@ -861,7 +609,7 @@ class BoardAgent(FrameworkAgent):
                                                   + "; use it, do not prove it again")
                         notes[goal.key].tries += 1
                         continue
-                    nxt, why = await lift_and_advance(bb.board, here, edit.body, author)
+                    nxt, why = await ladder.lift_and_advance(bb.board, here, edit.body, author)
                     if nxt is None:
                         notes[here.key].refused.add(edit.body)
                     events.append({"kind": "step", "by": author, "accepted": nxt is not None,
@@ -929,77 +677,6 @@ class BoardAgent(FrameworkAgent):
 
 
 
-        async def unstick() -> None:
-            """Every goal last in line, or nothing accepted for a while: the
-            innermost open have comes off on a fork, else the worst goal's
-            declaration starts over and what was said and planned for it goes."""
-
-            nonlocal next_bid
-
-            worst = max(bb.board.goals, key=lambda g: notes[g.key].tries, default=None)
-            if worst is None or not worst.decl:
-                return
-            # Measured on rmo_2000_6 (one55a 08:46→08:51): one goal left, 6 tries,
-            # and the declaration went back to its statement. Goals sitting among
-            # proved facts restart themselves once before the declaration does.
-            leaves = [g for g in bb.board.goals if not notes[g.key].leaf_restarted
-                      and settled_inside(bb.board.text, g) >= 2]
-            if leaves:
-                for g in leaves:
-                    notes[g.key].leaf_restarted = True
-                    notes.forget(g.key)
-                events.append({"kind": "leaf_restart", "by": "harness", "goals": len(leaves),
-                               "settled": settled_inside(bb.board.text, leaves[0])})
-                return
-            # The innermost open `have` goes first and its siblings stay: undo at
-            # the goal, not the declaration. The declaration restarts only when
-            # no open goal sits inside a `have` any more.
-            inside = [g for g in bb.board.goals if withdraw_only(bb.board.text, g)[0]]
-            if inside:
-                deepest = max(inside, key=lambda g: (len(g.indent), notes[g.key].tries))
-                # The stuck subtree is not thrown away: the board with it stays
-                # as a sibling branch and the take-back happens on a fork, so
-                # the two ways forward race, as two plans do.
-                if len(bb.branches) < BEAM + 1:
-                    fork = Board(bb.board.text, list(bb.board.goals), list(bb.board.messages),
-                                 bb.board.accepted, next_bid)
-                    next_bid += 1
-                    bb.sound[fork.bid] = bb.sound.get(bb.board.bid, bb.board.text)
-                    bb.branches.append(fork)
-                    bb.focus(fork)
-                    events.append({"stage": "fork", "from": bb.branches[0].bid if bb.branches else 0,
-                                   "to": fork.bid, "why": "stall"})
-                if await bb.take_back("harness", deepest,
-                                   "after the board made no progress for a while"):
-                    bb.prune()
-                    return
-            # A goal inside a cell: that cell alone goes back to its `sorry`
-            # (its block was one step's answer), the rest of the proof stays.
-            held = enclosing(bb.board.text, worst.line)
-            if held is not None:
-                if len(bb.branches) < BEAM + 1:
-                    fork = Board(bb.board.text, list(bb.board.goals), list(bb.board.messages),
-                                 bb.board.accepted, next_bid)
-                    next_bid += 1
-                    bb.sound[fork.bid] = bb.sound.get(bb.board.bid, bb.board.text)
-                    bb.branches.append(fork)
-                    bb.focus(fork)
-                    events.append({"stage": "fork", "from": bb.branches[0].bid if bb.branches else 0,
-                                   "to": fork.bid, "why": "reset"})
-                events.append({"stage": "reset", "cell": held.id, "decl": worst.decl,
-                               "tries": notes[worst.key].tries})
-                notes.forget(worst.key)
-                first_line = bb.board.text.split("\n")[held.start].strip()
-                bb.undone.setdefault(worst.decl, []).append(first_line)
-                await bb.commit(await bb.look(reset_cell(bb.board.text, held)), progress=False)
-                bb.prune()
-                return
-            restated[worst.decl] = restated.get(worst.decl, 0) + 1
-            fresh_text, _ = restate(bb.board.text, worst.decl)
-            events.append({"stage": "restate", "decl": worst.decl,
-                           "tries": notes[worst.key].tries})
-            notes.forget_decl(worst.decl)
-            await bb.commit(await bb.look(fresh_text), progress=False)
 
         def prompt_for(goal: Goal, model: str, skeleton: bool = False,
                        plan: str | None = None) -> str:
@@ -1062,7 +739,7 @@ class BoardAgent(FrameworkAgent):
         async def turn(model: str) -> bool:
             """One turn for one worker: False when there was no goal to take."""
 
-            nonlocal finished, next_bid
+            nonlocal finished
             if True:
                 async with lock:
                     if any(delivery.done_text(b) is not None for b in bb.branches):
@@ -1070,7 +747,7 @@ class BoardAgent(FrameworkAgent):
                         return True
                     if bb.all_last_in_line() or bb.stalled() or bb.exhausted():
                         drained = bb.exhausted()
-                        await unstick()
+                        await ladder.unstick()
                         if drained:
                             # The board moved (or could not): the models may be
                             # asked once more, with the new feedback in front of them.
@@ -1089,8 +766,8 @@ class BoardAgent(FrameworkAgent):
                             return True
                     if goal is not None and not notes[goal.key].swept:
                         notes[goal.key].swept = True
-                        if await sweep(goal) or await leaf_sweep(goal) or await witness_sweep(goal) \
-                                or await generalise_sweep(goal):
+                        if await ladder.sweep(goal) or await ladder.leaf_sweep(goal) or await ladder.witness_sweep(goal) \
+                                or await ladder.generalise_sweep(goal):
                             return True
                     if goal is not None and not notes[goal.key].searched \
                             and notes[goal.key].tries >= SEARCH_AFTER:
@@ -1099,7 +776,7 @@ class BoardAgent(FrameworkAgent):
                         # goals closed; 269 scans at 22 s), and Lean is busy
                         # 60-74% of a run. A goal the first step closes never pays.
                         notes[goal.key].searched = True
-                        if await library_sweep(goal):
+                        if await ladder.library_sweep(goal):
                             return True
                         await asking.consult(goal)
                     if goal is not None:
@@ -1135,8 +812,8 @@ class BoardAgent(FrameworkAgent):
                         if moved and second.strip() and second.strip() != plan.strip() \
                                 and len(bb.branches) < BEAM + 1:
                             fork = Board(now.text, list(now.goals), list(now.messages),
-                                         now.accepted, next_bid)
-                            next_bid += 1
+                                         now.accepted, ladder.next_bid)
+                            ladder.next_bid += 1
                             bb.sound[fork.bid] = bb.sound.get(now.bid, now.text)
                             bb.branches.append(fork)
                             bb.focus(fork)
@@ -1196,8 +873,8 @@ class BoardAgent(FrameworkAgent):
                         # file it was asked about, an accepted answer is a second
                         # way forward, and a second way is a branch, not waste.
                         fork = Board(base.text, list(base.goals), list(base.messages),
-                                     base.accepted, next_bid)
-                        next_bid += 1
+                                     base.accepted, ladder.next_bid)
+                        ladder.next_bid += 1
                         bb.sound[fork.bid] = bb.sound.get(base.bid, base.text)
                         bb.branches.append(fork)
                         bb.focus(fork)
@@ -1239,9 +916,9 @@ class BoardAgent(FrameworkAgent):
                 return True
 
         try:
-            cocktail = await usable_cocktail(services)
-            for candidate in sweep_files(problem.challenge, cocktail) + split_files(
-                    problem.challenge, cocktail):
+            ladder.cocktail = await usable_cocktail(services)
+            for candidate in sweep_files(problem.challenge, ladder.cocktail) + split_files(
+                    problem.challenge, ladder.cocktail):
                 if budget.time_left() <= 0:
                     break
                 check = await services.lean.check_file(candidate)

@@ -2664,13 +2664,14 @@ def test_a_leaf_is_checked_at_the_cap_timeout_and_its_own_cost_is_not_a_slow_ste
     lean2, llm2 = SlowLeafLean(), ScriptLLM({"model-a": ["omega"] * 3})
     lean2.no_leaf = True
     from submission import board_agent as ba
-    saved = ba.leaf_candidates
-    ba.leaf_candidates = lambda text: []
+    from submission.run import ladder
+    saved = ladder.leaf_candidates
+    ladder.leaf_candidates = lambda text: []
     try:
         result2 = asyncio.run(BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0)).solve(
             Problem(id="demo", description="p", challenge=challenge), FakeServices(lean2, llm2)))
     finally:
-        ba.leaf_candidates = saved
+        ladder.leaf_candidates = saved
     assert any(e.get("stage") == "slow" for e in result2.metadata["events"])
     assert lean2.timeouts and lean2.timeouts[0][1] < CHECK_TIMEOUT_CAP_S
 
