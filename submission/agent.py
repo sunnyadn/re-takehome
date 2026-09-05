@@ -69,6 +69,9 @@ class Config:
     # Research switch: VM_AUDIT=off lets every statement in unaudited (the
     # ablation arm of the writeup). The judged configuration is the default.
     audit: bool = True
+    # `VM_LEAVES=off` skips the shape-built tactic blocks (the ablation that
+    # measures the hand-written layer's share). The judged configuration is on.
+    leaves: bool = True
     # The worker hands the agent time_limit minus this, then hard-cancels.
     verify_reserve_s: float = 120.0
     # A cancelled call closes the ledger and scores the problem zero, so no
@@ -82,6 +85,7 @@ class Config:
         return cls(
             lines=_env_models("VM_LINES", (MODEL_A, MODEL_B)),
             audit=os.environ.get("VM_AUDIT", "on").strip().lower() not in ("off", "0", "false"),
+            leaves=os.environ.get("VM_LEAVES", "on").strip().lower() not in ("off", "0", "false"),
             budget_usd=settings.budget_usd,
             time_limit_s=settings.time_limit_s,
             verify_reserve_s=float(settings.verify_reserve_s),

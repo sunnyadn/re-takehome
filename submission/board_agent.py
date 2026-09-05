@@ -2485,7 +2485,7 @@ class BoardAgent(FrameworkAgent):
             models had found the route."""
 
             base = board
-            candidates = leaf_candidates(goal.text)
+            candidates = leaf_candidates(goal.text) if cfg.leaves else []
             if not candidates or not affordable("leaf"):
                 return False
             t0 = time.monotonic()

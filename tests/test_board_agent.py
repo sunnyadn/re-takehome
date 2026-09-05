@@ -2856,3 +2856,11 @@ def test_an_inaccessible_hypothesis_becomes_a_named_binder_of_the_cell():
     messages[0]["data"] = "unsolved goals\n⊢ 0 < x → 0 < x + 1"
     messages[1]["data"] = "theorem demo.extracted_1 (x : ℕ) : (0 : ℕ) < x → (0 : ℕ) < x + (1 : ℕ) := sorry"
     assert read_board(text, messages, False).goals[0].stmt == "(x : ℕ) : (0 : ℕ) < x → (0 : ℕ) < x + (1 : ℕ)"
+
+
+def test_vm_leaves_off_disables_the_leaf_sweep(monkeypatch):
+    from submission.agent import Config
+    monkeypatch.setenv("VM_LEAVES", "off")
+    assert Config.from_env().leaves is False
+    monkeypatch.delenv("VM_LEAVES")
+    assert Config.from_env().leaves is True
