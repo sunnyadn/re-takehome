@@ -116,6 +116,29 @@ def answer_slots(text: str) -> tuple[str, ...]:
     return tuple(ANSWER_SLOT.findall(text))
 
 
+CLOSED_HEAD = re.compile(r"^[ \t]*(?:theorem|lemma)\s+[A-Za-z_][\w']*\s*:\s*(.+?)\s*:=\s*by\s*$", re.M)
+OPEN_TOKENS = re.compile(r"[∀∃∑∏λ→↔∧∨¬]|\bfun\b|\bIs[A-Z]|\bSet\b|\bFinset\b|\{")
+
+
+def statement_probes(text: str, names: Sequence[str]) -> list[str]:
+    """`#eval` of the closed side of a binder-free `theorem t : term = name`
+    (or `name = term`), one per slot the statement fixes this way. Measured on
+    p06: both models failed to write the `#eval` and the slot stayed `sorry`."""
+
+    out: list[str] = []
+    for name in names:
+        for m in CLOSED_HEAD.finditer(text):
+            sides = [x.strip() for x in m.group(1).split(" = ")]
+            if len(sides) != 2 or name not in sides:
+                continue
+            term = sides[1] if sides[0] == name else sides[0]
+            if OPEN_TOKENS.search(term) or re.search(rf"\b{re.escape(name)}\b", term):
+                continue
+            out.append(f"#eval ({term})")
+            break
+    return out
+
+
 def fill_answer(text: str, name: str, value: str) -> str:
     """Replace one `abbrev name ... := sorry` slot with a literal."""
 

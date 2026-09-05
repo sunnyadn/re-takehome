@@ -42,6 +42,7 @@ from submission.agent import (
 )
 from submission.framework import (
     UNKNOWN_NAME,
+    statement_probes,
     alternatives,
     hand_to_search,
     declaration_name,
@@ -1187,6 +1188,17 @@ class FrameworkAgent:
         # p10: 72 turns asked about a goal Lean could not print. Both models
         # get a turn at it before that happens.
         note = ""
+        # A slot the statement equates to a closed term is evaluated here, no
+        # model asked (measured on p06: both failed to write the `#eval`).
+        own = statement_probes(text, answer_slots(text))
+        if own:
+            check = await services.lean.check_file(insert_preamble(text, "\n".join(own)))
+            values = printed_numbers(check.messages)
+            missing = answer_slots(text)
+            for name, value in zip(missing, values):
+                text = fill_answer(text, name, value)
+            events.append({"stage": "probe", "by": "harness", "asked": list(missing),
+                           "printed": values[:len(missing)], "unfilled": list(answer_slots(text))})
         for attempt in range(4):
             missing = answer_slots(text)
             if not missing:
@@ -1226,6 +1238,8 @@ class FrameworkAgent:
                            "printed": values[:len(missing)], "unfilled": list(left)})
             note = (f"\n\nThese slots are still unfilled: {', '.join(left)}. Each `#eval` "
                     "must print one bare numeral." if left else "")
+            if left and check.messages:
+                note += "\nLean said:\n" + format_messages(check.messages)[:600]
         return text
 
     async def _call(self, model: str, prompt: str, max_tokens: int, services: Services,

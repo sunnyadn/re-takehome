@@ -2615,3 +2615,40 @@ def test_a_block_sum_of_an_antitone_sequence_over_its_index_gets_the_block_bound
     assert got and "antitone_nat_of_succ_le" not in got[0] and "vm_sum_div_block x hpos hanti" in got[0]
     assert not any("vm_sum_div_block" in c for c in leaf_candidates(goal.replace("hmono : ∀ (n : ℕ), x n ≥ x (n + 1)\n", "")))
     assert "private theorem vm_sum_div_block" in preamble()
+
+
+class EvalLean(BoardLean):
+    """A file whose only probe is `#eval (7 ^ 2026 % 100)` prints 49."""
+
+    async def check_file(self, source, timeout_s=None):
+        if "#eval (7 ^ 2026 % 100)" in source:
+            self.sources.append(source)
+            return LeanCheck(True, [{"severity": "info", "pos": {"line": 3}, "endPos": {"line": 3},
+                                     "data": "49"}], False, False, 1)
+        return await super().check_file(source, timeout_s)
+
+
+def test_an_answer_slot_equated_to_a_closed_term_is_evaluated_by_the_harness_not_asked():
+    # Measured on p06 (frame124 reg): gpt-oss wrote `#eval (Nat.modPow 7 2026 100)`
+    # three times (no such name), qwen narrated without an `#eval`, the slot
+    # stayed `sorry` and 1258 s went into `49 = sorry`. The statement itself
+    # says what to evaluate: `7 ^ 2026 % 100 = p06_answer`, no binders.
+    from submission.framework import statement_probes
+    challenge = ("import Mathlib\n\n/-- doc -/\nabbrev p06_answer : ℕ := sorry\n\n"
+                 "theorem p06_pow_mod : 7 ^ 2026 % 100 = p06_answer := by\n  sorry\n")
+    assert statement_probes(challenge, ["p06_answer"]) == ["#eval (7 ^ 2026 % 100)"]
+    # Binders, or a side that is not closed, give nothing.
+    assert statement_probes(challenge.replace("theorem p06_pow_mod :", "theorem p06_pow_mod (n : ℕ) :"),
+                            ["p06_answer"]) == []
+    assert statement_probes("abbrev a : ℕ := sorry\ntheorem t : a = ∑ i ∈ Finset.range 3, f i := by\n  sorry\n",
+                            ["a"]) == []
+    assert statement_probes("abbrev a : ℕ := sorry\ntheorem t : IsLeast {n | n > 3} a := by\n  sorry\n", ["a"]) == []
+    step = "have key : True := by trivial\nexact key"
+    lean, llm = EvalLean(), ScriptLLM({"model-a": [step] * 3, "model-b": [step] * 3})
+    agent = BoardAgent(Config(lines=("model-a", "model-b"), budget_usd=1.0, time_limit_s=600.0))
+    result = asyncio.run(agent.solve(Problem(id="p06", description="compute", challenge=challenge),
+                                     FakeServices(lean, llm)))
+    assert "abbrev p06_answer : ℕ := 49" in result.solution
+    probes = [e for e in result.metadata["events"] if e.get("stage") == "probe"]
+    assert probes and probes[0]["by"] == "harness" and probes[0]["printed"] == ["49"]
+    assert not any("#eval" in p for _, p in llm.calls)
