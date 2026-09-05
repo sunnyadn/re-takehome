@@ -1759,8 +1759,9 @@ def test_an_auditor_that_does_not_answer_in_time_lets_the_step_through_unverifie
         "model-a": ["have fine : x < 3 := by\n  sorry\nhave key : True := by trivial\nexact key",
                     "omega", "have key : True := by trivial\nexact key"],
         "model-b": ['{"holds": true}'] * 4}, delay={"model-b": 0.8})
-    was = ba.AUDIT_WAIT_S
-    ba.AUDIT_WAIT_S = 0.1
+    from submission.run import asking
+    was = asking.AUDIT_WAIT_S
+    asking.AUDIT_WAIT_S = 0.1
     try:
         agent = BoardAgent(Config(lines=("model-a", "model-b"), budget_usd=1.0, time_limit_s=600.0))
         started = time.monotonic()
@@ -1769,7 +1770,7 @@ def test_an_auditor_that_does_not_answer_in_time_lets_the_step_through_unverifie
             FakeServices(lean, llm)))
         wall = time.monotonic() - started
     finally:
-        ba.AUDIT_WAIT_S = was
+        asking.AUDIT_WAIT_S = was
     events = result.metadata["events"]
     slow = [e for e in events if e.get("kind") == "slow_call"]
     assert slow and slow[0]["by"] == "model-b" and slow[0]["audits"] == 1
