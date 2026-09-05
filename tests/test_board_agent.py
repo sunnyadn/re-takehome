@@ -2698,3 +2698,42 @@ def test_a_leaf_is_checked_at_the_cap_timeout_and_its_own_cost_is_not_a_slow_ste
         ba.leaf_candidates = saved
     assert any(e.get("stage") == "slow" for e in result2.metadata["events"])
     assert lean2.timeouts and lean2.timeouts[0][1] < CHECK_TIMEOUT_CAP_S
+
+
+class RecallLean(CellLean):
+    """CellLean whose stated goals name each hypothesis once, so a claim under
+    a shadowing `have` of the same name states the same theorem."""
+
+    async def check_file(self, source, timeout_s=None):
+        check = await super().check_file(source, timeout_s)
+        out = []
+        for m in check.messages:
+            data = str(m.get("data", ""))
+            if ".extracted_1" in data:
+                seen: set[str] = set()
+                parts = [tok for tok in re.findall(r"\(\w+ : P\)|\S+", data)
+                         if not (tok.startswith("(") and tok in seen) and not seen.add(tok)]
+                m = dict(m, data=" ".join(parts))
+            out.append(m)
+        return LeanCheck(check.accepted, out, check.has_sorry, check.timed_out, check.duration_ms)
+
+
+def test_a_goal_already_proved_in_a_closed_cell_is_closed_again_by_recall_not_by_a_model():
+    # Measured on rmo_2001_2 (frame123): the divisor leaf closed the final goal
+    # in its cell at 67 s, then the enclosing have was withdrawn after four
+    # failures and the goal came back as new. A closed cell is a proof of a
+    # stated theorem; the same statement is closed by that block, no model asked.
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean = RecallLean()
+    llm = ScriptLLM({"model-a": ["have a1 : True := by\n  exfalso\n  sorry\nhave a1 : True := by\n  exfalso\n  sorry\nexact a1",
+                                 "exact a1"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0, audit=False))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=challenge),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["solved_by"] == "board_loop"
+    assert any(e.get("stage") == "proven" and e["stmt"].endswith(": False") for e in result.metadata["events"])
+    recalls = [e for e in result.metadata["events"] if e.get("kind") == "recall"]
+    assert recalls and recalls[0]["goal"].endswith("⊢ False")
+    # Two scripted replies; the second `False` goal never reached a model.
+    asked = [p for _, p in llm.calls if "What Lean reports as open" in p]
+    assert len(asked) == 2

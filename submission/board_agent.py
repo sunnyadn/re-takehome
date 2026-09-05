@@ -1763,6 +1763,25 @@ class BoardAgent(FrameworkAgent):
 
         cells = Cells()
         known_stmts: dict[tuple[str, str], str] = {}
+        # Statement → the block that closed a cell stating it. A closed cell is
+        # a proof of a theorem; withdrawing what enclosed it does not unprove
+        # it (measured on rmo_2001_2: the final goal, closed at 67 s, came back
+        # as new after the enclosing have was withdrawn and was never reclosed).
+        proven: dict[str, str] = {}
+        recalled: set[tuple[str, str]] = set()
+
+        def remember_closed(b: Board) -> None:
+            lines = b.text.split("\n")
+            for sp in all_cell_spans(b.text):
+                stmt = cells.statements.get(sp.id)
+                if not stmt or stmt in proven or any(sp.holds(g.line) for g in b.goals):
+                    continue
+                body = [l[sp.indent:] if len(l) - len(l.lstrip()) >= sp.indent else l.lstrip()
+                        for l in lines[sp.start:sp.end]]
+                block = strip_markers("\n".join(body))
+                if block.strip() and "sorry" not in block:
+                    proven[stmt] = block
+                    events.append({"stage": "proven", "cell": sp.id, "stmt": stmt[-80:], "lines": block.count("\n") + 1})
 
         def base_region(base: Board, focus: int | str, edited: Goal | None) -> tuple[int, int] | None:
             """The lines of `focus` in the base text: a cell's span, a proof's
@@ -1914,6 +1933,7 @@ class BoardAgent(FrameworkAgent):
                     fresh.bid = bid
             else:
                 sound[bid] = fresh.text
+                remember_closed(fresh)
             board = fresh
             for i, b in enumerate(branches):
                 if b.bid == bid:
@@ -2963,6 +2983,13 @@ class BoardAgent(FrameworkAgent):
                     if picked:
                         focus(picked[0])
                     base = board
+                    if goal is not None and goal.stmt in proven and goal.key not in recalled:
+                        recalled.add(goal.key)
+                        nxt, _ = await judge(base, goal, proven[goal.stmt])
+                        if nxt is not None:
+                            events.append({"kind": "recall", "goal": goal.text[-120:]})
+                            await commit(nxt)
+                            return True
                     if goal is not None and goal.key not in swept:
                         swept.add(goal.key)
                         if await sweep(goal) or await leaf_sweep(goal) or await witness_sweep(goal) \
