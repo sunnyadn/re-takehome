@@ -117,12 +117,6 @@ def test_answer_slot_is_found_and_filled():
     assert "abbrev p_answer : ℕ := 19" in filled
 
 
-def test_sweep_forces_every_alternative_to_close():
-    assert fw.sweep_body(("rfl", "omega")).count("; done)") == 2
-    assert "any_goals" in fw.any_goals_sweep(("rfl",))
-    assert "all_goals" not in fw.any_goals_sweep(("rfl",))
-
-
 def test_root_names_reads_the_graded_theorems():
     assert fw.root_names(TWO_THEOREMS) == ("a", "b")
 

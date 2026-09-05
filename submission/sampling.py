@@ -20,13 +20,6 @@ SAMPLES: tuple[str, ...] = (
     "fun n => 2 / ((n : ℚ) + 2)",
 )
 FORALL = re.compile(r"∀ \((\w+) : ℕ\),")
-FORALL_BARE = re.compile(r"∀ (\w+),")
-
-
-def binder_names(group: str) -> list[str]:
-    """`(a b : T)` -> [a, b]."""
-    head = group.strip()[1:-1].split(":", 1)[0]
-    return head.split()
 
 
 def sampled_search(groups: Sequence[str], target: str) -> tuple[list[str], str, str] | None:

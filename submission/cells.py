@@ -110,9 +110,6 @@ def dissolve(text: str, cell_id: int) -> str:
                      if not (MARK.match(l) and int(MARK.match(l).group(2)) == cell_id))
 
 
-BINDER_GROUP = re.compile(r"\(([^():]+?) : ")
-
-
 def explicit_binders(statement: str) -> list[tuple[str, str]]:
     """(name, type) for every explicit binder of a statement, in order."""
 
@@ -138,10 +135,6 @@ def explicit_binders(statement: str) -> list[tuple[str, str]]:
             names, typ = g.split(" : ", 1)
             out += [(n, typ.strip()) for n in names.split()]
     return out
-
-
-def explicit_names(statement: str) -> list[str]:
-    return [n for n, _ in explicit_binders(statement)]
 
 
 DATA_TYPE = re.compile(r"^(?:ℕ|ℤ|ℚ|ℝ|ℂ|Prop|Type\b.*|Sort\b.*|Fin\b.*|Finset\b.*|Set\b.*|List\b.*|Multiset\b.*"

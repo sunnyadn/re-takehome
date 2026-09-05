@@ -328,12 +328,6 @@ def sweep_body(cocktail: Sequence[str] = COCKTAIL) -> str:
     return "first\n" + "\n".join(f"| {wrap_tactic(t)}" for t in cocktail)
 
 
-def any_goals_sweep(cocktail: Sequence[str] = COCKTAIL) -> str:
-    """`all_goals` rolls everything back if one goal survives; `any_goals` keeps."""
-
-    return "any_goals (" + " | ".join(wrap_tactic(t) for t in cocktail) + ")"
-
-
 FIRST_BLOCK = re.compile(r"^([ \t]*)first[ \t]*\n((?:[ \t]*\|.*(?:\n|$))+)", re.M)
 ALTERNATIVE = re.compile(r"^[ \t]*\|[ \t]*\((.*);[ \t]*done\)[ \t]*$", re.M)
 

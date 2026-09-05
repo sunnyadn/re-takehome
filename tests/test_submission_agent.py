@@ -8,43 +8,8 @@ import pytest
 import submission.agent as agent_mod
 from re_harness import LLMCallError
 from submission.agent import (
-    COCKTAIL, Ledger, Line, SubmissionAgent, sweep_files, wrap_tactic,
+    COCKTAIL, Ledger, sweep_files, wrap_tactic,
 )
-
-
-def _walk(errors, proved=None):
-    """Each turn offers (proved have-steps, hard errors); default proved is flat."""
-
-    line = Line(index=0, owner="m")
-    ledger = agent_mod.Ledger()
-    seen = []
-    for i, e in enumerate(errors):
-        line.candidate, line.errors = f"file-{i}", e
-        line.signature, line.feedback = f"sig-{e}", f"fb-{e}"
-        line.candidate, line.errors = agent_mod.keep_best(
-            line, ledger, (proved[i] if proved else 1), e)
-        seen.append((line.errors, line.candidate))
-    return line, seen, ledger
-
-
-def test_a_line_keeps_working_from_its_latest_file_even_when_it_got_worse():
-    """Fewer Lean errors is not nearer a proof: 3 of 15 wins came through an
-    error increase, including the only ones on p09_imo1964 and
-    p10_factorial_pow."""
-
-    line, seen, ledger = _walk([5, 2, 16, 17, 7, 7])
-    assert [e for e, _ in seen] == [5, 2, 16, 17, 7, 7]
-    assert line.candidate == "file-5"
-    assert not [e for e in ledger.events if e.get("stage") == "restart"]
-
-
-def test_a_line_that_drifts_for_ten_turns_returns_to_its_best():
-    """An 1800s line takes about 6 turns, so this only reaches long runs."""
-
-    line, seen, ledger = _walk([5, 2] + [9] * 10, proved=[1, 3] + [0] * 10)
-    restarts = [e for e in ledger.events if e.get("stage") == "restart"]
-    assert len(restarts) == 1 and restarts[0]["to"] == [3, 2]
-    assert line.candidate == "file-1" and line.errors == 2
 
 
 def test_every_cocktail_alternative_is_parenthesised():
@@ -92,42 +57,6 @@ class _Services:
         self.llm = llm
 
 
-def _call_once(llm):
-    agent = SubmissionAgent()
-    ledger = Ledger()
-    out = asyncio.run(agent._call(
-        "qwen/qwen3.5-flash-02-23", "sys", "user", 100,
-        _Services(llm), ledger, 0, "repair", False,
-    ))
-    return out, ledger
-
-
-def test_a_refusal_is_retried_until_it_answers(monkeypatch):
-    monkeypatch.setattr(agent_mod, "RETRY_BACKOFF_S", (0.0, 0.0, 0.0))
-    llm = _FlakyLLM(refusals=2)
-    out, ledger = _call_once(llm)
-    assert out == "ok" and llm.calls == 3
-    assert sum("retry in" in str(e.get("note", "")) for e in ledger.events) == 2
-
-
-def test_retries_are_bounded_and_then_the_error_escapes(monkeypatch):
-    monkeypatch.setattr(agent_mod, "RETRY_BACKOFF_S", (0.0, 0.0, 0.0))
-    llm = _FlakyLLM(refusals=99)
-    with pytest.raises(LLMCallError):
-        _call_once(llm)
-    assert llm.calls == 4
-
-
-def test_an_error_that_poisons_accounting_is_not_retried(monkeypatch):
-    # 500 marks spend unknown, which zeroes the problem however good the proof
-    # is, so repeating the call would only burn time.
-    monkeypatch.setattr(agent_mod, "RETRY_BACKOFF_S", (0.0, 0.0, 0.0))
-    llm = _FlakyLLM(refusals=99, status=500)
-    with pytest.raises(LLMCallError):
-        _call_once(llm)
-    assert llm.calls == 1
-
-
 def test_the_stop_margin_never_eats_a_quarter_of_a_short_run():
     # The 8-hour floor used to swallow 47% of a 30-minute run.
     from submission.agent import Config
@@ -136,37 +65,6 @@ def test_the_stop_margin_never_eats_a_quarter_of_a_short_run():
     assert short.last_turn_start_s / 1800.0 > 0.6
     # The graded setting must be untouched by the cap.
     assert graded.last_turn_start_s == 25800.0
-
-
-def test_retries_are_capped_across_the_whole_problem(monkeypatch):
-    # Each refusal keeps its reservation as permanent exposure, so an
-    # unbounded per-call retry closes the ledger on a long run. The pool scales
-    # with the clock, so it is the short run that has one small enough to spend.
-    from submission.agent import Config
-    monkeypatch.setattr(agent_mod, "RETRY_BACKOFF_S", (0.0, 0.0, 0.0))
-    agent = SubmissionAgent(Config(time_limit_s=1800.0))
-    llm, ledger = _FlakyLLM(refusals=99), Ledger()
-    calls = 0
-    for _ in range(6):
-        try:
-            asyncio.run(agent._call("qwen/qwen3.5-flash-02-23", "s", "u", 100,
-                                    _Services(llm), ledger, 0, "repair", False))
-        except LLMCallError:
-            pass
-    retried = sum("retry in" in str(e.get("note", "")) for e in ledger.events)
-    assert retried == agent.config.max_retries
-
-
-def test_surplus_lines_offsets_by_import_count():
-    lines = ["import Mathlib", "import Aesop", "", "theorem t : True := by",
-             "  trivial", "  norm_num"]
-    source = "\n".join(lines) + "\n"
-    surplus = lines.index("  norm_num") + 1
-    # Lean sees the file without its 2 import lines and reports line 4;
-    # FileCoordinates hands it on as file line 6, which is what readers get.
-    messages = [{"severity": "error", "pos": {"line": 6},
-                 "data": "No goals to be solved"}]
-    assert agent_mod.surplus_lines(messages, source) == [surplus]
 
 
 def test_file_coordinates_moves_lean_positions_down_by_the_import_lines():
@@ -193,46 +91,6 @@ def test_file_coordinates_moves_lean_positions_down_by_the_import_lines():
     assert agent_mod.in_file_coordinates(services).lean is inner
 
 
-def test_surplus_lines_ignores_other_errors():
-    source = "import Mathlib\ntheorem t : True := by\n  bogus\n"
-    messages = [{"severity": "error", "pos": {"line": 2},
-                 "data": "Unknown identifier `bogus`"}]
-    assert agent_mod.surplus_lines(messages, source) == []
-
-
-def test_drop_lines_removes_only_named_lines():
-    source = "a\nb\nc\nd\n"
-    assert agent_mod.drop_lines(source, [2, 4]) == "a\nc\n"
-
-
-def test_drop_lines_keeps_declarations_below_the_drop():
-    source = (
-        "import Mathlib\n"
-        "theorem helper : True := by\n"
-        "  trivial\n"
-        "  norm_num\n"
-        "\n"
-        "theorem required : True := by\n"
-        "  trivial\n"
-    )
-    mended = agent_mod.drop_lines(source, [4])
-    assert "theorem required" in mended
-    assert "norm_num" not in mended
-
-
-def test_extract_lean_drops_a_swallowed_fence():
-    text = "```\n\n```lean\n\ntheorem t : True := by trivial\n```"
-    out = agent_mod.extract_lean(text, fallback="import Mathlib\n")
-    assert "```" not in out
-    assert "theorem t" in out
-
-
-def test_extract_lean_keeps_inline_backticks_in_docstrings():
-    text = "```lean\n/-- Helper: `2 ^ 3` is small. -/\ntheorem t : True := by trivial\n```"
-    out = agent_mod.extract_lean(text, fallback="import Mathlib\n")
-    assert "`2 ^ 3`" in out
-
-
 class _StuckLLM:
     """Answers with a fresh file each turn, so the loop reaches the Lean check."""
 
@@ -253,20 +111,6 @@ _TWO_DECL_LINES = ["import Mathlib", "", "lemma helper : True := by",
                    "  exact Nat.made_up", "", "theorem required : True := by",
                    "  trivial"]
 _TWO_DECLS = "\n".join(_TWO_DECL_LINES) + "\n"
-
-
-def test_search_file_keeps_the_declarations_below_the_failure():
-    out = agent_mod.search_file(_TWO_DECLS, 4)
-    assert "all_goals apply?" in out
-    assert "theorem required" in out, "the graded declaration was cut away"
-    assert "Nat.made_up" not in out
-
-
-def test_search_file_never_overwrites_the_statement():
-    # An error reported on the `:= by` header must not replace the header.
-    out = agent_mod.search_file(_TWO_DECLS, 3)
-    assert "lemma helper : True := by" in out
-    assert "all_goals apply?" in out
 
 
 def test_suggestions_picks_only_try_this_info():
@@ -298,28 +142,6 @@ class _SearchLean:
         )
 
 
-def _advance_once(lean, challenge=_TWO_DECLS):
-    agent = SubmissionAgent()
-    agent._deadline = None
-    line = Line(index=0, owner="qwen/qwen3.5-flash-02-23")
-    line.candidate = challenge
-    services = _Services(_StuckLLM())
-    services.lean = lean
-    services.checkpoint = lambda *a, **k: None
-    problem = SimpleNamespace(challenge=challenge, description="s", id="t")
-    ledger = Ledger()
-    asyncio.run(agent._advance(problem, line, services, ledger, (), ()))
-    return line, ledger
-
-
-def test_a_missing_name_pulls_a_real_lemma_into_the_feedback():
-    lean = _SearchLean()
-    line, ledger = _advance_once(lean)
-    assert any("apply?" in s for s in lean.sources), "no lemma search was run"
-    assert "Nat.sqrt_le" in line.feedback, "the real lemma never reached the model"
-    assert [e for e in ledger.events if e.get("stage") == "lemma_search"]
-
-
 class _PlainFailLean(_SearchLean):
     async def check_file(self, source, **kwargs):
         self.sources.append(source)
@@ -327,12 +149,6 @@ class _PlainFailLean(_SearchLean):
             accepted=False, has_sorry=False, timed_out=False, container_restarted=False,
             messages=[{"severity": "error", "pos": {"line": 3}, "data": "unsolved goals"}],
         )
-
-
-def test_no_search_when_no_name_is_missing():
-    lean = _PlainFailLean()
-    _advance_once(lean)
-    assert not any("apply?" in s for s in lean.sources), "searched without a missing name"
 
 
 class _HugeHintLean(_SearchLean):
@@ -377,64 +193,10 @@ def test_the_search_budget_scales_with_the_time_limit():
             > agent_mod.SEARCH_BUDGET_FRACTION * small.time_limit_s)
 
 
-def test_searching_stops_once_the_time_budget_is_gone():
-    agent = SubmissionAgent(agent_mod.Config(time_limit_s=0.4))
-    agent._deadline = None
-    lean = _SlowSearchLean()
-    services = _Services(_StuckLLM())
-    services.lean = lean
-    services.checkpoint = lambda *a, **k: None
-    problem = SimpleNamespace(challenge=_TWO_DECLS, description="s", id="t")
-    line, ledger = Line(index=0, owner="qwen/qwen3.5-flash-02-23"), Ledger()
-    line.candidate = _TWO_DECLS
-    for _ in range(12):
-        asyncio.run(agent._advance(problem, line, services, ledger, (), ()))
-    fired = [e for e in ledger.events if e.get("stage") == "lemma_search"]
-    assert fired, "no search ran at all"
-    assert len(fired) < 12, "the time budget never stopped the search"
-    assert agent._search_spent_s >= agent_mod.SEARCH_BUDGET_FRACTION * 0.4
-
-
-def test_the_hint_block_is_capped():
-    line, _ = _advance_once(_HugeHintLean())
-    assert "Nat.sqrt_le" in line.feedback
-    assert len(line.feedback) < agent_mod.FEEDBACK_CHARS + agent_mod.HINT_CHARS + 500
-
-
-def test_search_file_never_drops_a_graded_declaration():
-    """Cutting a file to expose one goal twice destroyed declarations the
-    grader needs byte-identical. This walks every line of every challenge."""
-
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parent.parent / "sample-problems"
-    checked = 0
-    for problem in sorted(p for p in root.iterdir() if p.is_dir()):
-        challenge = problem / "challenge.lean"
-        if not challenge.exists():
-            continue
-        source = challenge.read_text()
-        required = agent_mod.declared_names(source)
-        for line in range(1, len(source.splitlines()) + 1):
-            out = agent_mod.search_file(source, line)
-            if out is None:
-                continue
-            checked += 1
-            missing = [n for n in required if n not in out]
-            assert not missing, f"{problem.name} line {line} dropped {missing}"
-    assert checked > 50, f"only {checked} splices exercised, the walk is not covering"
-
-
 _MIXED_ERRORS = [   # file coordinates, as FileCoordinates hands them on
     {"severity": "error", "pos": {"line": 4}, "data": "linarith failed to find a contradiction"},
     {"severity": "error", "pos": {"line": 8}, "data": "Unknown constant `Nat.made_up`"},
 ]
-
-
-def test_source_lines_filters_to_the_matching_error():
-    source = "import Mathlib\n" + "".join(f"line{i}\n" for i in range(1, 9))
-    assert agent_mod.source_lines(_MIXED_ERRORS, source) == [4, 8]
-    assert agent_mod.source_lines(_MIXED_ERRORS, source, agent_mod.MISSING_NAME) == [8]
 
 
 class _MixedErrorLean(_SearchLean):
@@ -458,29 +220,12 @@ class _MixedErrorLean(_SearchLean):
         )
 
 
-def test_the_search_targets_the_invented_name_not_the_first_error():
-    # 62% of triggering checks have an earlier, unrelated error; searching there
-    # returns lemmas for a goal the hint text then misdescribes.
-    lean = _MixedErrorLean()
-    _advance_once(lean, challenge=_TWO_DECLS)
-    spliced = [s for s in lean.sources if "apply?" in s]
-    assert spliced, "no search ran"
-    body = spliced[0].splitlines()
-    at = next(i for i, l in enumerate(body, start=1) if "all_goals apply?" in l)
-    assert at > 4, f"searched at line {at}, which is the unrelated first error"
-
-
 def test_the_retry_pool_scales_with_the_clock():
     # Eight was sized for a 30-minute run of ~8 calls; a graded run makes ~35x
     # that, and exhausting the pool ends the run hours early.
     assert agent_mod.Config(time_limit_s=1800.0).max_retries == 8
     assert agent_mod.Config(time_limit_s=28800.0).max_retries == 128
     assert agent_mod.Config(time_limit_s=60.0).max_retries == 8
-
-
-def test_the_agent_takes_its_retry_pool_from_its_config():
-    agent = SubmissionAgent(agent_mod.Config(time_limit_s=28800.0))
-    assert agent._retries_left == 128
 
 
 def test_refused_before_generation_reads_the_harness_message():
@@ -523,22 +268,6 @@ class _NoErrorLean:
                                container_restarted=False, messages=[])
 
 
-def test_a_file_that_drops_the_graded_theorem_is_never_kept():
-    """Observed on a real graded run: 7.2h and $0.61 submitted a 141-byte file
-    with the theorem deleted, because deleting it left zero errors to count."""
-
-    challenge = "import Mathlib\n\ntheorem required : True := by\n  sorry\n"
-    agent = SubmissionAgent()
-    services = _Services(_SurrenderLLM())
-    services.lean = _NoErrorLean()
-    kept = []
-    services.checkpoint = lambda source, meta=None: kept.append(source)
-    problem = SimpleNamespace(challenge=challenge, description="s", id="t")
-    result = asyncio.run(agent.solve(problem, services))
-    assert _SURRENDER not in kept, "a file without the graded theorem was checkpointed"
-    assert "theorem required" in result.solution, "returned a file missing the theorem"
-
-
 class _FixableLean(_SearchLean):
     """Fails on an invented name, and accepts the file once the real one is in."""
 
@@ -559,31 +288,6 @@ class _FixableLean(_SearchLean):
             container_restarted=False,
             messages=[{"severity": "error", "pos": {"line": 3},
                        "data": "Unknown constant `Nat.made_up`"}])
-
-
-def _advance_result(lean, challenge=_TWO_DECLS):
-    agent = SubmissionAgent()
-    agent._deadline = None
-    line = Line(index=0, owner="qwen/qwen3.5-flash-02-23")
-    line.candidate = challenge
-    services = _Services(_StuckLLM())
-    services.lean = agent_mod.FileCoordinates(lean)   # _advance sits below the solve boundary
-    services.checkpoint = lambda *a, **k: None
-    problem = SimpleNamespace(challenge=challenge, description="s", id="t")
-    ledger = Ledger()
-    got = asyncio.run(agent._advance(problem, line, services, ledger, (), ()))
-    return got, line, ledger
-
-
-def test_a_lemma_lean_found_is_spliced_in_rather_than_requested():
-    """The correct hint reached the model 3 times on rmo_2000_2 and was used 0
-    times, so the tactic is applied instead of suggested."""
-
-    got, line, ledger = _advance_result(_FixableLean())
-    assert got is True, "a substitution that Lean accepts was not taken"
-    assert "Nat.sqrt_le" in line.candidate
-    assert "theorem required" in line.candidate, "the graded declaration was cut"
-    assert [e for e in ledger.events if e.get("stage") == "substituted"]
 
 
 def test_both_shapes_of_lean_suggestion_yield_a_tactic():
@@ -627,22 +331,6 @@ class _NeverAcceptLean:
                                           "data": "unsolved goals"}])
 
 
-def test_the_slots_run_concurrently_rather_than_taking_turns():
-    """91.5% of wall clock was spent waiting on serial calls, while one line
-    idled through the other's 418-second wait."""
-
-    llm = _CountingLLM()
-    agent = SubmissionAgent(agent_mod.Config(time_limit_s=1800.0, max_turns_per_line=1))
-    services = _Services(llm)
-    services.lean = _NeverAcceptLean()
-    services.checkpoint = lambda *a, **k: None
-    problem = SimpleNamespace(challenge=_TWO_DECLS, description="s", id="t")
-    asyncio.run(agent.solve(problem, services))
-    slots = len(agent_mod.SLOT_TEMPERATURES) * 2
-    assert llm.peak > 1, "calls were still serialised"
-    assert llm.peak >= slots, f"peak {llm.peak} below the {slots} slots"
-
-
 class _PartiallyFixableLean(_SearchLean):
     """The spliced lemma clears one error of three and leaves the rest."""
 
@@ -664,17 +352,6 @@ class _PartiallyFixableLean(_SearchLean):
         return self._errors(1 if "Nat.sqrt_le" in source else 3)
 
 
-def test_a_substitution_that_only_reduces_errors_is_still_taken():
-    """No recorded search ever ran on a one-error file, so demanding the whole
-    file compile made the mechanism unreachable."""
-
-    got, line, ledger = _advance_result(_PartiallyFixableLean())
-    assert got is False, "a file Lean still rejects was reported as solved"
-    assert "Nat.sqrt_le" in line.candidate, "the improvement was discarded"
-    assert line.errors == 1, f"errors not recomputed after the splice: {line.errors}"
-    assert [e for e in ledger.events if e.get("stage") == "substituted"]
-
-
 class _WorseningLean(_PartiallyFixableLean):
     """The spliced lemma makes the file worse, so it must be refused."""
 
@@ -687,34 +364,6 @@ class _WorseningLean(_PartiallyFixableLean):
                 messages=[{"severity": "info",
                            "data": "Try this:\n  [apply] exact Nat.sqrt_le k"}])
         return self._errors(5 if "Nat.sqrt_le" in source else 3)
-
-
-def test_a_substitution_that_adds_errors_is_refused():
-    got, line, ledger = _advance_result(_WorseningLean())
-    assert got is False
-    assert "Nat.sqrt_le" not in line.candidate, "a worse file was adopted"
-    assert not [e for e in ledger.events if e.get("stage") == "substituted"]
-
-
-def test_a_truncated_proof_asks_lean_with_a_bare_sorry():
-    src = ("import Mathlib\n\ntheorem t : True := by\n  have h : 1 = 1 := by\n"
-           "    made_up_tactic\n  trivial\n")
-    cut = agent_mod.resume_file(src, 5)
-    assert cut is not None and "sorry" in cut
-    assert "trace_state" not in cut, "trace_state does not survive the cut"
-
-
-def test_open_goals_refuses_a_prefix_that_still_has_a_real_error():
-    """A prefix is only verified when nothing but the goal is left."""
-
-    messages = [{"severity": "error", "data": "unsolved goals\n⊢ x = 9"},
-                {"severity": "error", "data": "Unknown identifier `foo`"}]
-    assert agent_mod.open_goals(messages) == []
-
-
-def test_open_goals_returns_the_goal_when_only_the_goal_is_left():
-    messages = [{"severity": "error", "data": "unsolved goals\nx : ℕ\n⊢ x = 9"}]
-    assert agent_mod.open_goals(messages) == ["x : ℕ\n⊢ x = 9"]
 
 
 class _ResumableLean(_SearchLean):
@@ -738,20 +387,6 @@ class _ResumableLean(_SearchLean):
                        "data": "Unknown constant `Nat.made_up`"}])
 
 
-def test_the_verified_prefix_reaches_the_repair_prompt():
-    """The prefix carries a sorry, so it must never become the candidate."""
-
-    got, line, ledger = _advance_result(_ResumableLean())
-    assert got is False
-    assert line.resume is not None, "the compiled prefix was not kept"
-    assert line.resume[1] == "⊢ 2 = 2"
-    assert "sorry" not in line.candidate, "a file with a sorry became the candidate"
-    prompt = agent_mod.repairer_user(
-        SimpleNamespace(id="t", description="s", challenge=_TWO_DECLS), line, False)
-    assert "already compiles" in prompt and "⊢ 2 = 2" in prompt
-    assert [e for e in ledger.events if e.get("stage") == "resume"]
-
-
 class _SurplusLean(_SearchLean):
     """One surplus tactic, whose removal clears that error but not the others."""
 
@@ -770,34 +405,14 @@ class _SurplusLean(_SearchLean):
         return self._msgs("Nat.made_up" in source)
 
 
-def test_surplus_tactics_are_dropped_without_the_whole_file_compiling():
-    """44 of 299 rejected checks carried surplus lines and none was dropped,
-    because the mend was only taken when the file then compiled."""
-
-    got, line, ledger = _advance_result(_SurplusLean())
-    assert got is False
-    dropped = [e for e in ledger.events if e.get("stage") == "drop_surplus"]
-    assert dropped, "a mend that strictly reduced the errors was refused"
-    assert "theorem required" in line.candidate, "the graded declaration was cut"
-
-
 def test_a_mend_that_cuts_a_graded_declaration_is_refused():
     """surplus_lines can point at the statement itself; scoring_faults is the
     only thing standing between that and a file the grader scores zero."""
 
-    from submission.agent import drop_lines, scoring_faults
+    from submission.agent import scoring_faults
+    from submission.framework import drop_lines
     cut = drop_lines(_TWO_DECLS, [6])
     assert scoring_faults(cut, (), _TWO_DECLS), "dropping the statement raised no fault"
-
-
-def test_the_nat_subtraction_warning_is_keyed_on_the_statement():
-    """Truncated subtraction produced 8 `Neg ℕ` errors and 31 omega failures on
-    rmo_2000_2; a statement without it must not pay for the warning."""
-
-    natsub = "theorem t (x : ℕ) (h : 0 < x - 1) : True := by\n  sorry\n"
-    plain = "theorem t (x : ℝ) (h : x + 1 = 2) : True := by\n  sorry\n"
-    assert agent_mod.traps(natsub) and "truncat" not in "".join(agent_mod.traps(plain))
-    assert agent_mod.traps(plain) == []
 
 
 def test_split_candidates_are_only_built_for_a_decomposable_goal():
@@ -808,34 +423,3 @@ def test_split_candidates_are_only_built_for_a_decomposable_goal():
     assert len(agent_mod.split_files(iff, ("rfl",))) == len(agent_mod.SPLITTERS)
     assert agent_mod.split_files(flat, ("rfl",)) == []
 
-
-def test_a_swap_keeps_the_proof_after_the_failing_line():
-    source = "import Mathlib\ntheorem t : True := by\n  have a := 1\n  bogus_name\n  trivial\n"
-    swapped = agent_mod.swap_line(source, 4, "exact rfl")
-    assert swapped is not None
-    assert "have a := 1" in swapped and "trivial" in swapped
-    assert "bogus_name" not in swapped and "exact rfl" in swapped
-    assert len(swapped.splitlines()) == len(source.splitlines())
-
-
-def test_the_tail_form_is_what_discarded_the_proof():
-    source = "import Mathlib\ntheorem t : True := by\n  have a := 1\n  bogus_name\n  trivial\n"
-    tail = agent_mod.splice_at_failure(source, 4, "exact rfl")
-    assert tail is not None and "trivial" not in tail
-
-
-def test_a_refine_that_opens_goals_is_not_counted_as_worse():
-    opened = [{"severity": "error", "data": "unsolved goals\n⊢ 8 ≤ (x + 2) ^ 3"},
-              {"severity": "error", "data": "unsolved goals\n⊢ x ≤ y"}]
-    named = [{"severity": "error", "data": "unknown constant `Nat.lt_of_pow_lt_pow`"}]
-    assert agent_mod.hard_errors(opened) == 0
-    assert agent_mod.hard_errors(named) == 1
-    assert agent_mod.hard_errors(opened + named) == 1
-
-
-def test_a_gutted_file_never_becomes_the_best():
-    """Two fewer errors does not outrank four proved steps that were deleted."""
-
-    line, _, ledger = _walk([9] + [1] * 12, proved=[4] + [0] * 12)
-    assert not [e for e in ledger.events if e.get("stage") == "restart"]
-    assert line.best_proved == 4

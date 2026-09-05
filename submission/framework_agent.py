@@ -107,10 +107,6 @@ NO_REASONING = {"enabled": False}
 NARRATES = ("qwen",)
 GOAL_CHARS = 4000
 FILE_CHARS = 8000
-# Two rejections on one goal and the other model gets it, with Lean's reason.
-# Measured: qwen answers in mathematics, gpt-oss answers in Lean. Asking both
-# for the same thing wastes whichever one is answering out of its strength.
-STALL_BEFORE_SWAP = 2
 PLAN_TOKENS = 1500
 
 PLANNER_SYSTEM = """You are a competition mathematician. You are given one goal from a
@@ -120,17 +116,6 @@ Say how to prove it, in at most six short lines. Name the key fact: the modulus,
 the witness, the identity, the bound, the induction, the case split. Give the
 value when it is a number. Write mathematics, not Lean, and do not restate the
 goal."""
-# Facts that compile but never move the goal still enter every later prompt, so
-# a goal that stands through this many of them is rolled back to where it began.
-DRIFT_LIMIT = 6
-MAX_REVERTS = 2
-# Per goal, not per run: a goal that has stood through this many accepted steps
-# has the cursor moved off it, and only a lone goal ends the run here.
-STUCK_LIMIT = 24
-# Both models get a turn at a goal, the second one holding a plan, before the
-# cursor leaves it. Measured on p09: `case mp` is hard and `case mpr` is not,
-# and a cursor pinned to the topmost placeholder never reaches the easy one.
-PARK_AFTER = 4
 # The finish pass is free of tokens but not of clock, so it is bounded.
 MAX_COLLAPSE = 24
 # Measured on p08: a file the REPL checks in 570ms timed out at the comparator's
@@ -147,9 +132,6 @@ def below_header(text: str) -> str:
     return text[i + len(PREAMBLE_END):] if i >= 0 else text
 HEAVY = ("nlinarith", "polyrith", "decide", "interval_cases")
 LIGHTER = ("linarith", "norm_num", "positivity", "simp", "omega", "ring")
-# The cocktail is ordered by how often each tactic wins, so the one that fired
-# is usually near the front.
-COLLAPSE_TRIES = 12
 LOOSE_DRAIN_S = 30.0
 MAX_DELETIONS = 12
 # Each try is one check, and a check is 60ms against a reply's seconds.
@@ -422,16 +404,6 @@ def stalled(before: State, after: State) -> bool:
             and len(placeholders(after.text)) >= len(placeholders(before.text)))
 
 
-@dataclass
-class Turn:
-    """One proposal and what became of it."""
-
-    author: str
-    kind: str
-    accepted: bool
-    cost: float = 0.0
-
-
 class FrameworkAgent:
     def __init__(self, config: Config | None = None):
         self.config = config or Config.from_env()
@@ -443,456 +415,6 @@ class FrameworkAgent:
 
         return NO_REASONING if any(n in model for n in NARRATES) else REASONING
 
-    async def solve(self, problem: Problem, services: Services) -> AgentResult:
-        services = in_file_coordinates(services)
-        cfg = self.config
-        started = time.monotonic()
-        deadline = started + cfg.last_turn_start_s
-        ledger = Ledger()
-        names = answer_names(problem.challenge)
-        text = normalise_imports(problem.challenge, problem.challenge)
-        best = text
-        events: list[dict[str, Any]] = []
-        models = list(cfg.lines)
-        # Measured: qwen wrote p08 alone in one step and answered p09 in prose,
-        # while gpt-oss did the reverse. Neither is the writer; the one that is
-        # not writing is the one asked for the mathematics.
-        turn_of = 0
-        plan = ""
-        loose: list[asyncio.Task[str]] = []
-        swept: set[tuple[str, tuple[str, int]]] = set()
-        divided: set[str] = set()
-        stalls = 0
-        feedback: Feedback | None = None
-        raised = False
-        spare: list[tuple[str, str]] = []
-        anchor_goal, anchor_text, on_goal, stuck = "", text, 0, 0
-        prior_text = text
-        sound = text
-        reverted: dict[str, int] = {}
-        tried: dict[str, int] = {}
-
-        def time_left() -> float:
-            return deadline - time.monotonic()
-
-        def can_ask() -> bool:
-            return ledger.spent_usd < BUDGET_HEADROOM * cfg.budget_usd
-
-        def offer(candidate: str, accepted: bool) -> None:
-            """Only ever checkpoint a file the grader could score."""
-
-            nonlocal best
-            if accepted or not scoring_faults(candidate, names, problem.challenge):
-                best = candidate
-                services.checkpoint(best, {"accepted": accepted})
-
-        async def park(state: State, why: str) -> State:
-            """Move the cursor to the next open goal.
-
-            What was said about the goal being left says nothing about the next
-            one, so the plan and the feedback go with it."""
-
-            nonlocal stalls, plan, feedback, on_goal, stuck, anchor_goal, anchor_text
-            if state.goals <= 1:
-                return state
-            moved = await self._look(
-                state.text, services, (state.focus + 1) % state.goals)
-            events.append({"stage": "park", "why": why, "left": state.goal[:60],
-                           "now": moved.goal[:60]})
-            stalls, plan, feedback, on_goal, stuck = 0, "", None, 0, 0
-            anchor_goal, anchor_text = moved.goal, moved.text
-            return moved
-
-        async def refuse(state: State, why: str) -> State:
-            """Count a declaration the file would not take, and move on at the cap.
-
-            Rejections here returned to the top of the loop without touching
-            either counter, so nothing swapped the model and nothing ended the
-            goal: one p09 run asked the same model 481 times."""
-
-            nonlocal stalls, stuck
-            stalls, stuck = stalls + 1, stuck + 1
-            if stuck < STUCK_LIMIT:
-                return state
-            return await backtrack(state)
-
-        async def backtrack(state: State) -> State:
-            """Leave a goal nothing works on: sideways if there is another,
-            backwards if there is not.
-
-            Measured on p09: rejected steps only ever counted towards `park`,
-            so a single goal with nowhere to park held the cursor for 512s and
-            40 model calls, on a goal that was not true to begin with."""
-
-            nonlocal prior_text
-            moved = await park(state, "rejected")
-            if moved.goal != state.goal:
-                return moved
-            if reverted.get(state.goal, 0) >= MAX_REVERTS or prior_text == state.text:
-                return moved
-            reverted[state.goal] = reverted.get(state.goal, 0) + 1
-            events.append({"stage": "backtrack", "goal": state.goal[:60]})
-            gone, prior_text = prior_text, state.text
-            back = await self._look(gone, services)
-            tried[back.goal] = 0
-            return back
-
-        def result(source: str, how: str, accepted: bool) -> AgentResult:
-            # Turns are many and alike; a stage is rare and is why the run went
-            # the way it did, so the tail window never drops one.
-            tail = events[-60:]
-            kept = [e for e in events[:-60] if "stage" in e] + tail
-            return AgentResult(source, {
-                "strategy": "framework",
-                "solved_by": how,
-                "accepted_by_repl": accepted,
-                "spend_usd": round(ledger.spent_usd, 6),
-                "wall_s": round(time.monotonic() - started, 1),
-                "turns": len(events),
-                "events": kept,
-            })
-
-        async def deliver(text: str, how: str) -> AgentResult | None:
-            """Every winning file leaves by the same door: finish, then verify."""
-
-            state = await self._finish(State(text=text, accepted=True), services, time_left)
-            check = await services.lean.check_file(
-                axiom_probe(state.text, declared_names(problem.challenge)))
-            faults, _ = grade(state.text, check, names, problem.challenge)
-            events.append({"stage": "verify", "accepted": check.accepted,
-                           "faults": faults[:5], "compile_ms": check.duration_ms,
-                           "slow": check.duration_ms > SLOW_COMPILE_MS})
-            if not check.accepted or faults:
-                return None
-            offer(state.text, True)
-            return result(state.text, how, True)
-
-        try:
-            cocktail = await usable_cocktail(services)
-            for candidate in sweep_files(problem.challenge, cocktail) + split_files(
-                    problem.challenge, cocktail):
-                if time_left() <= 0:
-                    break
-                check = await services.lean.check_file(candidate)
-                if check.accepted and not scoring_faults(candidate, names, problem.challenge):
-                    events.append({"stage": "sweep", "accepted": True})
-                    # A 39-way `first` compiles here and still has to fit the
-                    # comparator's 180 seconds, so it goes through §4 too.
-                    won = await deliver(candidate, "deterministic_sweep")
-                    if won:
-                        return won
-                    offer(candidate, True)
-                    return result(candidate, "deterministic_sweep", True)
-
-            if graded_theorems(problem.challenge) > 1 and can_ask():
-                text = await self._share(problem, text, services, ledger, events)
-            if definition_slots(text) and can_ask():
-                text = await self._define(problem, text, services, ledger, events)
-            if names and can_ask():
-                text = await self._resolve_answers(
-                    problem, text, names, services, ledger, events)
-
-            state = await self._look(text, services)
-            while time_left() > 0:
-                if state.accepted and is_done(state.text):
-                    break
-                if is_done(state.text) or state.accepted:
-                    settled = await self._settle(state, services)
-                    if settled.text == state.text:
-                        events.append({"stage": "stop", "note": "no goal left to work on"})
-                        break
-                    state = settled
-                    continue
-
-                # Measured on p09: a file carrying an error of its own rejects
-                # every later step, including a correct lemma, because the check
-                # judges the whole file. Nothing recovers from that but a
-                # rollback to the last file Lean had no error in.
-                # A step that is expensive rather than wrong is committed the
-                # same way and costs the same: 16 of one run's 153 checks died
-                # on heartbeats at a `simp ... at *` already in the file, every
-                # later step was refused for a price it had not set, and the
-                # file was being kept as the one to roll back to.
-                _, _, dear, broken = classify(state.messages)
-                if broken or dear:
-                    if state.text != sound:
-                        events.append({"stage": "repair",
-                                       "why": "cost" if dear and not broken else "error",
-                                       "said": format_messages(broken or dear)[:300],
-                                       "was": state.text[-300:]})
-                        state = await self._look(sound, services, state.focus)
-                else:
-                    sound = state.text
-
-                # Several goals behind one placeholder: give each its own, so
-                # the closers, the cursor and the park all reach every one.
-                if state.goal not in divided:
-                    divided.add(state.goal)
-                    apart = split_cursor(state.text, state.goal, state.focus)
-                    if apart:
-                        state = await self._look(apart, services, state.focus)
-                        events.append({"stage": "split", "goals": state.goals})
-                        continue
-
-                # Never re-run a closer on a goal whose text and file are both
-                # unchanged; a longer file is a changed context.
-                spare, routed = [], None
-                seen = (state.goal, len(state.text))
-                if state.goal and ("closers", seen) not in swept:
-                    block, kind, author = sweep_body(cocktail), "closers", "harness"
-                    swept.add(("closers", seen))
-                elif state.goal and ("search", seen) not in swept:
-                    block, kind, author = "exact?", "search", "harness"
-                    swept.add(("search", seen))
-                elif can_ask():
-                    # The writer alone is the cheap path and often enough; the
-                    # mathematician is what a stalled goal needs, not every goal.
-                    author = models[turn_of % len(models)]
-                    if stalls >= STALL_BEFORE_SWAP:
-                        # Two rejections: hand the goal to the other model, and
-                        # let the one that just failed say what it was aiming at.
-                        planner = models[(turn_of + 1) % len(models)]
-                        plan = await self._ask_plan(
-                            problem, state, services, ledger, planner)
-                        events.append({"kind": "plan", "by": planner, "chars": len(plan)})
-                        turn_of, stalls = turn_of + 1, 0
-                        author = models[turn_of % len(models)]
-                    # Measured on p09: the two answer at the same rate and one
-                    # is 20x slower, so waiting for both spends the clock on
-                    # nothing. Lean judges whoever arrives first; the other is
-                    # already in flight and is the spare if the first is wrong.
-                    asked = [author] + ([m for m in models if m != author]
-                                        if stalls else [])
-                    flight = {}
-                    for who in asked:
-                        task = asyncio.ensure_future(self._ask_step(
-                            problem, state, feedback, who, services, ledger, plan))
-                        flight[task] = who
-                        loose.append(task)
-                    block, spare, cut = "", [], False
-                    while flight and not block:
-                        done, _ = await asyncio.wait(
-                            list(flight), return_when=asyncio.FIRST_COMPLETED)
-                        for task in done:
-                            who, reply = flight.pop(task), task.result()
-                            cut = cut or reply == CUT
-                            if not reply or reply == CUT:
-                                continue
-                            if block:
-                                spare.append((who, reply))
-                            else:
-                                block, author = reply, who
-                    spare += [(who, task) for task, who in flight.items()]
-                    if not block and cut:
-                        block = CUT
-                    kind = "step"
-                    if not block or block == CUT:
-                        # A refused reply is a failed turn. Skipping it silently
-                        # spins the loop without a check, a cost or a stall.
-                        gave = "cut" if block == CUT else "empty"
-                        events.append({"kind": gave, "by": author})
-                        said = feedback.text if feedback else "nothing yet"
-                        feedback = Feedback(author, said, gave)
-                        stalls, stuck = stalls + 1, stuck + 1
-                        if stalls >= STALL_BEFORE_SWAP:
-                            plan, stalls = "", 0
-                        if stuck >= STUCK_LIMIT:
-                            events.append({"stage": "stuck", "note": "replies refused"})
-                            break
-                        continue
-                    named = declaration_name(block)
-                    if named and named != enclosing_name(state.text, state.focus) \
-                            and named in open_names(state.text):
-                        # A proof of another open declaration, written from its
-                        # first line. Measured on p09: appended at the cursor it
-                        # doubled its own opening (`induction'` twice), and once
-                        # the cursor had moved on it was dropped whole, 7 turns
-                        # in 8 minutes. It is what the model means: that proof.
-                        fresh, at = restate(state.text, named)
-                        routed, state = state, await self._look(fresh, services, at)
-                        block = drop_own(proof_body(block, named),
-                                         [n for n in root_names(fresh) if n != named])
-                        events.append({"kind": "route", "by": author, "to": named})
-                        named = ""
-                    if named and named in declared_names(problem.challenge):
-                        feedback = Feedback(author, "that name is the problem's own; "
-                                            "prove it where it stands", "rejected")
-                        state = await refuse(state, "own name")
-                        continue
-                    if named and named in declared_names(state.text):
-                        # A name was only ever checked against the challenge, so
-                        # the theorem this agent hoisted itself read as new and
-                        # Lean refused the second copy. One p09 run spent 481 of
-                        # its 481 turns re-declaring `pow_two_mod_seven`.
-                        events.append({"kind": "lemma", "by": author, "name": named,
-                                       "accepted": False, "why": "declared"})
-                        feedback = Feedback(
-                            author, f"`{named}` is already in the file. Do not "
-                            "declare it again. If the goal at the cursor is its "
-                            "own statement, prove it with tactic lines; otherwise "
-                            "cite it by name.", "rejected")
-                        state = await refuse(state, "re-declared")
-                        continue
-                    if named:
-                        nxt = await self._look(
-                            insert_preamble(state.text, block), services)
-                        kept = not classify(nxt.messages)[3]
-                        if not kept and as_goal(block):
-                            # The statement may be right and only its proof
-                            # wrong, which is what the cursor is for.
-                            nxt = await self._look(
-                                insert_preamble(state.text, as_goal(block)), services)
-                            kept = not classify(nxt.messages)[3]
-                        events.append({"kind": "lemma", "by": author, "name": named,
-                                       "accepted": kept})
-                        if kept:
-                            state, feedback, stalls = nxt, None, 0
-                        else:
-                            feedback = Feedback(
-                                author, format_messages(nxt.messages)[:FEEDBACK_CHARS])
-                            state = await refuse(state, "lemma")
-                        continue
-                    if is_probe(block):
-                        printed = await self._probe(state, block, services)
-                        feedback = Feedback(author, printed, "probe")
-                        events.append({"kind": "probe", "by": author, "printed": printed[:80]})
-                        continue
-                else:
-                    events.append({"stage": "stop", "note": "budget headroom"})
-                    break
-
-                began = state
-                nxt, why = await self._advance(state, block, services)
-                if nxt is not None and emptied(state, nxt):
-                    # Sampled on p09: refusing this step took the accepted rate
-                    # from 7/14 to 0/21 over two runs, and nothing recorded why.
-                    # It is counted until a run says what it costs.
-                    events.append({"stage": "emptied", "by": author, "kind": kind})
-                if nxt is not None and kind != "step" and stalled(state, nxt):
-                    # Only a model's turn was ever counted against a goal, so a
-                    # sweep that closed a goal nested under the cursor and left
-                    # the same one there ran 640 times on p09 and asked nobody.
-                    nxt, why = None, "the sweep left the goal exactly as it was"
-                for other, later in (spare if nxt is None else []):
-                    alternative = later if isinstance(later, str) else await later
-                    if not alternative or alternative == CUT:
-                        continue
-                    nxt, why2 = await self._advance(state, alternative, services)
-                    events.append({"kind": "second", "by": other,
-                                   "accepted": nxt is not None})
-                    if nxt is not None:
-                        author, block, why = other, alternative, ""
-                        break
-                    why = why2
-                if nxt is None and why != BUDGET_RETRY and kind == "step":
-                    # One wrong name at line ten is not a reason to lose lines
-                    # one to nine. The error kept is still the model's own; a
-                    # prefix's error describes a block it never wrote.
-                    for shorter in prefixes(block)[:MAX_PREFIXES]:
-                        nxt, _ = await self._advance(state, shorter, services)
-                        if nxt is not None:
-                            events.append({"kind": "prefix", "by": author,
-                                           "lines": shorter.count("\n") + 1})
-                            block, why = shorter, ""
-                            break
-                if nxt is None and why != BUDGET_RETRY:
-                    # The fact may be right and only its proof wrong, which is
-                    # exactly what `exact?` is for. One free check decides.
-                    retry = hand_to_search(block)
-                    if retry != block:
-                        # Measured on p09: reporting this attempt's error told
-                        # the model `exact?` had failed, which is not what it
-                        # wrote; 11 of 21 steps were answered that way.
-                        nxt, _ = await self._advance(state, retry, services)
-                        events.append({"kind": "search-retry", "by": author,
-                                       "accepted": nxt is not None})
-                if nxt is None and why == BUDGET_RETRY and not raised:
-                    # A step that only ran out of elaboration budget is not a
-                    # wrong step; give it the budget once and re-adjudicate.
-                    raised = True
-                    state = await self._look(
-                        insert_preamble(state.text, RAISED_BUDGETS), services, state.focus)
-                    nxt, why = await self._advance(state, block, services)
-                events.append({"kind": kind, "by": author, "accepted": nxt is not None})
-                if nxt is None and routed is not None:
-                    state = routed
-                if nxt is None:
-                    # Only a model's own rejections count towards its turn; the
-                    # free attempts are the harness's.
-                    if why == BUDGET_RETRY:
-                        why = ("the step exceeded Lean's elaboration budget even at "
-                               "a raised budget; make it cheaper")
-                    feedback = Feedback(author if kind == "step" else kind, why)
-                    stalls += 1 if kind == "step" else 0
-                    if stalls >= STALL_BEFORE_SWAP and plan:
-                        # The plan it was given did not survive Lean either, so
-                        # the next stall buys a new one.
-                        plan = ""
-                    if kind == "step":
-                        tried[state.goal] = tried.get(state.goal, 0) + 1
-                        if tried[state.goal] >= PARK_AFTER:
-                            state = await backtrack(state)
-                    continue
-                state, feedback, stalls = nxt, None, 0
-                if kind == "closers":
-                    # A 39-way block left in the file is re-elaborated by every
-                    # later check, and there is one per goal the sweep closes.
-                    state = await self._collapse_last(state, services)
-                if kind != "step" and stalled(began, state):
-                    # Measured on p09: the sweep's own span made the goal look
-                    # new for one check, and collapsing the block put the same
-                    # goal back 13 bytes later. The turn is what has to move.
-                    events[-1] = {"kind": kind, "by": author, "accepted": False}
-                    feedback = Feedback(kind, "the sweep left the goal exactly as it was")
-                    state = await self._look(began.text, services, began.focus)
-                    continue
-                offer(state.text, state.accepted and is_done(state.text))
-
-                if state.goal != anchor_goal:
-                    prior_text = anchor_text
-                    anchor_goal, anchor_text, on_goal, stuck = state.goal, state.text, 0, 0
-                    plan = ""
-                    continue
-                on_goal += 1 if kind == "step" else 0
-                stuck += 1 if kind == "step" else 0
-                if stuck >= STUCK_LIMIT:
-                    if state.goals > 1:
-                        state = await park(state, "stuck")
-                        continue
-                    # An unfinished proof scores what a stopped one scores, so
-                    # there is nothing to save by stopping. Measured on p09: this
-                    # ended a healthy run at 763s of the 1800s it was given, and
-                    # having spent 2% of the budget. Time and money are the exits.
-                    events.append({"stage": "stuck", "goal": anchor_goal[:80]})
-                    plan, stuck = "", 0
-                if on_goal >= DRIFT_LIMIT and reverted.get(anchor_goal, 0) < MAX_REVERTS:
-                    dropped = [h[2] for h in have_spans(state.text)][-on_goal:]
-                    reverted[anchor_goal] = reverted.get(anchor_goal, 0) + 1
-                    events.append({"stage": "revert", "dropped": len(dropped)})
-                    state = await self._look(anchor_text, services, state.focus)
-                    feedback = Feedback(author, "; ".join(dropped)[:FEEDBACK_CHARS], "drift")
-                    plan, on_goal = "", 0
-                elif on_goal >= DRIFT_LIMIT:
-                    # The rollbacks are spent and the goal still stands; another
-                    # open goal is a better use of the clock than a third try.
-                    state = await park(state, "drift")
-
-            if is_done(state.text):
-                won = await deliver(state.text, "framework_loop")
-                if won:
-                    return won
-            offer(state.text, False)
-            return result(best, "best_effort", False)
-        except (BudgetExceeded, BudgetAccountingError, LeanRuntimeError) as exc:
-            events.append({"stage": "abort", "error": type(exc).__name__})
-            return result(best, "aborted", False)
-        finally:
-            # A reply still in flight has been reserved against the budget, and
-            # a reservation nothing settles poisons the ledger. It is waited
-            # out, never cancelled.
-            if loose:
-                await asyncio.wait(loose, timeout=LOOSE_DRAIN_S)
-
     async def _look(self, text: str, services: Services, focus: int = 0) -> State:
         """One check does both jobs: it adjudicates, and it prints the next goal."""
 
@@ -903,52 +425,6 @@ class FrameworkAgent:
         return State(text=text, goal=cursor_goal(check.messages, line), line=line,
                      messages=list(check.messages), accepted=check.accepted,
                      focus=focus, goals=open_goals)
-
-    async def _settle(self, state: State, services: Services) -> State:
-        """Match placeholders to goals: drop a spare one, add a missing one."""
-
-        surplus = [l for l in (message_line(m) for m in classify(state.messages)[1]) if l]
-        if surplus:
-            return await self._look(drop_lines(state.text, surplus), services, state.focus)
-        if state.accepted:
-            return (await self._look(drop_lines(state.text, [state.line]), services,
-                                     state.focus)
-                    if state.line else state)
-        return state
-
-    async def _advance(self, state: State, block: str,
-                       services: Services) -> tuple[State | None, str]:
-        """Try one step. Anything but an open goal means the step is discarded."""
-
-        try:
-            candidate, span = replace_cursor(state.text, block, index=state.focus)
-        except ValueError:
-            return None, "no active goal"
-        nxt = await self._look(candidate, services, state.focus)
-        _, surplus, expensive, failures = classify(nxt.messages)
-        if expensive and not failures:
-            return None, BUDGET_RETRY
-        if failures or expensive:
-            said = format_messages(nxt.messages)[:FEEDBACK_CHARS]
-            return None, f"{said}\n{notes_for(said)}".strip()
-        if unreachable(nxt.messages, nxt.text, nxt.line):
-            # The step opened a branch and left it unfinished, so its goal sits
-            # where no placeholder reaches. Measured on p07: guessing where to
-            # put one lands outside the branch and every later closer is a
-            # no-op that still counts as a win.
-            return None, ("that step left a goal open inside a branch nothing "
-                          "can get back to. A step that splits the goal gives "
-                          "every branch its own `sorry`, or closes it outright")
-        if any(in_span(m, span) for m in surplus):
-            # Measured on p09: a step written where the goal is already closed
-            # draws one `no goals` error, and dropping the one line Lean names
-            # leaves the rest of the step in the file as dead text. The step is
-            # wrong as a whole, so it goes as a whole.
-            return None, ("there are no goals left where that step was written: "
-                          "the goal it was meant for is already closed")
-        if surplus:
-            nxt = await self._settle(nxt, services)
-        return nxt, ""
 
     async def _finish(self, state: State, services: Services, time_left) -> State:
         """Take the search out of a finished file: the comparator allows 180s."""
@@ -1010,20 +486,6 @@ class FrameworkAgent:
                 state = probe
         return state
 
-    async def _collapse_last(self, state: State, services: Services) -> State:
-        """Put the alternative that fired where the search block stands."""
-
-        blocks = first_blocks(state.text)
-        if not blocks:
-            return state
-        block = blocks[-1]
-        for tactic in alternatives(block.group(2))[:COLLAPSE_TRIES]:
-            probe = await self._look(
-                collapse(state.text, block, tactic), services, state.focus)
-            if not classify(probe.messages)[3] and not classify(probe.messages)[2]:
-                return probe
-        return state
-
     async def _substitute_search(self, state: State, services: Services) -> State:
         """Replace each `exact?` with the term it printed, keeping the search
         call when the term does not re-elaborate."""
@@ -1068,45 +530,6 @@ class FrameworkAgent:
                                     services, ledger, PLANNER_SYSTEM)
         return strip_fences(reply).strip()[:GOAL_CHARS]
 
-    async def _ask_step(self, problem: Problem, state: State,
-                        feedback: Feedback | None, model: str, services: Services,
-                        ledger: Ledger, plan: str = "") -> str:
-        source, line = render(state.text, state.focus)
-        source, gone = without_techniques(source)
-        line = line - gone + 1 if gone and line else line
-        parts = [f"Problem: {problem.description}".strip(),
-                 "File:\n" + source[-FILE_CHARS:],
-                 "What Lean reports as open, with its hypotheses. The first goal "
-                 f"is the active one, at `skip` on line {line}:\n"
-                 f"{state.goal[:GOAL_CHARS]}"]
-        if plan:
-            parts.append("A mathematician was asked how to prove this goal and "
-                         f"answered:\n{plan}")
-        if feedback:
-            parts.append(f"{feedback.lead(model)}:\n{feedback.text}")
-        # Measured on p09: with the shared lemma also invited here, one run
-        # spent 19 of its 69 turns writing declarations and Lean took 2. The
-        # shared fact is asked for once, before the loop; a step is a step.
-        # Measured on p09: qwen narrates instead of answering unless the
-        # contract is the last thing it reads.
-        parts.append("Reply with one ```lean code block containing only tactic "
-                     "lines, and nothing before or after it. No explanation.")
-        reply, why = await self._call(
-            model, "\n\n".join(parts), STEP_TOKENS, services, ledger)
-        if why == "length":
-            return CUT
-        # A reply about a goal inside a declaration comes back as that whole
-        # declaration; its header is a name already taken, and its body is the
-        # step. Names elsewhere in the file are taken too, and truncating there
-        # keeps whatever is new.
-        here = enclosing_name(state.text, state.focus)
-        step = unwrap_own(screen_step(reply), (here,) if here else ())
-        if declaration_name(step) in set(open_names(state.text)) - {here}:
-            # A whole proof of another open declaration is the loop's to route.
-            return step
-        taken = [n for n in root_names(state.text) if n != here]
-        return drop_own(step, taken)
-
     async def _share(self, problem: Problem, text: str, services: Services,
                      ledger: Ledger, events: list[dict[str, Any]]) -> str:
         """The fact several theorems need, hoisted above them before any step.
@@ -1139,40 +562,6 @@ class FrameworkAgent:
             events.append({"stage": "share", "name": named, "kept": kept})
             if kept:
                 text = candidate
-        return text
-
-    async def _define(self, problem: Problem, text: str, services: Services,
-                      ledger: Ledger, events: list[dict[str, Any]]) -> str:
-        """A definition slot holds the answer as a term, not as a proof.
-
-        Measured on putnam_2018_a1: left as `:= by sorry` the cursor takes it
-        for a goal and writes `exact?` into a place with no goal to search."""
-
-        for name, kind in definition_slots(text):
-            note = ""
-            for attempt in range(4):
-                ask = (f"Give the value of `{name} : {kind}`.\n\nProblem: "
-                       f"{problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
-                       f"Reply with one Lean 4 term of type `{kind}` on a single line, "
-                       "and nothing else. It is the answer itself, not a proof of it, "
-                       "so no tactics and no `by`." + note)
-                said, _ = await self._call(
-                    self.config.lines[attempt % len(self.config.lines)], ask,
-                    ANSWER_TOKENS, services, ledger, think=True)
-                term = " ".join(strip_fences(said).split("\n"))[:FEEDBACK_CHARS].strip()
-                if not term or term.startswith("by "):
-                    note = "\n\nYour last reply was not a term."
-                    continue
-                candidate = fill_definition(text, name, term)
-                check = await services.lean.check_file(candidate)
-                kept = not classify(check.messages)[3]
-                events.append({"stage": "define", "name": name, "kept": kept,
-                               "term": term[:120]})
-                if kept:
-                    text = candidate
-                    break
-                note = ("\n\nThat term did not elaborate. Lean said:\n"
-                        + format_messages(check.messages)[:FEEDBACK_CHARS])
         return text
 
     async def _resolve_answers(self, problem: Problem, text: str, names: Sequence[str],
@@ -1323,10 +712,6 @@ def spoken(reply: str) -> str:
 
 
 BUDGET_RETRY = "__budget__"
-# A reply the provider cut at the token limit, which is not a step and not a
-# refusal: its syntax error is an artefact of the cut, never the mistake.
-CUT = "__cut__"
-NUMBER = re.compile(r"^-?\d+$")
 
 
 def is_probe(block: str) -> bool:
@@ -1422,10 +807,6 @@ def screen_step(reply: str, allow_sorry: bool = False) -> str:
     if all(l.strip() in ("", "skip") for l in block.splitlines()):
         return ""
     return block
-
-
-def create_agent() -> FrameworkAgent:
-    return FrameworkAgent()
 
 
 HINTED = re.compile(r"\b(nlinarith|linarith|positivity|norm_num)\s*\[([^\]]*)\]")

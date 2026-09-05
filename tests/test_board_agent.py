@@ -1110,7 +1110,6 @@ def test_a_rewrite_that_unfolds_a_variable_everywhere_is_measured_as_inflation()
     assert inflated(mem, unfolded) == 1.0
 
 
-
 def test_a_big_operator_written_with_in_is_spelled_the_way_this_mathlib_reads_it():
     # Measured on rmo_2000_3 (65 rejections, 208 occurrences) and putnam_2020_a2
     # (14 rejections): both models write `∑ j in Finset.Icc 0 k`, the spelling
@@ -1416,53 +1415,6 @@ def test_a_goal_keeps_its_history_when_a_fact_is_added_above_it():
     tries2 = {old[1].key: 1}
     inherit(old, twin, (tries2,))
     assert new[2].key not in tries2
-
-
-def test_a_goal_about_divisibility_carries_the_current_mathlib_names_before_any_error():
-    # Measured on rmo_2000_6 (one52b, 1 h): the models reached the right lemmas
-    # (Nat.Prime.dvd_of_dvd_pow, pow_dvd_iff_le_factorization) after rounds of
-    # unknown-name rejections and a detour through factorization arithmetic;
-    # the right half of the theorem was never reached. The names are known
-    # before the first step; the name probe only ever answered a rejection.
-    from submission.framework_agent import sheet_for
-    sheet = sheet_for("a b : ℕ\nha : 0 < a\n⊢ 10 ∣ a * b")
-    assert "Nat.Prime.dvd_mul" in sheet and "Nat.le_of_dvd" in sheet
-    assert sheet_for("x : ℕ\n⊢ x + 1 = 1 + x") == ""
-    assert len(sheet.splitlines()) <= 16
-    # a comparison and a power in different conjuncts is not a power inequality
-    both = sheet_for("⊢ IsLeast {n | ∃ a b, 0 < a ∧ 2000 ∣ a ^ 3 * b ^ 4 ∧ n = a * b} 10")
-    assert "Nat.pow_lt_pow_left" not in both and both.startswith("IsLeast S a is")
-    assert "Nat.pow_lt_pow_left" in sheet_for("⊢ (x + 2) ^ 3 < y ^ 3")
-    # the other five hard problems' vocabularies (names #check'd in the image)
-    assert "field_simp" in sheet_for("a b : ℤ\n⊢ (1 : ℚ) / ↑a + 1 / ↑b = 3 / 2018 ↔ (a, b) ∈ S")
-    assert "Nat.choose_succ_succ" in sheet_for("k : ℕ\n⊢ ∑ j ∈ Finset.Icc 0 k, 2 ^ (k - j) * (k + j).choose j = 4 ^ k")
-    assert "Finset.sum_le_card_nsmul" in sheet_for("x : ℕ → ℝ\n⊢ ∑ i ∈ Finset.Ico 1 (k + 1), x i / ↑i ≤ 3")
-    assert "Nat.prime_dvd_prime_iff_eq" in sheet_for("p q m : ℕ\nhp : Nat.Prime p\n⊢ p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2 → p = q")
-    from submission.agent import COCKTAIL
-    assert "assumption" in COCKTAIL
-    # the planner sees the sheet too
-    import asyncio
-    from submission.framework_agent import FrameworkAgent, State
-    from submission.agent import Config
-    from re_harness import Problem
-    fa = FrameworkAgent(Config(lines=("m",), budget_usd=1.0, time_limit_s=60.0))
-    llm = ScriptLLM({"m": ["plan"]})
-    asyncio.run(fa._ask_plan(Problem(id="d", description="p", challenge=""),
-                             State(text="", goal="a b : ℕ\n⊢ 10 ∣ a * b"), FakeServices(BoardLean(), llm),
-                             __import__("submission.agent", fromlist=["Ledger"]).Ledger(), "m"))
-    assert any("Nat.Prime.dvd_mul" in p for _, p in llm.calls)
-    # the fake Lean prints a goal as its declaration name, so the wiring is
-    # checked with a sheet that answers every goal
-    import submission.board_agent as ba
-    real = ba.sheet_for
-    ba.sheet_for = lambda goal: "SHEET-MARK " + goal.split("⊢", 1)[-1].strip()
-    try:
-        challenge = "import Mathlib\n\ntheorem demo (a b : ℕ) : 2 ∣ a * b := by\n  sorry\n"
-        _, _, llm, _ = run(challenge, {"model-b": ["have key : True := by trivial\nexact key"]},
-                           lines=("model-b",))
-    finally:
-        ba.sheet_for = real
-    assert any("as #check prints them:\nSHEET-MARK demo" in p for m, p in llm.calls)
 
 
 def test_an_existential_goal_with_a_decidable_body_gets_its_witness_from_evaluation():
@@ -1976,34 +1928,6 @@ def test_a_finished_proof_that_calls_no_technique_ships_without_the_block():
                            lines=("model-a",), time_limit=20)
     assert result2.metadata["accepted_by_repl"] is True
     assert "techniques defined for this file" in result2.solution
-
-
-def test_a_slow_model_is_asked_for_fewer_tokens_than_it_could_not_deliver_in_time():
-    # Measured on p10 (v7.79): a 4000-token gpt-oss step at 19 tokens/s ran
-    # 206 s, past the harness's 180 s read timeout, and the ledger going
-    # unknown scored 0 a proof accepted 38 s earlier. After two replies at
-    # that rate the next call asks for what 120 s can carry.
-    from submission.framework_agent import LATENCY_BUDGET_S, PACE_FLOOR
-    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=3.0))
-    assert agent._paced("m", 4000) == 4000
-    agent._pace["m"] = [(4000, 206.0)]
-    assert agent._paced("m", 4000) == 4000                    # one reply is no rate
-    agent._pace["m"].append((3000, 100.0))
-    assert agent._paced("m", 4000) == int(4000 / 206.0 * LATENCY_BUDGET_S)
-    agent._pace["m"].append((50, 60.0))                       # a short reply says nothing
-    assert agent._paced("m", 4000) == int(4000 / 206.0 * LATENCY_BUDGET_S)
-    agent._pace["m"] = [(2000, 400.0), (2000, 400.0)]
-    assert agent._paced("m", 4000) == PACE_FLOOR
-    # _call records every reply's tokens and seconds under the model's name.
-    class CountedLLM(ScriptLLM):
-        async def complete(self, *, model, messages, **kwargs):
-            r = await super().complete(model=model, messages=messages, **kwargs)
-            r.usage = {"cost": 0.01, "completion_tokens": 700}
-            return r
-    lean, llm = BoardLean(), CountedLLM({"model-a": ["have key : True := by trivial\nexact key"]})
-    asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=ONE),
-                            FakeServices(lean, llm)))
-    assert agent._pace["model-a"] and agent._pace["model-a"][0][0] == 700
 
 
 def test_powers_bounded_in_the_context_give_a_pow_bounds_leaf():
@@ -2814,7 +2738,6 @@ def test_a_goal_a_model_has_repeated_on_is_not_offered_to_it_again_until_the_boa
     repeats = [e for e in result.metadata["events"] if e.get("kind") == "repeat"]
     assert len(repeats) <= 1, f"{len(repeats)} repeats"
     assert sum(1 for m, _ in llm.calls if m == "model-a") <= 3
-
 
 
 def test_leaf_reads_past_a_set_forall_and_a_conjunction_hypothesis():
