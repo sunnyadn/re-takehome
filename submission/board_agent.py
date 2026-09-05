@@ -20,7 +20,7 @@ from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
 from submission.cells import (CELL_PROBE, Cells, dissolve, enclosing, marker, modular,
-                              remap, render_check, reset_cell, strip_markers)
+                              remap, render_check, reopen_past_cell, reset_cell, strip_markers)
 from submission.conjecture import (families, fits, lemma_text, read_table, table_file,
                                    verified, verify_file)
 from submission.leaves import _hyps as leaf_hyps, _sum_variables, leaf_candidates
@@ -2117,7 +2117,7 @@ class BoardAgent(FrameworkAgent):
                 # under a header report): it gets a placeholder where Lean says it
                 # is, and the step stands. Measured on rmo_2000_6: the closing step
                 # was refused for a goal it had not touched.
-                reopened = await look(reopen(nxt.text, *lost), base)
+                reopened = await look(reopen_past_cell(nxt.text, *lost), base)
                 if not classify(reopened.messages)[3] and not unreachable(reopened.messages, reopened.text, -1):
                     events.append({"stage": "reopen", "line": lost[0], "decl": goal.decl})
                     nxt, lost = reopened, None

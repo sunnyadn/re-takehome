@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Sequence
 
 from submission.framework import (DECL_HEAD, PLACEHOLDER, PROOF_HEAD, proof_span,
-                                  line_of)
+                                  line_of, reopen)
 
 MARK = re.compile(r"^([ \t]*)-- cell (\d+)[ \t]*$")
 BUDGET_ASK = re.compile(r"^set_option maxHeartbeats (\d+) in\b")
@@ -307,3 +307,17 @@ def modular(text: str, cells: Cells) -> str:
     """The delivered form: cells as declarations, no probes, no markers."""
 
     return render_check(text, cells, focus=None, probes=False).text
+
+
+def reopen_past_cell(text: str, line: int, column: int | None = None) -> str:
+    """`reopen`, except that a line which is a cell's marker (where its link
+    maps back to) puts the placeholder after the cell, at the marker's indent:
+    inside the cell it would close the cell's goal and leave the lost one lost."""
+
+    lines = text.split("\n")
+    found = MARK.match(lines[line - 1]) if 1 <= line <= len(lines) else None
+    if found:
+        span = next((s for s in all_spans(text) if s.start == line), None)
+        if span:
+            return reopen(text, span.end, span.indent)
+    return reopen(text, line, column)

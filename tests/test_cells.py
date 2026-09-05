@@ -120,3 +120,20 @@ def test_a_cell_is_called_with_data_by_name_and_hypotheses_by_type():
     assert link(8, "(x : ℕ → ℝ) (hpos : ∀ (n : ℕ), (0 : ℝ) < x n) (S : Set ℕ) : True").startswith(
         "first | (exact vm_cell_8 x ‹_› S)")
     assert link(9, ": IsGreatest {n | n < (3 : ℕ)} (2 : ℕ)") == "exact vm_cell_9"
+
+
+def test_a_lost_goal_reported_at_a_cell_s_link_is_reopened_after_the_cell_not_inside_it():
+    # Measured on rmo_2000_6 (frame127 dump 0148-0153): `refine ⟨?_, ?_⟩` left
+    # `case refine_2` with no placeholder; its span ended on cell 63's link,
+    # which maps back to the marker line, so the placeholder went inside the
+    # cell and the leaf that had just closed the cell was refused for it.
+    from submission.cells import reopen_past_cell
+    text = ("theorem demo : A ∧ B := by\n  refine ⟨?_, ?_⟩\n  -- cell 63\n  have h : A := by\n"
+            "    trivial\n  exact h\n\ntheorem other : True := by\n  trivial\n")
+    got = reopen_past_cell(text, 3, 4)
+    lines = got.split("\n")
+    assert lines[:7] == ["theorem demo : A ∧ B := by", "  refine ⟨?_, ?_⟩", "  -- cell 63",
+                         "  have h : A := by", "    trivial", "  exact h", "  sorry"]
+    # Not a marker line: the plain reopen.
+    plain = reopen_past_cell("theorem t : True := by\n  refine ?_\n", 2, 2)
+    assert plain.split("\n")[2] == "  sorry"
