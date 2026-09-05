@@ -2867,15 +2867,19 @@ def test_vm_leaves_off_disables_the_leaf_sweep(monkeypatch):
 
 
 def test_a_sum_bounded_through_its_subsequence_at_the_squares_is_a_leaf():
-    # rmo_2000_3: both models decompose by √k, drop the factor 3 and withdraw
-    # the block bound; the route is a shape (extend, block, bound, sum).
+    # The goal is quoted from a run (frame133, rmo_2000_3): `open Finset` in the
+    # challenge makes Lean print `Ico`, and the top goal still carries its `∀ k`.
     from submission.leaves import leaf_candidates
     goal = ("x : ℕ → ℝ\nhpos : ∀ (n : ℕ), 0 < x n\nhmono : ∀ (n : ℕ), x n ≥ x (n + 1)\n"
-            "hsq : ∀ (N : ℕ), ∑ i ∈ Finset.Ico 1 (N + 1), x (i * i) / ↑i ≤ 1\nk : ℕ\n"
-            "⊢ ∑ i ∈ Finset.Ico 1 (k + 1), x i / ↑i ≤ 3")
+            "hsq : ∀ (N : ℕ), ∑ i ∈ Ico 1 (N + 1), x (i * i) / ↑i ≤ 1\n"
+            "⊢ ∀ (k : ℕ), ∑ i ∈ Ico 1 (k + 1), x i / ↑i ≤ 3")
     got = next((c for c in leaf_candidates(goal) if "ico_blocks k" in c), "")
+    assert got.startswith("set_option maxHeartbeats 400000 in (intro k; ")
     assert "vm_sum_div_block x hpos vm_anti" in got and "hsq k" in got
     assert got.index("vm_split") < got.index("vm_block") < got.index("linarith")
+    # The same after the binder is introduced, and with `Finset.` spelled out.
+    inner = goal.replace("⊢ ∀ (k : ℕ), ", "k : ℕ\n⊢ ").replace("Ico", "Finset.Ico")
+    assert any("ico_blocks k" in c for c in leaf_candidates(inner))
     # The constant has to cover three times the hypothesis's bound.
     assert not any("ico_blocks" in c for c in leaf_candidates(goal.replace("≤ 3", "≤ 2")))
     # Without the monotonicity there is no Antitone to hand the lemma.

@@ -241,7 +241,12 @@ def _cycles(goal_text: str) -> list[tuple[int, int, int, str]]:
     return out
 
 
-SUM_BOUND = re.compile(r"∑ [^,]*∈ Finset\.(?:range \((\w+) \+ 1\)|Icc 0 (\w+))")
+# With `open Finset` in the challenge Lean prints `Ico`, without it `Finset.Ico`;
+# every matcher below has to read both (measured on rmo_2000_3: the goal says
+# `∑ i ∈ Ico 1 (k + 1), x i / ↑i ≤ 3` and the prefixed patterns never fired).
+FS = r"(?:Finset\.)?"
+
+SUM_BOUND = re.compile(rf"∑ [^,]*∈ {FS}(?:range \((\w+) \+ 1\)|Icc 0 (\w+))")
 
 
 def _sum_variables(hyps: list[tuple[str, str]], target: str) -> list[str]:
@@ -354,12 +359,12 @@ def _nonlinear(hyps: list[tuple[str, str]], keep: str) -> list[str]:
     return out
 
 
-BLOCKS = re.compile(r"∑ \w+ ∈ Finset\.Ico \S+ \((\w+) \+ 1\), ∑ \w+ ∈ Finset\.Ico ")
+BLOCKS = re.compile(rf"∑ \w+ ∈ {FS}Ico \S+ \((\w+) \+ 1\), ∑ \w+ ∈ {FS}Ico ")
 
 FACTOR = r"\((?:[^()]|\([^()]*\))+\)|[A-Za-z_][\w']*"
 
 
-SQUARE_SUM = re.compile(r"^∑ (\w+) ∈ Finset\.Ico (\d+) \((\w+) \+ 1\), ([A-Za-z_][\w']*) \1 / (?:↑\1|\(\1 : ℝ\)) ≤ (\d+)$")
+SQUARE_SUM = re.compile(rf"^∑ (\w+) ∈ {FS}Ico (\d+) \((\w+) \+ 1\), ([A-Za-z_][\w']*) \1 / (?:↑\1|\(\1 : ℝ\)) ≤ (\d+)$")
 
 
 def _square_blocks(hyps: list[tuple[str, str]], target: str) -> str | None:
@@ -374,7 +379,7 @@ def _square_blocks(hyps: list[tuple[str, str]], target: str) -> str | None:
     if not found:
         return None
     i, a, k, f, c = found.groups()
-    sq = re.compile(rf"^∀ (?:\((\w+) : ℕ\)|(\w+)), ∑ (\w+) ∈ Finset\.Ico {a} \(\1?\2? \+ 1\), "
+    sq = re.compile(rf"^∀ (?:\((\w+) : ℕ\)|(\w+)), ∑ (\w+) ∈ {FS}Ico {a} \(\1?\2? \+ 1\), "
                     rf"{re.escape(f)} \(\3 \* \3\) / (?:↑\3|\(\3 : ℝ\)) ≤ (\d+)$")
     bound = next(((n, m.group(4)) for n, t in hyps for m in [sq.match(t)] if m), None)
     pos = next((n for n, t in hyps if re.match(rf"^∀ (?:\w+|\(\w+ : ℕ\)), 0 < {re.escape(f)} \w+$", t)), None)
@@ -419,6 +424,7 @@ SET_FORALL = re.compile(r"^∀ (\w+) ∈ \{(\w+) \| ∃ ([\w ]+?), (.+)\}, (.+)$
 LOWER_BOUNDS = re.compile(r"^(.+?) ∈ lowerBounds \{(\w+) \| ∃ ([\w ]+?), (.+)\}$")
 # The same after membership is unfolded: `∀ (n : ℕ), (∃ a b, P) → T`.
 FORALL_EXISTS = re.compile(r"^∀ \((\w+) : ℕ\), \(∃ ([\w ]+?), (.+)\) → (.+)$")
+PLAIN_FORALL = re.compile(r"^∀ \((\w+) : ([^)]+)\), (.+)$")
 
 
 def _conjuncts(prop: str) -> list[str]:
@@ -547,7 +553,7 @@ def leaf_candidates(goal_text: str) -> list[str]:
     # block by its length times its first term, the rest is one division
     # inequality. Measured on rmo_2000_3 (cells build, 0/2): the models stated
     # this bound and withdrew it after 4 tries every time.
-    blk = re.match(r"^∑ (\w+) ∈ Finset\.Ico (\S+|\([^()]*\)) (\S+|\([^()]*(?:\([^()]*\)[^()]*)*\)), "
+    blk = re.match(rf"^∑ (\w+) ∈ {FS}Ico (\S+|\([^()]*\)) (\S+|\([^()]*(?:\([^()]*\)[^()]*)*\)), "
                    r"([A-Za-z_][\w']*) \1 / (?:↑\1|\(\1 : ℝ\)) ≤ (.+)$", target)
     if blk:
         _, a, b, x, _ = blk.groups()
@@ -755,6 +761,19 @@ def leaf_candidates(goal_text: str) -> list[str]:
             root = int(round(int(rhs) ** (1 / int(n)))) + 1
             if root <= CASES_MAX:
                 out.append(f"bounded_cases {v} {root}")
+    if out:
+        return _finalised(out)
+    # Nothing reads the quantified form: introduce the binder and read the body.
+    # Measured on rmo_2000_3 (frame133): the top goal is `∀ (k : ℕ), ∑ … ≤ 3`,
+    # and every leaf of the body is blind until `k` is a hypothesis.
+    intro = PLAIN_FORALL.match(target)
+    if intro:
+        v, typ, inner = intro.groups()
+        head = goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
+        body = leaf_candidates(f"{head}{v} : {typ}\n⊢ {inner}")
+        if body:
+            return _finalised([f"intro {v}\n" + c[len(BUDGET) + 2:-1].replace("; ", chr(10))
+                               for c in body])
     return _finalised(out)
 
 
