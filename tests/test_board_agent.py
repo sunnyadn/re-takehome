@@ -1579,6 +1579,7 @@ def test_a_board_that_accepts_nothing_for_a_share_of_the_window_restarts_before_
     # withdrawals on one route, and the clock ran out before every goal reached
     # LAST_IN_LINE. Time without an accepted step is a reason to start over.
     import submission.board_agent as ba
+    from submission.run import blackboard
     clock = {"now": 0.0}
 
     def ticking():
@@ -1591,7 +1592,7 @@ def test_a_board_that_accepts_nothing_for_a_share_of_the_window_restarts_before_
                                       + ["have key : True := by trivial\nexact key"] * 3},
                           lines=("model-b",), time_limit=600.0)
     first = next(e for e in result.metadata["events"] if e.get("stage") == "restate")
-    assert first["tries"] < ba.LAST_IN_LINE
+    assert first["tries"] < blackboard.LAST_IN_LINE
 
 
 def test_goal_tokens_are_the_goal_s_identifiers_then_its_notation_with_the_weak_words_last():

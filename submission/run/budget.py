@@ -24,6 +24,9 @@ class Budget:
         self.started = time.monotonic()
         self.deadline = self.started + run.cfg.last_turn_start_s
         self.probe_spent = {"scan": 0.0, "leaf": 0.0, "retry": 0.0}
+        # Set while a leaf block is being judged: those checks get the cap
+        # timeout, and a slow step inside one is not held against it.
+        self.heavy_leaf = False
 
     def elapsed(self) -> float:
         return time.monotonic() - self.started
