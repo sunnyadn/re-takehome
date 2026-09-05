@@ -420,6 +420,46 @@ def _square_blocks(hyps: list[tuple[str, str]], target: str) -> str | None:
     return "\n".join(lines)
 
 
+# `[^{}]` so that a conjunction of two of these is not read as one (measured on
+# rmo_2000_6: a greedy body swallowed both halves and produced a 7-part obtain).
+IS_LEAST = re.compile(r"^IsLeast \{(\w+) \| ∃ ([\w ]+), ([^{}]+)\} (\d+)$")
+
+
+def _is_least(target: str) -> str | None:
+    """`IsLeast {n | ∃ a b, … ∧ m ∣ a^i * b^j ∧ n = a * b} c`, both halves without a
+    model: the witness of `n = a * b` at a literal is a factor pair of it, tried in
+    turn, and the bound is the radical route already used for `c ≤ a * b`. Measured
+    on rmo_2000_6: both halves are this shape and the models write the split and the
+    witness by hand, 9 of 16 runs."""
+
+    found = IS_LEAST.match(target)
+    if not found:
+        return None
+    n, binders, body, c = found.groups()
+    names = binders.split()
+    parts = _conjuncts(body)
+    last = re.match(rf"^{re.escape(n)} = (.+)$", parts[-1]) if parts else None
+    if last is None or len(names) != 2:
+        return None
+    product = last.group(1)
+    if [t.strip() for t in product.split(" * ")] != names:
+        return None
+    hyps = [(f"vm_c{i}", t) for i, t in enumerate(parts[:-1])]
+    bound = _radical_bound(hyps, "≤", c, product)
+    if bound is None:
+        return None
+    value = int(c)
+    pairs = [(d, value // d) for d in range(1, value + 1) if value % d == 0]
+    witness = " | ".join(f"exact ⟨{a}, {b}, by norm_num⟩" for a, b in pairs)
+    held = ", ".join(f"vm_c{i}" for i in range(len(parts)))
+    lower = (f"intro vm_n vm_hn\nobtain ⟨{', '.join(names)}, {held}⟩ := vm_hn\n"
+             f"subst vm_c{len(parts) - 1}\n{bound}")
+    # The membership half is stated as `c ∈ {n | …}`; the anonymous constructor
+    # does not see the existential through `setOf` until it is unfolded.
+    return (f"refine ⟨(by try simp only [Set.mem_setOf_eq]\n first | {witness}), "
+            f"(by {'; '.join(lower.split(chr(10)))})⟩")
+
+
 SET_FORALL = re.compile(r"^∀ (\w+) ∈ \{(\w+) \| ∃ ([\w ]+?), (.+)\}, (.+)$")
 LOWER_BOUNDS = re.compile(r"^(.+?) ∈ lowerBounds \{(\w+) \| ∃ ([\w ]+?), (.+)\}$")
 # The same after membership is unfolded: `∀ (n : ℕ), (∃ a b, P) → T`.
@@ -540,6 +580,9 @@ def leaf_candidates(goal_text: str) -> list[str]:
                 radical = _radical_bound(hyps, "≤", lo.strip(), m.group(1))
                 if radical:
                     out.append(f"subst {n}\n{radical}")
+    least = _is_least(target)
+    if least:
+        out.append(least)
     # A sum bounded through its subsequence at the squares (rmo_2000_3's shape).
     blocks = _square_blocks(hyps, target)
     if blocks:
@@ -766,6 +809,18 @@ def leaf_candidates(goal_text: str) -> list[str]:
     # Nothing reads the quantified form: introduce the binder and read the body.
     # Measured on rmo_2000_3 (frame133): the top goal is `∀ (k : ℕ), ∑ … ≤ 3`,
     # and every leaf of the body is blind until `k` is a hypothesis.
+    # A conjunction of goals each of which a leaf reads: both halves in one block.
+    # Measured on rmo_2000_6: the theorem is two `IsLeast` of the same shape and a
+    # model wrote the split in every run.
+    parts = _conjuncts(target)
+    if len(parts) > 1:
+        head = goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
+        halves = [leaf_candidates(f"{head}⊢ {t}") for t in parts]
+        if all(halves):
+            # `And.intro`, not `⟨_, _⟩`: a first half that is itself a conjunction
+            # (`IsLeast` is one) swallows the anonymous constructor.
+            inner = " ".join(f"(by {h[0][len(BUDGET) + 2:-1]})" for h in halves)
+            return _finalised([f"refine And.intro {inner}"])
     intro = PLAIN_FORALL.match(target)
     if intro:
         names, typ, inner = intro.groups()

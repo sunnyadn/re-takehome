@@ -2895,3 +2895,26 @@ def test_a_quantified_goal_with_no_candidate_of_its_own_is_introduced():
             "⊢ ∀ (j k : ℕ), ∑ i ∈ Ico 1 (k + 1), x i / ↑i ≤ 3")
     got = next((c for c in leaf_candidates(goal) if "ico_blocks k" in c), "")
     assert got.startswith("set_option maxHeartbeats 400000 in (intro j k; ")
+
+
+def test_an_is_least_over_a_product_is_a_leaf():
+    # Both goals are quoted from a run (frame134, rmo_2000_6).
+    from submission.leaves import leaf_candidates
+    one = ("⊢ IsLeast {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b} 10")
+    got = next((c for c in leaf_candidates(one) if "prime_to_bases" in c), "")
+    # The witness of `n = a * b` at a literal is one of its factor pairs.
+    assert "exact ⟨1, 10, by norm_num⟩" in got and "exact ⟨2, 5, by norm_num⟩" in got
+    assert "Nat.le_of_dvd" in got and "vm_c2" in got
+    # A radical below the claimed least element carries no bound.
+    assert not any("prime_to_bases" in c for c in leaf_candidates(one.replace("} 10", "} 11")))
+
+
+def test_a_conjunction_of_two_leaf_goals_is_one_block():
+    from submission.leaves import leaf_candidates
+    both = ("⊢ IsLeast {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b} 10 ∧ "
+            "IsLeast {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 3 * b ^ 4 ∧ n = a * b} 10")
+    got = leaf_candidates(both)
+    assert len(got) == 1
+    # `And.intro`, since `IsLeast` is itself a conjunction and swallows `⟨_, _⟩`.
+    assert "refine And.intro (by " in got[0]
+    assert got[0].count("prime_to_bases 5") == 2
