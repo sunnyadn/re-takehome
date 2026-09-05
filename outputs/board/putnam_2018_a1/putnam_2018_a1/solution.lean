@@ -175,7 +175,7 @@ macro_rules
   | `(tactic| pow_squeeze $y $n $lo) => `(tactic| (
       have hn : ($n : ℕ) ≠ 0 := by norm_num
       have hhi : $y ^ $n < ($lo + 1) ^ $n := by
-        first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
+        first | omega | simp | (ring_nf at *; omega) | (ring_nf at *; nlinarith)
       have h2 := (Nat.pow_lt_pow_iff_left hn).1 hhi
       first
         | (have hlo : ($lo : ℕ) ^ $n < $y ^ $n := by
@@ -280,7 +280,6 @@ macro_rules
       have hpow : $a ^ $n % $m = $a ^ ($n % $k) % $m := by
         conv_lhs => rw [← Nat.div_add_mod $n $k, pow_add, pow_mul]
         rw [Nat.mul_mod, Nat.pow_mod, hcyc, one_pow, ← Nat.mul_mod, one_mul]
-      have hlt : $n % $k < $k := Nat.mod_lt _ (by norm_num)
       generalize hr : $n % $k = r at hpow hlt
       interval_cases r <;> norm_num at hpow <;> (try simp only [Nat.ModEq] at *) <;>
         first | omega | (generalize $a ^ $n = x at *; omega) | (generalize $a ^ $n = x at *; split_ifs at * <;> omega)))
@@ -405,426 +404,17 @@ private theorem vm_sum_div_block (x : ℕ → ℝ) (hpos : ∀ n, 0 < x n) (hant
 -- end of techniques
 
 
-theorem vm_cell_6 (a b : ℤ) (h : (0 : ℤ) < a ∧ (0 : ℤ) < b) : a = (673 : ℤ) ∧ b = (1358114 : ℤ) ∨ a = (674 : ℤ) ∧ b = (340033 : ℤ) ∨ a = (1009 : ℤ) ∧ b = (2018 : ℤ) ∨ a = (2018 : ℤ) ∧ b = (1009 : ℤ) ∨ a = (340033 : ℤ) ∧ b = (674 : ℤ) ∨ a = (1358114 : ℤ) ∧ b = (673 : ℤ) → (1 : ℚ) / ↑a + (1 : ℚ) / ↑b = (3 / 2018 : ℚ) := by
-  first
-  | (trace "closer 0"; rfl; done)
-  | (trace "closer 1"; trivial; done)
-  | (trace "closer 2"; assumption; done)
-  | (trace "closer 3"; norm_num; done)
-  | (trace "closer 4"; simp; done)
-  | (trace "closer 5"; omega; done)
-  | (trace "closer 6"; positivity; done)
-  | (trace "closer 7"; ring; done)
-  | (trace "closer 8"; linarith; done)
-  | (trace "closer 9"; nlinarith; done)
-  | (trace "closer 10"; field_simp; ring; done)
-  | (trace "closer 11"; simp; omega; done)
-  | (trace "closer 12"; norm_num; omega; done)
-  | (trace "closer 13"; constructor <;> norm_num; done)
-  | (trace "closer 14"; simp_all; done)
-  | (trace "closer 15"; aesop; done)
-  | (trace "closer 16"; decide; done)
-  | (trace "closer 17"; gcongr; done)
-  | (trace "closer 18"; bound; done)
-  | (trace "closer 19"; norm_cast; done)
-  | (trace "closer 20"; push_cast; ring; done)
-  | (trace "closer 21"; interval_cases <;> norm_num; done)
-  | (trace "closer 22"; exact le_refl _; done)
-  | (trace "closer 23"; tauto; done)
-  | (trace "closer 24"; subst_vars <;> omega; done)
-  | (trace "closer 25"; subst_vars <;> ring; done)
-  | (trace "closer 26"; subst_vars <;> nlinarith; done)
-  | (trace "closer 27"; constructor <;> omega; done)
-  | (trace "closer 28"; refine ⟨?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 29"; simp_all <;> omega; done)
-  | (trace "closer 30"; zify; omega; done)
-  | (trace "closer 31"; push_cast; omega; done)
-  | (trace "closer 32"; ring_nf; omega; done)
-  | (trace "closer 33"; ring_nf; nlinarith; done)
-  | (trace "closer 34"; interval_cases <;> omega; done)
-  | (trace "closer 35"; simp_arith; done)
-  | (trace "closer 36"; constructor <;> simp; done)
-  | (trace "closer 37"; refine ⟨?_, ?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 38"; decide <;> norm_num; done)
-  | (trace "closer 39"; field_simp; nlinarith; done)
-  | (trace "closer 40"; rify; nlinarith; done)
-  | (trace "closer 41"; omega <;> norm_num; done)
+theorem vm_cell_77 (a b : ℤ) (h : (0 : ℤ) < a ∧ (0 : ℤ) < b) (h_2018_sq : (2018 : ℕ) ^ (2 : ℕ) = (4072324 : ℕ)) (h_mod : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)) (h_divisors : ∀ (d : ℤ), d ∣ (2018 : ℤ) ^ (2 : ℕ) → d > (0 : ℤ) → d ≤ (4072324 : ℤ)) (h_eq : ↑b * (2018 : ℚ) + ↑a * (2018 : ℚ) = ↑b * ↑a * (3 : ℚ)) : b * (2018 : ℤ) + a * (2018 : ℤ) = b * a * (3 : ℤ) := by
+  exact_mod_cast h_eq
 
-theorem vm_cell_72 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) (h_divisor_cases : ∃ d, d ∣ (2018 : ℤ) ^ (2 : ℕ) ∧ (3 : ℤ) * a - (2018 : ℤ) = d ∧ (3 : ℤ) * b - (2018 : ℤ) = (2018 : ℤ) ^ (2 : ℕ) / d) (h_pos_bound : (3 : ℤ) * a - (2018 : ℤ) > (-2018 : ℤ)) (h_mod_3 : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)) (h_valid_pairs : (a, b) ∈ ({((673 : ℤ), (1358114 : ℤ)), ((674 : ℤ), (340033 : ℤ)), ((1009 : ℤ), (2018 : ℤ)), ((2018 : ℤ), (1009 : ℤ)), ((340033 : ℤ), (674 : ℤ)), ((1358114 : ℤ), (673 : ℤ))} : Set (ℤ × ℤ))) : (a, b) ∈ ({((673 : ℤ), (1358114 : ℤ)), ((674 : ℤ), (340033 : ℤ)), ((1009 : ℤ), (2018 : ℤ)), ((2018 : ℤ), (1009 : ℤ)), ((340033 : ℤ), (674 : ℤ)), ((1358114 : ℤ), (673 : ℤ))} : Set (ℤ × ℤ)) := by
-  first
-  | (trace "closer 0"; rfl; done)
-  | (trace "closer 1"; trivial; done)
-  | (trace "closer 2"; assumption; done)
-  | (trace "closer 3"; norm_num; done)
-  | (trace "closer 4"; simp; done)
-  | (trace "closer 5"; omega; done)
-  | (trace "closer 6"; positivity; done)
-  | (trace "closer 7"; ring; done)
-  | (trace "closer 8"; linarith; done)
-  | (trace "closer 9"; nlinarith; done)
-  | (trace "closer 10"; field_simp; ring; done)
-  | (trace "closer 11"; simp; omega; done)
-  | (trace "closer 12"; norm_num; omega; done)
-  | (trace "closer 13"; constructor <;> norm_num; done)
-  | (trace "closer 14"; simp_all; done)
-  | (trace "closer 15"; aesop; done)
-  | (trace "closer 16"; decide; done)
-  | (trace "closer 17"; gcongr; done)
-  | (trace "closer 18"; bound; done)
-  | (trace "closer 19"; norm_cast; done)
-  | (trace "closer 20"; push_cast; ring; done)
-  | (trace "closer 21"; interval_cases <;> norm_num; done)
-  | (trace "closer 22"; exact le_refl _; done)
-  | (trace "closer 23"; tauto; done)
-  | (trace "closer 24"; subst_vars <;> omega; done)
-  | (trace "closer 25"; subst_vars <;> ring; done)
-  | (trace "closer 26"; subst_vars <;> nlinarith; done)
-  | (trace "closer 27"; constructor <;> omega; done)
-  | (trace "closer 28"; refine ⟨?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 29"; simp_all <;> omega; done)
-  | (trace "closer 30"; zify; omega; done)
-  | (trace "closer 31"; push_cast; omega; done)
-  | (trace "closer 32"; ring_nf; omega; done)
-  | (trace "closer 33"; ring_nf; nlinarith; done)
-  | (trace "closer 34"; interval_cases <;> omega; done)
-  | (trace "closer 35"; simp_arith; done)
-  | (trace "closer 36"; constructor <;> simp; done)
-  | (trace "closer 37"; refine ⟨?_, ?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 38"; decide <;> norm_num; done)
-  | (trace "closer 39"; field_simp; nlinarith; done)
-  | (trace "closer 40"; rify; nlinarith; done)
-  | (trace "closer 41"; omega <;> norm_num; done)
+theorem vm_cell_52 (a b : ℤ) (h : (0 : ℤ) < a ∧ (0 : ℤ) < b) (h_2018_sq : (2018 : ℕ) ^ (2 : ℕ) = (4072324 : ℕ)) (h_mod : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)) (h_divisors : ∀ (d : ℤ), d ∣ (2018 : ℤ) ^ (2 : ℕ) → d > (0 : ℤ) → d ≤ (4072324 : ℤ)) (h_eq : ↑b * (2018 : ℚ) + ↑a * (2018 : ℚ) = ↑b * ↑a * (3 : ℚ)) : b * (2018 : ℤ) + a * (2018 : ℤ) = (3 : ℤ) * a * b := by
+  ring_nf at h_eq ⊢
+  first | (exact vm_cell_77 a b ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_77 a b h h_2018_sq h_mod h_divisors h_eq) | (apply vm_cell_77 <;> assumption)
 
-theorem vm_cell_64 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) (h_pos_bound : (3 : ℤ) * a - (2018 : ℤ) > (-2018 : ℤ)) (h_mod_3 : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)) (d : ℤ) (hda : (3 : ℤ) * a - (2018 : ℤ) = d) (hdb : (3 : ℤ) * b - (2018 : ℤ) = (2018 : ℤ) ^ (2 : ℕ) / d) (k : ℤ) (hk : (2018 : ℤ) ^ (2 : ℕ) = d * k) (h_d_pos : (0 : ℤ) < d) : d ∣ (2018 : ℤ) ^ (2 : ℕ) := by
-  first
-  | (trace "closer 0"; rfl; done)
-  | (trace "closer 1"; trivial; done)
-  | (trace "closer 2"; assumption; done)
-  | (trace "closer 3"; norm_num; done)
-  | (trace "closer 4"; simp; done)
-  | (trace "closer 5"; omega; done)
-  | (trace "closer 6"; positivity; done)
-  | (trace "closer 7"; ring; done)
-  | (trace "closer 8"; linarith; done)
-  | (trace "closer 9"; nlinarith; done)
-  | (trace "closer 10"; field_simp; ring; done)
-  | (trace "closer 11"; simp; omega; done)
-  | (trace "closer 12"; norm_num; omega; done)
-  | (trace "closer 13"; constructor <;> norm_num; done)
-  | (trace "closer 14"; simp_all; done)
-  | (trace "closer 15"; aesop; done)
-  | (trace "closer 16"; decide; done)
-  | (trace "closer 17"; gcongr; done)
-  | (trace "closer 18"; bound; done)
-  | (trace "closer 19"; norm_cast; done)
-  | (trace "closer 20"; push_cast; ring; done)
-  | (trace "closer 21"; interval_cases <;> norm_num; done)
-  | (trace "closer 22"; exact le_refl _; done)
-  | (trace "closer 23"; tauto; done)
-  | (trace "closer 24"; subst_vars <;> omega; done)
-  | (trace "closer 25"; subst_vars <;> ring; done)
-  | (trace "closer 26"; subst_vars <;> nlinarith; done)
-  | (trace "closer 27"; constructor <;> omega; done)
-  | (trace "closer 28"; refine ⟨?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 29"; simp_all <;> omega; done)
-  | (trace "closer 30"; zify; omega; done)
-  | (trace "closer 31"; push_cast; omega; done)
-  | (trace "closer 32"; ring_nf; omega; done)
-  | (trace "closer 33"; ring_nf; nlinarith; done)
-  | (trace "closer 34"; interval_cases <;> omega; done)
-  | (trace "closer 35"; simp_arith; done)
-  | (trace "closer 36"; constructor <;> simp; done)
-  | (trace "closer 37"; refine ⟨?_, ?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 38"; decide <;> norm_num; done)
-  | (trace "closer 39"; field_simp; nlinarith; done)
-  | (trace "closer 40"; rify; nlinarith; done)
-  | (trace "closer 41"; omega <;> norm_num; done)
-
-theorem vm_cell_63 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) (h_pos_bound : (3 : ℤ) * a - (2018 : ℤ) > (-2018 : ℤ)) (h_mod_3 : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)) (d : ℤ) (hda : (3 : ℤ) * a - (2018 : ℤ) = d) (hdb : (3 : ℤ) * b - (2018 : ℤ) = (2018 : ℤ) ^ (2 : ℕ) / d) (k : ℤ) (hk : (2018 : ℤ) ^ (2 : ℕ) = d * k) : (0 : ℤ) < d := by
-  first
-  | (trace "closer 0"; rfl; done)
-  | (trace "closer 1"; trivial; done)
-  | (trace "closer 2"; assumption; done)
-  | (trace "closer 3"; norm_num; done)
-  | (trace "closer 4"; simp; done)
-  | (trace "closer 5"; omega; done)
-  | (trace "closer 6"; positivity; done)
-  | (trace "closer 7"; ring; done)
-  | (trace "closer 8"; linarith; done)
-  | (trace "closer 9"; nlinarith; done)
-  | (trace "closer 10"; field_simp; ring; done)
-  | (trace "closer 11"; simp; omega; done)
-  | (trace "closer 12"; norm_num; omega; done)
-  | (trace "closer 13"; constructor <;> norm_num; done)
-  | (trace "closer 14"; simp_all; done)
-  | (trace "closer 15"; aesop; done)
-  | (trace "closer 16"; decide; done)
-  | (trace "closer 17"; gcongr; done)
-  | (trace "closer 18"; bound; done)
-  | (trace "closer 19"; norm_cast; done)
-  | (trace "closer 20"; push_cast; ring; done)
-  | (trace "closer 21"; interval_cases <;> norm_num; done)
-  | (trace "closer 22"; exact le_refl _; done)
-  | (trace "closer 23"; tauto; done)
-  | (trace "closer 24"; subst_vars <;> omega; done)
-  | (trace "closer 25"; subst_vars <;> ring; done)
-  | (trace "closer 26"; subst_vars <;> nlinarith; done)
-  | (trace "closer 27"; constructor <;> omega; done)
-  | (trace "closer 28"; refine ⟨?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 29"; simp_all <;> omega; done)
-  | (trace "closer 30"; zify; omega; done)
-  | (trace "closer 31"; push_cast; omega; done)
-  | (trace "closer 32"; ring_nf; omega; done)
-  | (trace "closer 33"; ring_nf; nlinarith; done)
-  | (trace "closer 34"; interval_cases <;> omega; done)
-  | (trace "closer 35"; simp_arith; done)
-  | (trace "closer 36"; constructor <;> simp; done)
-  | (trace "closer 37"; refine ⟨?_, ?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 38"; decide <;> norm_num; done)
-  | (trace "closer 39"; field_simp; nlinarith; done)
-  | (trace "closer 40"; rify; nlinarith; done)
-  | (trace "closer 41"; omega <;> norm_num; done)
-
-theorem vm_cell_45 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) (h_divisor_cases : ∃ d, d ∣ (2018 : ℤ) ^ (2 : ℕ) ∧ (3 : ℤ) * a - (2018 : ℤ) = d ∧ (3 : ℤ) * b - (2018 : ℤ) = (2018 : ℤ) ^ (2 : ℕ) / d) (h_pos_bound : (3 : ℤ) * a - (2018 : ℤ) > (-2018 : ℤ)) : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ) := by
-  first
-  | (trace "closer 0"; rfl; done)
-  | (trace "closer 1"; trivial; done)
-  | (trace "closer 2"; assumption; done)
-  | (trace "closer 3"; norm_num; done)
-  | (trace "closer 4"; simp; done)
-  | (trace "closer 5"; omega; done)
-  | (trace "closer 6"; positivity; done)
-  | (trace "closer 7"; ring; done)
-  | (trace "closer 8"; linarith; done)
-  | (trace "closer 9"; nlinarith; done)
-  | (trace "closer 10"; field_simp; ring; done)
-  | (trace "closer 11"; simp; omega; done)
-  | (trace "closer 12"; norm_num; omega; done)
-  | (trace "closer 13"; constructor <;> norm_num; done)
-  | (trace "closer 14"; simp_all; done)
-  | (trace "closer 15"; aesop; done)
-  | (trace "closer 16"; decide; done)
-  | (trace "closer 17"; gcongr; done)
-  | (trace "closer 18"; bound; done)
-  | (trace "closer 19"; norm_cast; done)
-  | (trace "closer 20"; push_cast; ring; done)
-  | (trace "closer 21"; interval_cases <;> norm_num; done)
-  | (trace "closer 22"; exact le_refl _; done)
-  | (trace "closer 23"; tauto; done)
-  | (trace "closer 24"; subst_vars <;> omega; done)
-  | (trace "closer 25"; subst_vars <;> ring; done)
-  | (trace "closer 26"; subst_vars <;> nlinarith; done)
-  | (trace "closer 27"; constructor <;> omega; done)
-  | (trace "closer 28"; refine ⟨?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 29"; simp_all <;> omega; done)
-  | (trace "closer 30"; zify; omega; done)
-  | (trace "closer 31"; push_cast; omega; done)
-  | (trace "closer 32"; ring_nf; omega; done)
-  | (trace "closer 33"; ring_nf; nlinarith; done)
-  | (trace "closer 34"; interval_cases <;> omega; done)
-  | (trace "closer 35"; simp_arith; done)
-  | (trace "closer 36"; constructor <;> simp; done)
-  | (trace "closer 37"; refine ⟨?_, ?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 38"; decide <;> norm_num; done)
-  | (trace "closer 39"; field_simp; nlinarith; done)
-  | (trace "closer 40"; rify; nlinarith; done)
-  | (trace "closer 41"; omega <;> norm_num; done)
-
-theorem vm_cell_44 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) (h_divisor_cases : ∃ d, d ∣ (2018 : ℤ) ^ (2 : ℕ) ∧ (3 : ℤ) * a - (2018 : ℤ) = d ∧ (3 : ℤ) * b - (2018 : ℤ) = (2018 : ℤ) ^ (2 : ℕ) / d) : (3 : ℤ) * a - (2018 : ℤ) > (-2018 : ℤ) := by
-  first
-  | (trace "closer 0"; rfl; done)
-  | (trace "closer 1"; trivial; done)
-  | (trace "closer 2"; assumption; done)
-  | (trace "closer 3"; norm_num; done)
-  | (trace "closer 4"; simp; done)
-  | (trace "closer 5"; omega; done)
-  | (trace "closer 6"; positivity; done)
-  | (trace "closer 7"; ring; done)
-  | (trace "closer 8"; linarith; done)
-  | (trace "closer 9"; nlinarith; done)
-  | (trace "closer 10"; field_simp; ring; done)
-  | (trace "closer 11"; simp; omega; done)
-  | (trace "closer 12"; norm_num; omega; done)
-  | (trace "closer 13"; constructor <;> norm_num; done)
-  | (trace "closer 14"; simp_all; done)
-  | (trace "closer 15"; aesop; done)
-  | (trace "closer 16"; decide; done)
-  | (trace "closer 17"; gcongr; done)
-  | (trace "closer 18"; bound; done)
-  | (trace "closer 19"; norm_cast; done)
-  | (trace "closer 20"; push_cast; ring; done)
-  | (trace "closer 21"; interval_cases <;> norm_num; done)
-  | (trace "closer 22"; exact le_refl _; done)
-  | (trace "closer 23"; tauto; done)
-  | (trace "closer 24"; subst_vars <;> omega; done)
-  | (trace "closer 25"; subst_vars <;> ring; done)
-  | (trace "closer 26"; subst_vars <;> nlinarith; done)
-  | (trace "closer 27"; constructor <;> omega; done)
-  | (trace "closer 28"; refine ⟨?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 29"; simp_all <;> omega; done)
-  | (trace "closer 30"; zify; omega; done)
-  | (trace "closer 31"; push_cast; omega; done)
-  | (trace "closer 32"; ring_nf; omega; done)
-  | (trace "closer 33"; ring_nf; nlinarith; done)
-  | (trace "closer 34"; interval_cases <;> omega; done)
-  | (trace "closer 35"; simp_arith; done)
-  | (trace "closer 36"; constructor <;> simp; done)
-  | (trace "closer 37"; refine ⟨?_, ?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 38"; decide <;> norm_num; done)
-  | (trace "closer 39"; field_simp; nlinarith; done)
-  | (trace "closer 40"; rify; nlinarith; done)
-  | (trace "closer 41"; omega <;> norm_num; done)
-
-theorem vm_cell_113 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) (h_pos_bound : (3 : ℤ) * a - (2018 : ℤ) > (-2018 : ℤ)) (h_mod_3 : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)) (h_div : (3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)) (h_d_pos : (3 : ℤ) * a - (2018 : ℤ) > (0 : ℤ)) (h_d_ne_zero : (3 : ℤ) * a - (2018 : ℤ) ≠ (0 : ℤ)) : (3 : ℤ) * b - (2018 : ℤ) = (2018 : ℤ) ^ (2 : ℕ) / ((3 : ℤ) * a - (2018 : ℤ)) := by
-  exact Int.eq_ediv_of_mul_eq_right h_d_ne_zero h_factor
-
-theorem vm_cell_111 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) (h_pos_bound : (3 : ℤ) * a - (2018 : ℤ) > (-2018 : ℤ)) (h_mod_3 : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)) (h_div : (3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)) (h_d_pos : (3 : ℤ) * a - (2018 : ℤ) > (0 : ℤ)) : (3 : ℤ) * b - (2018 : ℤ) = (2018 : ℤ) ^ (2 : ℕ) / ((3 : ℤ) * a - (2018 : ℤ)) := by
-  have h_d_ne_zero : 3 * a - 2018 ≠ 0 := by
-    intro h
-    have h_a : a = 673 := by
-      omega
-    rw [h_a] at h
-    norm_num at h
-    <;> omega
-  first | (exact vm_cell_113 a b ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_113 a b ha_pos hb_pos h_eq h_eq_int h_factor h_pos_bound h_mod_3 h_div h_d_pos h_d_ne_zero) | (apply vm_cell_113 <;> assumption)
-
-theorem vm_cell_107 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) (h_pos_bound : (3 : ℤ) * a - (2018 : ℤ) > (-2018 : ℤ)) (h_mod_3 : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)) (h_div : (3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)) : (3 : ℤ) * a - (2018 : ℤ) > (0 : ℤ) := by
-  first
-  | (trace "closer 0"; rfl; done)
-  | (trace "closer 1"; trivial; done)
-  | (trace "closer 2"; assumption; done)
-  | (trace "closer 3"; norm_num; done)
-  | (trace "closer 4"; simp; done)
-  | (trace "closer 5"; omega; done)
-  | (trace "closer 6"; positivity; done)
-  | (trace "closer 7"; ring; done)
-  | (trace "closer 8"; linarith; done)
-  | (trace "closer 9"; nlinarith; done)
-  | (trace "closer 10"; field_simp; ring; done)
-  | (trace "closer 11"; simp; omega; done)
-  | (trace "closer 12"; norm_num; omega; done)
-  | (trace "closer 13"; constructor <;> norm_num; done)
-  | (trace "closer 14"; simp_all; done)
-  | (trace "closer 15"; aesop; done)
-  | (trace "closer 16"; decide; done)
-  | (trace "closer 17"; gcongr; done)
-  | (trace "closer 18"; bound; done)
-  | (trace "closer 19"; norm_cast; done)
-  | (trace "closer 20"; push_cast; ring; done)
-  | (trace "closer 21"; interval_cases <;> norm_num; done)
-  | (trace "closer 22"; exact le_refl _; done)
-  | (trace "closer 23"; tauto; done)
-  | (trace "closer 24"; subst_vars <;> omega; done)
-  | (trace "closer 25"; subst_vars <;> ring; done)
-  | (trace "closer 26"; subst_vars <;> nlinarith; done)
-  | (trace "closer 27"; constructor <;> omega; done)
-  | (trace "closer 28"; refine ⟨?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 29"; simp_all <;> omega; done)
-  | (trace "closer 30"; zify; omega; done)
-  | (trace "closer 31"; push_cast; omega; done)
-  | (trace "closer 32"; ring_nf; omega; done)
-  | (trace "closer 33"; ring_nf; nlinarith; done)
-  | (trace "closer 34"; interval_cases <;> omega; done)
-  | (trace "closer 35"; simp_arith; done)
-  | (trace "closer 36"; constructor <;> simp; done)
-  | (trace "closer 37"; refine ⟨?_, ?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 38"; decide <;> norm_num; done)
-  | (trace "closer 39"; field_simp; nlinarith; done)
-  | (trace "closer 40"; rify; nlinarith; done)
-  | (trace "closer 41"; omega <;> norm_num; done)
-
-theorem vm_cell_106 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) (h_pos_bound : (3 : ℤ) * a - (2018 : ℤ) > (-2018 : ℤ)) (h_mod_3 : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)) (h_div : (3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)) : (3 : ℤ) * b - (2018 : ℤ) = (2018 : ℤ) ^ (2 : ℕ) / ((3 : ℤ) * a - (2018 : ℤ)) := by
-  have h_d_pos : 3 * a - 2018 > 0 := by
-    first | (exact vm_cell_107 a b ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_107 a b ha_pos hb_pos h_eq h_eq_int h_factor h_pos_bound h_mod_3 h_div) | (apply vm_cell_107 <;> assumption)
-  have h_deq : (3 * b - 2018) = 2018 ^ 2 / (3 * a - 2018) := by
-    first | (exact vm_cell_111 a b ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_111 a b ha_pos hb_pos h_eq h_eq_int h_factor h_pos_bound h_mod_3 h_div h_d_pos) | (apply vm_cell_111 <;> assumption)
-  exact h_deq
-
-theorem vm_cell_85 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) (h_pos_bound : (3 : ℤ) * a - (2018 : ℤ) > (-2018 : ℤ)) (h_mod_3 : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)) (h_div : (3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ)) : (3 : ℤ) * b - (2018 : ℤ) = (2018 : ℤ) ^ (2 : ℕ) / ((3 : ℤ) * a - (2018 : ℤ)) := by
-  first | (exact vm_cell_106 a b ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_106 a b ha_pos hb_pos h_eq h_eq_int h_factor h_pos_bound h_mod_3 h_div) | (apply vm_cell_106 <;> assumption)
-
-theorem vm_cell_81 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) (h_pos_bound : (3 : ℤ) * a - (2018 : ℤ) > (-2018 : ℤ)) (h_mod_3 : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)) : (3 : ℤ) * b - (2018 : ℤ) = (2018 : ℤ) ^ (2 : ℕ) / ((3 : ℤ) * a - (2018 : ℤ)) := by
-  have h_div : 3 * a - 2018 ∣ 2018 ^ 2 := by
-    have h_main : (3 * a - 2018) * (3 * b - 2018) = 2018 ^ 2 := h_factor
-    exact Dvd.intro _ h_main
-  first | (exact vm_cell_85 a b ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_85 a b ha_pos hb_pos h_eq h_eq_int h_factor h_pos_bound h_mod_3 h_div) | (apply vm_cell_85 <;> assumption)
-
-set_option maxHeartbeats 400000 in
-theorem vm_cell_25 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) : (3 : ℤ) * a - (2018 : ℤ) ∣ (2018 : ℤ) ^ (2 : ℕ) := by
-  set_option maxHeartbeats 400000 in (have hdvd : 3 * a - 2018 ∣ 2018 ^ 2 := Dvd.intro _ h_factor; divisor_cases hdvd <;> (first | (solve_sub; first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; omega)) | (first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; omega))))
-
-theorem vm_cell_24 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) (h_factor : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ)) : ∃ d, d ∣ (2018 : ℤ) ^ (2 : ℕ) ∧ (3 : ℤ) * a - (2018 : ℤ) = d ∧ (3 : ℤ) * b - (2018 : ℤ) = (2018 : ℤ) ^ (2 : ℕ) / d := by
-  refine ⟨3 * a - 2018, ?_, rfl, ?_⟩
-  case refine_1 =>
-    first | (exact vm_cell_25 a b ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_25 a b ha_pos hb_pos h_eq h_eq_int h_factor) | (apply vm_cell_25 <;> assumption)
-  case refine_2 =>
-    have h_pos_bound : 3 * a - 2018 > -2018 := by
-      have h₁ : 0 < a := ha_pos
-      have h₂ : 0 < b := hb_pos
-      have h₃ : (b + a) * 2018 = a * b * 3 := h_eq_int
-      have h₄ : (3 * a - 2018) * (3 * b - 2018) = 2018 ^ 2 := h_factor
-      by_contra h
-      have h₅ : 3 * a - 2018 ≤ -2018 := by linarith
-      have h₆ : 3 * a ≤ 0 := by linarith
-      have h₇ : a ≤ 0 := by omega
-      linarith
-
-    have h_mod_3 : (3 * a - 2018) % 3 = 1 := by
-      have h₁ : (3 * a - 2018) % 3 = (-2018) % 3 := by
-        have h₂ : (3 * a) % 3 = 0 := by
-          simp [Int.mul_emod]
-        have h₃ : (3 * a - 2018) % 3 = ((3 * a) % 3 - 2018 % 3) % 3 := by
-          simp [Int.sub_emod]
-        rw [h₃, h₂]
-        <;> simp [Int.sub_emod]
-      rw [h₁]
-      norm_num
-    first | (exact vm_cell_81 a b ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_81 a b ha_pos hb_pos h_eq h_eq_int h_factor h_pos_bound h_mod_3) | (apply vm_cell_81 <;> assumption)
-
-theorem vm_cell_21 (a b : ℤ) (ha_pos : (0 : ℤ) < a) (hb_pos : (0 : ℤ) < b) (h_eq : (↑b + ↑a) * (2018 : ℚ) = ↑a * ↑b * (3 : ℚ)) (h_eq_int : (b + a) * (2018 : ℤ) = a * b * (3 : ℤ)) : ((3 : ℤ) * a - (2018 : ℤ)) * ((3 : ℤ) * b - (2018 : ℤ)) = (2018 : ℤ) ^ (2 : ℕ) := by
-  first
-  | (trace "closer 0"; rfl; done)
-  | (trace "closer 1"; trivial; done)
-  | (trace "closer 2"; assumption; done)
-  | (trace "closer 3"; norm_num; done)
-  | (trace "closer 4"; simp; done)
-  | (trace "closer 5"; omega; done)
-  | (trace "closer 6"; positivity; done)
-  | (trace "closer 7"; ring; done)
-  | (trace "closer 8"; linarith; done)
-  | (trace "closer 9"; nlinarith; done)
-  | (trace "closer 10"; field_simp; ring; done)
-  | (trace "closer 11"; simp; omega; done)
-  | (trace "closer 12"; norm_num; omega; done)
-  | (trace "closer 13"; constructor <;> norm_num; done)
-  | (trace "closer 14"; simp_all; done)
-  | (trace "closer 15"; aesop; done)
-  | (trace "closer 16"; decide; done)
-  | (trace "closer 17"; gcongr; done)
-  | (trace "closer 18"; bound; done)
-  | (trace "closer 19"; norm_cast; done)
-  | (trace "closer 20"; push_cast; ring; done)
-  | (trace "closer 21"; interval_cases <;> norm_num; done)
-  | (trace "closer 22"; exact le_refl _; done)
-  | (trace "closer 23"; tauto; done)
-  | (trace "closer 24"; subst_vars <;> omega; done)
-  | (trace "closer 25"; subst_vars <;> ring; done)
-  | (trace "closer 26"; subst_vars <;> nlinarith; done)
-  | (trace "closer 27"; constructor <;> omega; done)
-  | (trace "closer 28"; refine ⟨?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 29"; simp_all <;> omega; done)
-  | (trace "closer 30"; zify; omega; done)
-  | (trace "closer 31"; push_cast; omega; done)
-  | (trace "closer 32"; ring_nf; omega; done)
-  | (trace "closer 33"; ring_nf; nlinarith; done)
-  | (trace "closer 34"; interval_cases <;> omega; done)
-  | (trace "closer 35"; simp_arith; done)
-  | (trace "closer 36"; constructor <;> simp; done)
-  | (trace "closer 37"; refine ⟨?_, ?_, ?_⟩ <;> norm_num; done)
-  | (trace "closer 38"; decide <;> norm_num; done)
-  | (trace "closer 39"; field_simp; nlinarith; done)
-  | (trace "closer 40"; rify; nlinarith; done)
-  | (trace "closer 41"; omega <;> norm_num; done)
+theorem vm_cell_46 (a b : ℤ) (h : (0 : ℤ) < a ∧ (0 : ℤ) < b) (h_2018_sq : (2018 : ℕ) ^ (2 : ℕ) = (4072324 : ℕ)) (h_mod : ((3 : ℤ) * a - (2018 : ℤ)) % (3 : ℤ) = (1 : ℤ)) (h_divisors : ∀ (d : ℤ), d ∣ (2018 : ℤ) ^ (2 : ℕ) → d > (0 : ℤ) → d ≤ (4072324 : ℤ)) (h_eq : (1 : ℚ) / ↑a + (1 : ℚ) / ↑b = (3 / 2018 : ℚ)) : b * (2018 : ℤ) + a * (2018 : ℤ) = (3 : ℤ) * a * b := by
+  field_simp [h.1.ne', h.2.ne'] at h_eq
+  ring_nf at h_eq
+  first | (exact vm_cell_52 a b ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_52 a b h h_2018_sq h_mod h_divisors h_eq) | (apply vm_cell_52 <;> assumption)
 
 theorem putnam_2018_a1
   (a b : ℤ)
@@ -834,29 +424,39 @@ theorem putnam_2018_a1
       (2018, 1009), (340033, 674), (1358114, 673)} : Set (ℤ × ℤ))) := by
   constructor
   case mp =>
+    have h_2018_sq : 2018 ^ 2 = 4072324 := by norm_num
+    have h_mod : (3 * a - 2018) % 3 = 1 := by
+      have h₁ : (3 * a - 2018) % 3 = (-2018) % 3 := by
+        have : (3 * a) % 3 = 0 := by omega
+        omega
+      omega
+    have h_divisors : ∀ (d : ℤ), d ∣ 2018 ^ 2 → d > 0 → d ≤ 4072324 := by
+      intro d hd hpos
+      have : d ≤ 4072324 := by
+        have h₂ : d ∣ 4072324 := by simpa [h_2018_sq] using hd
+        exact Int.le_of_dvd (by positivity) h₂
+      exact this
     intro h_eq
-    rcases h with ⟨ha_pos, hb_pos⟩
-    field_simp [ha_pos.ne', hb_pos.ne'] at h_eq
-    have h_eq_int : (b + a) * 2018 = a * b * 3 := by
-      norm_cast at h_eq ⊢
-      <;> ring_nf at h_eq ⊢ <;> linarith
+    have h_eq_int : b * 2018 + a * 2018 = 3 * a * b := by
+      first | (exact vm_cell_46 a b ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_46 a b h h_2018_sq h_mod h_divisors h_eq) | (apply vm_cell_46 <;> assumption)
     have h_factor : (3 * a - 2018) * (3 * b - 2018) = 2018 ^ 2 := by
-      first | (exact vm_cell_21 a b ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_21 a b ha_pos hb_pos h_eq h_eq_int) | (apply vm_cell_21 <;> assumption)
-    have h_divisor_cases : ∃ d : ℤ, d ∣ 2018 ^ 2 ∧ 3 * a - 2018 = d ∧ 3 * b - 2018 = 2018 ^ 2 / d := by
-      first | (exact vm_cell_24 a b ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_24 a b ha_pos hb_pos h_eq h_eq_int h_factor) | (apply vm_cell_24 <;> assumption)
-    have h_pos_bound : 3 * a - 2018 > -2018 := by
-      first | (exact vm_cell_44 a b ‹_› ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_44 a b ha_pos hb_pos h_eq h_eq_int h_factor h_divisor_cases) | (apply vm_cell_44 <;> assumption)
-    have h_mod_3 : (3 * a - 2018) % 3 = 1 := by
-      first | (exact vm_cell_45 a b ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_45 a b ha_pos hb_pos h_eq h_eq_int h_factor h_divisor_cases h_pos_bound) | (apply vm_cell_45 <;> assumption)
-    have h_valid_pairs : (a, b) ∈ ({(673, 1358114), (674, 340033), (1009, 2018), (2018, 1009), (340033, 674), (1358114, 673)} : Set (ℤ × ℤ)) := by
-      rcases h_divisor_cases with ⟨d, hdvd, hda, hdb⟩
-      rcases hdvd with ⟨k, hk⟩
-      have h_d_pos : 0 < d := by
-        first | (exact vm_cell_63 a b ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› d ‹_› ‹_› k ‹_›) | (exact vm_cell_63 a b ha_pos hb_pos h_eq h_eq_int h_factor h_pos_bound h_mod_3 d hda hdb k hk) | (apply vm_cell_63 <;> assumption)
-      have h_d_divides : d ∣ 2018 ^ 2 := by
-        first | (exact vm_cell_64 a b ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› d ‹_› ‹_› k ‹_› ‹_›) | (exact vm_cell_64 a b ha_pos hb_pos h_eq h_eq_int h_factor h_pos_bound h_mod_3 d hda hdb k hk h_d_pos) | (apply vm_cell_64 <;> assumption)
-      set_option maxHeartbeats 400000 in (have hdvd : 3 * a - 2018 ∣ 2018 ^ 2 := Dvd.intro _ h_factor; divisor_cases hdvd <;> (clear hm hdvd h_eq_int hda hdb hk; (try simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *); rw [hx] at h_factor; norm_num at h_factor <;> omega))
-    first | (exact vm_cell_72 a b ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_› ‹_›) | (exact vm_cell_72 a b ha_pos hb_pos h_eq h_eq_int h_factor h_divisor_cases h_pos_bound h_mod_3 h_valid_pairs) | (apply vm_cell_72 <;> assumption)
+      have h₁ : b * 2018 + a * 2018 = 3 * a * b := h_eq_int
+      ring_nf at h₁ ⊢
+      linarith
+    set_option maxHeartbeats 400000 in (obtain ⟨vm_h0, vm_h1⟩ := h; have hdvd : 3 * a - 2018 ∣ 2018 ^ 2 := Dvd.intro _ h_factor; divisor_cases hdvd <;> (clear hm hdvd h_eq_int; (try simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *); rw [hx] at h_factor; norm_num at h_factor <;> omega))
   case mpr =>
-    simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq] at *
-    first | (exact vm_cell_6 a b ‹_›) | (exact vm_cell_6 a b h) | (apply vm_cell_6 <;> assumption)
+    intro hmem
+    rcases hmem with hmem | hmem | hmem | hmem | hmem | hmem
+    · rcases hmem with ⟨rfl, rfl⟩
+      norm_num
+    · rcases hmem with ⟨rfl, rfl⟩
+      norm_num
+    · rcases hmem with ⟨rfl, rfl⟩
+      norm_num
+    · rcases hmem with ⟨rfl, rfl⟩
+      norm_num
+    · rcases hmem with ⟨rfl, rfl⟩
+      norm_num
+    · rcases hmem with ⟨rfl, rfl⟩
+      norm_num
+
