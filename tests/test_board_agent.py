@@ -2885,3 +2885,13 @@ def test_a_sum_bounded_through_its_subsequence_at_the_squares_is_a_leaf():
     # Without the monotonicity there is no Antitone to hand the lemma.
     assert not any("ico_blocks" in c for c in
                    leaf_candidates(goal.replace("hmono : ∀ (n : ℕ), x n ≥ x (n + 1)\n", "")))
+
+
+def test_a_quantified_goal_with_no_candidate_of_its_own_is_introduced():
+    # Grouped binders too: Lean prints `∀ (a b : ℕ), …` for one binder group.
+    from submission.leaves import leaf_candidates
+    goal = ("x : ℕ → ℝ\nhpos : ∀ (n : ℕ), 0 < x n\nhmono : ∀ (n : ℕ), x n ≥ x (n + 1)\n"
+            "hsq : ∀ (N : ℕ), ∑ i ∈ Ico 1 (N + 1), x (i * i) / ↑i ≤ 1\n"
+            "⊢ ∀ (j k : ℕ), ∑ i ∈ Ico 1 (k + 1), x i / ↑i ≤ 3")
+    got = next((c for c in leaf_candidates(goal) if "ico_blocks k" in c), "")
+    assert got.startswith("set_option maxHeartbeats 400000 in (intro j k; ")

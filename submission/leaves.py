@@ -424,7 +424,7 @@ SET_FORALL = re.compile(r"^∀ (\w+) ∈ \{(\w+) \| ∃ ([\w ]+?), (.+)\}, (.+)$
 LOWER_BOUNDS = re.compile(r"^(.+?) ∈ lowerBounds \{(\w+) \| ∃ ([\w ]+?), (.+)\}$")
 # The same after membership is unfolded: `∀ (n : ℕ), (∃ a b, P) → T`.
 FORALL_EXISTS = re.compile(r"^∀ \((\w+) : ℕ\), \(∃ ([\w ]+?), (.+)\) → (.+)$")
-PLAIN_FORALL = re.compile(r"^∀ \((\w+) : ([^)]+)\), (.+)$")
+PLAIN_FORALL = re.compile(r"^∀ \(([\w ]+) : ([^)]+)\), (.+)$")
 
 
 def _conjuncts(prop: str) -> list[str]:
@@ -768,11 +768,12 @@ def leaf_candidates(goal_text: str) -> list[str]:
     # and every leaf of the body is blind until `k` is a hypothesis.
     intro = PLAIN_FORALL.match(target)
     if intro:
-        v, typ, inner = intro.groups()
+        names, typ, inner = intro.groups()
         head = goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
-        body = leaf_candidates(f"{head}{v} : {typ}\n⊢ {inner}")
+        bound = "".join(f"{v} : {typ}\n" for v in names.split())
+        body = leaf_candidates(f"{head}{bound}⊢ {inner}")
         if body:
-            return _finalised([f"intro {v}\n" + c[len(BUDGET) + 2:-1].replace("; ", chr(10))
+            return _finalised([f"intro {names}\n" + c[len(BUDGET) + 2:-1].replace("; ", chr(10))
                                for c in body])
     return _finalised(out)
 
