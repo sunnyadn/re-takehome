@@ -6,103 +6,28 @@ still the proof; a reply is read once, as a proof of whatever it names."""
 from __future__ import annotations
 
 import asyncio
-import json
-import os
-from pathlib import Path
 import re
-import subprocess
 import time
-from dataclasses import dataclass, field
 from typing import Any, Sequence
 
 from re_harness import AgentResult, LLMCallError, Problem, Services
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
-from submission.cells import (CELL_PROBE, Cells, dissolve, enclosing, marker, modular,
-                              remap, render_check, reopen_past_cell, reset_cell, strip_markers)
+from submission.cells import (CELL_PROBE, Cells, dissolve, enclosing, modular, remap, render_check, reopen_past_cell, reset_cell, strip_markers)
 from submission.conjecture import (families, fits, lemma_text, read_table, table_file,
                                    verified, verify_file)
 from submission.leaves import _hyps as leaf_hyps, _sum_variables, leaf_candidates
 from submission.sampling import read_sample_hit, sample_file, sampled_search
 from submission.techniques import (PREAMBLE_MARK, blank_techniques, strip_techniques,
                                    uses_techniques, without_techniques)
-from submission.agent import (
-    BUDGET_HEADROOM,
-    technique_card,
-    with_preamble,
-    FEEDBACK_CHARS,
-    Config,
-    Ledger,
-    in_file_coordinates,
-    answer_names,
-    declared_names,
-    format_messages,
-    grade,
-    normalise_imports,
-    scoring_faults,
-    split_files,
-    sweep_files,
-    usable_cocktail,
-)
-from submission.framework import (
-    DECLARATION,
-    DECL_HEAD,
-    as_goal,
-    axiom_probe,
-    classify,
-    declaration_name,
-    definition_slots,
-    fill_definition,
-    drop_lines,
-    goal_text,
-    graded_theorems,
-    hand_to_search,
-    in_span,
-    insert_above,
-    insert_preamble,
-    is_done,
-    line_of,
-    message_line,
-    message_text,
-    message_span,
-    normalise_steps,
-    open_names,
-    placeholders,
-    prefixes,
-    proof_body,
-    proof_span,
-    reindent,
-    render,
-    restate,
-    root_names,
-    split_cursor,
-    sweep_body,
-    unreachable,
-    reopen,
-)
-from submission.framework_agent import (
-    VACUOUS,
-    BUDGET_RETRY,
-    FILE_CHARS,
-    NARRATES,
-    ANSWER_TOKENS,
-    strip_fences,
-    GOAL_CHARS,
-    LOOSE_DRAIN_S,
-    MAX_PREFIXES,
-    RAISED_BUDGETS,
-    SLOW_COMPILE_MS,
-    STEP_TOKENS,
-    FRAMEWORK_SYSTEM,
-    Feedback,
-    FrameworkAgent,
-    State,
-    is_probe,
-    notes_for,
-    sheet_for,
-    screen_step,
-)
+from submission.agent import (BUDGET_HEADROOM, technique_card, with_preamble, FEEDBACK_CHARS, Ledger, in_file_coordinates, answer_names, declared_names, format_messages, grade, normalise_imports, scoring_faults, split_files, sweep_files, usable_cocktail)
+from submission.framework import (DECL_HEAD, axiom_probe, classify, definition_slots, fill_definition, drop_lines, graded_theorems, hand_to_search, in_span, insert_above, insert_preamble, is_done, line_of, message_line, message_span, placeholders, prefixes, proof_span, reindent, render, restate, root_names, split_cursor, unreachable)
+from submission.framework_agent import (VACUOUS, BUDGET_RETRY, FILE_CHARS, ANSWER_TOKENS, strip_fences, GOAL_CHARS, LOOSE_DRAIN_S, RAISED_BUDGETS, SLOW_COMPILE_MS, FRAMEWORK_SYSTEM, Feedback, FrameworkAgent, State, notes_for, sheet_for)
+from submission.board.types import (Board, Edit, Goal, HAVE_HEAD, Notes, all_cell_spans, author_free, binder_names, hyp_count, hypotheses, inherit, is_root_goal, narrates, owner, shift_message, signature, split_top, step_tokens, target_of)
+from submission.board.reply import (ascribe_literals, claim_of, dialect, interpret, mine_statements, salvage, set_elements, unwrap)
+from submission.board.text import (context_grows, drop_declaration, enclosing_chain, enclosing_have, inflated, is_stated, proved_facts, put, restates, settled_inside, shed_unreferenced, split_facts, split_statement, stated_facts, view, withdraw, withdraw_only)
+from submission.board.probes import (CHECK_TIMEOUT_CAP_S, CHECK_TIMEOUT_FLOOR_S, PROBE, UNKNOWN_NAME, WITNESS_BOUND, apply_file, audit_prompt, check_timeout_s, container_memory_bytes, counterexample_search, dump_check, existential, extract_file, fired_closer, goal_tokens, have_extract_file, is_closed, library_file, library_names, name_probe_file, read_board, read_library, read_name_probe, read_suggestions, read_witness, read_witnesses, render_all, searched_clean, statements, tagged_closers, witness_file, witness_search_file)
 
 # The cursor loop's prompt, less "give every have a body": on the board a
 # `have` may end in `sorry` and becomes a goal of its own.
@@ -161,15 +86,8 @@ TIMED_OUT = ("that step timed out: the file no longer checks in time. The tactic
              "simp with a wide lemma set); the step was removed. Use interval_cases "
              "on a bounded variable, or state the cases as a disjunction and prove "
              "each with norm_num")
-# A check is cut at a few times what the current file costs, never the harness's
-# 120s: the slow-step guard refuses anything adding SLOW_STEP_MS anyway, and a
-# timeout also forces a container restart (measured putnam_2018_a1: 36..82s each).
-CHECK_TIMEOUT_FLOOR_S = 30
-CHECK_TIMEOUT_CAP_S = 120
 
 
-def check_timeout_s(base_ms: int) -> int:
-    return min(CHECK_TIMEOUT_CAP_S, max(CHECK_TIMEOUT_FLOOR_S, (3 * base_ms + 20_000) // 1000))
 
 
 # The REPL keeps every command's state. Measured in the harness image: a real
@@ -190,18 +108,8 @@ def check_timeout_s(base_ms: int) -> int:
 RENEW_AT_BYTES = int(3.0 * 2 ** 30)
 RENEW_AFTER_CHECKS = 200
 MEMORY_SAMPLE_EVERY = 4
-UNITS = {"B": 1, "KiB": 2 ** 10, "MiB": 2 ** 20, "GiB": 2 ** 30, "KB": 10 ** 3, "MB": 10 ** 6, "GB": 10 ** 9}
 
 
-def container_memory_bytes(name: str) -> int | None:
-    """One `docker stats` reading for the container, None when unavailable."""
-    try:
-        out = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", name],
-                             capture_output=True, text=True, timeout=20).stdout
-    except (OSError, subprocess.SubprocessError):
-        return None
-    m = re.match(r"\s*([\d.]+)\s*([KMG]i?B|B)", out)
-    return int(float(m.group(1)) * UNITS[m.group(2)]) if m else None
 
 
 class RenewingLean:
@@ -286,182 +194,37 @@ LEAF_CAP_MS = 90_000
 BEAM = 2
 
 
-@dataclass(frozen=True)
-class Goal:
-    """One placeholder: where it is now, and what Lean says it is."""
-
-    line: int
-    indent: str
-    decl: str
-    text: str
-    stmt: str = field(default="", compare=False)   # what extract_goal printed here
-    cell: int = field(default=0, compare=False)    # the marked span it sits in
-
-    @property
-    def key(self) -> tuple[str, str]:
-        return self.decl, self.text
 
 
-@dataclass
-class Board:
-    """The file, every goal on it, and what the last check said."""
-
-    text: str
-    goals: list[Goal] = field(default_factory=list)
-    messages: list[dict[str, Any]] = field(default_factory=list)
-    accepted: bool = False
-    bid: int = 0
-    ms: int = 0
-
-    @property
-    def score(self) -> tuple[int, int]:
-        """Fewer open goals first; the tie goes to the older branch. (Proved
-        `have`s were tried as the first key: a filler `have : True` counts.)"""
-        return len(self.goals), self.bid
-
-    def find(self, key: tuple[str, str]) -> Goal | None:
-        return next((g for g in self.goals if g.key == key), None)
-
-    def index(self, goal: Goal) -> int:
-        """Where a goal sits among the placeholders, by content first: a goal
-        object from an earlier board keeps its old line number."""
-        keys = [g.key for g in self.goals]
-        if goal.key in keys:
-            return keys.index(goal.key)
-        return [g.line for g in self.goals].index(goal.line)
 
 
-# `skip` succeeds where no goal is left, so a placeholder under a step that
-# closed its goal was silent and took the enclosing block's goal for its own
-# (measured on rmo_2000_6: every step for `⊢ 10 ≤ n` went to a dead line 34
-# lines above it, nine times over). `focus` fails there: "no goals to be solved".
-PROBE = "focus skip"
 
 
-def dump_check(text: str, focus: Any, check: Any) -> None:
-    """Every rendered file and its verdict, when VM_DUMP_DIR is set (debugging)."""
-    where = os.environ.get("VM_DUMP_DIR")
-    if not where:
-        return
-    os.makedirs(where, exist_ok=True)
-    n = len(os.listdir(where)) // 2
-    Path(where, f"{n:04d}.lean").write_text(text)
-    Path(where, f"{n:04d}.json").write_text(json.dumps({
-        "focus": focus, "ms": check.duration_ms, "accepted": check.accepted,
-        "timed_out": check.timed_out,
-        "messages": [{"severity": m.get("severity"), "line": (m.get("pos") or {}).get("line"),
-                      "data": str(m.get("data"))[:400]} for m in check.messages]}, ensure_ascii=False, indent=1))
 
 
-LITERAL_MEMBER = re.compile(r"(\([^()]*\)|[A-Za-z_][\w']*) ∈ (\{[^{}|]*\})(?! :)")
 
 
-def ascribe_literals(stmt: str) -> str:
-    """A set literal after `∈` ascribed from the member's binder type: `(a, b) ∈
-    {…}` with `(a b : ℤ)` becomes `(a, b) ∈ ({…} : Set (ℤ × ℤ))`. Lean drops the
-    ascription when it prints a goal and cannot elaborate the literal without it."""
-
-    types: dict[str, str] = {}
-    for grp in re.findall(r"\(([^():]+) : ([^()]+(?:\([^()]*\)[^()]*)*)\)", stmt):
-        for n in grp[0].split():
-            types[n] = grp[1].strip()
-
-    def fix(m: re.Match[str]) -> str:
-        member, lit = m.group(1), m.group(2)
-        names = re.findall(r"[A-Za-z_][\w']*", member)
-        kinds = [types.get(n) for n in names]
-        if not names or any(k is None for k in kinds):
-            return m.group(0)
-        typ = kinds[0] if len(kinds) == 1 else "(" + " × ".join(kinds) + ")"
-        return f"{member} ∈ ({lit} : Set {typ})"
-    return LITERAL_MEMBER.sub(fix, stmt)
 
 
-def is_root_goal(text: str, goal: Goal) -> bool:
-    """The placeholder that is a proof's whole body: its cell is the proof."""
-
-    span = proof_span(text, goal.decl) if goal.decl else None
-    if not span:
-        return False
-    head = DECL_HEAD.match(text[span[0]:span[1]])
-    if not head:
-        return False
-    first = line_of(text, span[0]) + head.group(1).count("\n") + 1
-    return goal.line == first
 
 
-def shift_message(message: dict[str, Any], delta: int) -> dict[str, Any]:
-    out = dict(message)
-    for key in ("pos", "endPos"):
-        pos = out.get(key)
-        if isinstance(pos, dict) and isinstance(pos.get("line"), int):
-            out[key] = dict(pos, line=pos["line"] + delta)
-    return out
 
 
-def all_cell_spans(text: str):
-    from submission.cells import all_spans
-    return all_spans(text)
 
 
-def render_all(text: str) -> str:
-    """Every placeholder as the probe, so one check prints every goal and
-    names every placeholder with no goal behind it."""
-
-    out, shift = text, 0
-    for match in placeholders(text):
-        start, end = match.start() + shift, match.end() + shift
-        out = out[:start] + f"{match.group(1)}{PROBE}" + out[end:]
-        shift += len(PROBE) - (match.end() - match.start() - len(match.group(1)))
-    return out
 
 
-def owner(text: str, line: int) -> str:
-    """The proof declaration a line is inside, if any."""
-
-    for name in root_names(text):
-        span = proof_span(text, name)
-        if span and line_of(text, span[0]) <= line <= line_of(text, max(span[1] - 1, span[0])):
-            return name
-    return ""
 
 
-def read_board(text: str, messages: Sequence[dict[str, Any]], accepted: bool) -> Board:
-    """Each placeholder takes the tightest `unsolved goals` span holding it."""
-
-    spans = [(m, message_span(m)) for m in classify(messages)[0]]
-    stated = statements(messages)
-    goals = []
-    for match in placeholders(text):
-        line = line_of(text, match.start())
-        fits = [(s[1] - s[0], goal_text(m)) for m, s in spans if s and s[0] <= line <= s[1]]
-        held = enclosing(text, line)
-        shown = min(fits, key=lambda f: f[0])[1] if fits else ""
-        goals.append(Goal(line, match.group(1), owner(text, line), shown,
-                          name_premises(stated.get(line, ""), shown), held.id if held else 0))
-    return Board(text, goals, list(messages), accepted)
 
 
 META = re.compile(r"\?[\w.]+|^(?:Type|Sort)\b")
 
 
-HAVE_HEAD = re.compile(r"^(\s*)(have\b.*?)\s*:=\s*by\s*$")
-# A goal whose statement the model wrote, as opposed to one Lean derived from an
-# `intro` or `rcases`. Measured: auditing every new goal was 48% of the wall
-# clock under the lock, and every false statement caught was a `have`.
-STATED_HEAD = re.compile(r"^(\s*)((?:have|suffices|show|obtain)\b.*?)\s*:=\s*by\s*$")
 
 
-CLOSER_TAG = re.compile(r"^closer (\d+)$")
-DECL_NAME = re.compile(r"\s*(?:private\s+)?(?:theorem|lemma)\s+[\w'.]+")
-HAVE_NAME = re.compile(r"^\s*have\s+([A-Za-z_][\w'.]*)\s*(?::|:=)")
 
 
-# Tactics that evaluate a closed statement; none of them uses a hypothesis
-# from the context, so every hypothesis is proved at the values, not assumed.
-WITNESS_CLOSERS = ("norm_num", "decide", "simp",
-                   "norm_num [Finset.mem_insert, Finset.mem_singleton]",
-                   "simp; norm_num", "norm_num; decide")
 AUDIT_TOKENS = 2500
 # An auditor that has not answered by then lets the step through as unverified;
 # the call runs on and is drained before the agent returns (a reservation left
@@ -469,1089 +232,164 @@ AUDIT_TOKENS = 2500
 AUDIT_WAIT_S = 120.0
 AUDIT_SYSTEM = ("You audit one goal inside a Lean 4 proof. You answer with one "
                 "JSON object and nothing else.")
-# Lean states the goal itself: every hypothesis in scope as a binder, numerals
-# typed so the text elaborates again on its own.
-EXTRACT = "set_option pp.numericTypes true in extract_goal"
-EXTRACTED = re.compile(r"theorem\s+[\w'.]*extracted_\d+\s*(.*)", re.S)
-OPENERS, CLOSERS = "({[⦃", ")}]⦄"
-# Measured on the graded image: Lean's severity string is `info`.
-INFO = ("info", "information")
 
 
-def split_top(s: str, sep: str) -> tuple[str, str] | None:
-    """`s` split at the first `sep` outside every bracket; None without one."""
-    depth = 0
-    for i, ch in enumerate(s):
-        depth += (ch in OPENERS) - (ch in CLOSERS)
-        if depth == 0 and s.startswith(sep, i) and not s.startswith(":=", i):
-            return s[:i], s[i + len(sep):]
-    return None
 
 
-def narrates(model: str) -> bool:
-    return any(n in model for n in NARRATES)
 
 
-# Measured over 808 gpt-oss replies at 6000 tokens: p95 146–182 s and 2
-# ReadTimeouts at the harness's 180 s, each closing the problem's ledger. At the
-# slow rate seen 6000 tokens cannot finish inside 180 s; 4000 can. qwen: max 60 s.
-SLOW_STEP_TOKENS = 4000
 
 
-def step_tokens(model: str) -> int:
-    return STEP_TOKENS if narrates(model) else SLOW_STEP_TOKENS
 
 
-def extract_file(text: str, goals: Sequence[Goal]) -> str:
-    """The file with these goals' placeholders asking Lean to state them."""
-    lines = blank_techniques(render_all(text)).split("\n")
-    for g in goals:
-        lines[g.line - 1] = g.indent + EXTRACT
-    return "\n".join(lines)
 
 
-APPLY_PROBE = "set_option maxHeartbeats 40000 in apply?"
-TRY_THIS = re.compile(r"Try this:\s*(?:\[apply\]\s*)?(exact|refine)\s+(.+)", re.S)
 
 
-def apply_file(text: str, goal: Goal) -> str:
-    """The file with this goal asking Mathlib what unifies with it."""
-    lines = blank_techniques(render_all(text)).split("\n")
-    lines[goal.line - 1] = goal.indent + APPLY_PROBE
-    return "\n".join(lines)
 
 
-def read_suggestions(messages: Sequence[dict[str, Any]], line: int) -> list[tuple[str, str]]:
-    """`apply?`'s answers at this line: (exact|refine, term), Lean's order."""
-    out = []
-    for m in messages:
-        if m.get("severity") not in INFO or message_line(m) != line:
-            continue
-        for found in TRY_THIS.finditer(message_text(m)):
-            term = " ".join(found.group(2).split())
-            if (found.group(1), term) not in out:
-                out.append((found.group(1), term))
-    return out
 
 
-def have_extract_file(lines: Sequence[str], at: Sequence[int]) -> tuple[str, dict[int, int]]:
-    """The file with these `have`s' bodies replaced by a request to state the
-    claim; the map from each have's line index to the line Lean answers on."""
-    out, where, shift, i = [], {}, 0, 0
-    marks = set(at)
-    text_lines = render_all("\n".join(lines)).split("\n")
-    while i < len(text_lines):
-        ln = text_lines[i]
-        out.append(ln)
-        head = HAVE_HEAD.match(ln) if i in marks else None
-        if not head:
-            i += 1
-            continue
-        depth = len(head.group(1))
-        j = i + 1
-        while j < len(text_lines) and (not text_lines[j].strip()
-                                       or len(text_lines[j]) - len(text_lines[j].lstrip()) > depth):
-            j += 1
-        out.append(" " * (depth + 2) + EXTRACT)
-        where[i] = len(out)
-        i = j
-    return "\n".join(out), where
 
 
-def statements(messages: Sequence[Any]) -> dict[int, str]:
-    """Line -> the statement `extract_goal` printed there, binders and target."""
-    out: dict[int, str] = {}
-    for m in messages:
-        if not isinstance(m, dict) or m.get("severity") not in INFO:
-            continue
-        found, line = EXTRACTED.search(message_text(m)), message_line(m)
-        if found and line is not None:
-            body = found.group(1)
-            out[line] = " ".join(body.rsplit(":=", 1)[0].split())
-    return out
 
 
-NUMERAL_TYPE = re.compile(r"\((\d+) : ℕ\)")
 
 
-def name_premises(stmt: str, goal_text: str) -> str:
-    """An inaccessible hypothesis (`a✝`) comes back from `extract_goal` as an arrow
-    premise. Named as a binder, the link passes it (`‹_›`) and a block sees the goal
-    it was written for (measured on rmo_2000_6: 10 link failures in two runs)."""
-    parsed = split_statement(stmt) if stmt else None
-    if not parsed or "⊢" not in goal_text:
-        return stmt
-    groups, target = parsed
-    shown = " ".join(goal_text.rsplit("⊢", 1)[-1].split())
-
-    def same(a: str, b: str) -> bool:
-        return NUMERAL_TYPE.sub(r"\1", a).strip() == NUMERAL_TYPE.sub(r"\1", b).strip()
-
-    premises: list[str] = []
-    rest = target
-    while not same(rest, shown):
-        cut = split_top(rest, " → ")
-        if cut is None:
-            return stmt
-        premises.append(cut[0].strip())
-        rest = cut[1].strip()
-    if not premises:
-        return stmt
-    named = [f"(vm_p{i + 1} : {prem})" for i, prem in enumerate(premises)]
-    return " ".join(groups + named) + f" : {rest}"
 
 
-def split_statement(stmt: str) -> tuple[list[str], str] | None:
-    """Binder groups and target of a stated goal; None if it reads unusually."""
-    groups, depth, buf = [], 0, ""
-    for i, ch in enumerate(stmt):
-        if depth == 0 and ch == ":":
-            return groups, stmt[i + 1:].strip()
-        if depth == 0 and not ch.isspace() and ch not in OPENERS:
-            return None
-        depth += (ch in OPENERS) - (ch in CLOSERS)
-        buf += ch
-        if depth == 0 and ch in CLOSERS:
-            groups.append(buf.strip())
-            buf = ""
-    return None
 
 
-def claim_of(have_statement: str) -> str:
-    """The proposition in `have h : P`; "" when there is no top-level colon."""
-    parts = split_top(have_statement, ":")
-    return parts[1].strip() if parts and parts[0].startswith("have") else ""
 
 
-def binder_names(group: str) -> list[str]:
-    parts = split_top(group[1:-1], ":")
-    return parts[0].split() if parts else []
 
 
-UNKNOWN_NAME = re.compile(r"(?:[Uu]nknown (?:constant|identifier)|environment does not contain) `([^`]+)`")
-# Lean lists, for each misspelt library name, the declarations whose last
-# component shares its tokens, with their types. One CommandElabM pass over
-# the environment; nothing is assumed about which names exist.
-NAME_PROBE = """open Lean Elab Command in
-#eval show CommandElabM Unit from do
-  let env ← getEnv
-  let wanted : List String := [{names}]
-  let names := env.constants.toList.filterMap fun (n, _) =>
-    if n.isInternal then none else some (n, n.toString)
-  for w in wanted do
-    let toks := (((w.splitOn ".").flatMap (·.splitOn "_")).filter (fun t => t.length > 1)).eraseDups
-    let tail := (w.splitOn ".").getLast!
-    let need := if toks.length ≤ 2 then toks.length else toks.length - 1
-    let mut hits : Array (Nat × Nat × Name) := #[]
-    for (n, s) in names do
-      let hit := toks.foldl (fun acc t => if (s.splitOn t).length > 1 then acc + 1 else acc) 0
-      if hit ≥ need then
-        let bonus := if (s.splitOn tail).length > 1 then 2 else 0
-        hits := hits.push (hit + bonus, s.length, n)
-    let sorted := hits.qsort (fun a b => decide (a.1 > b.1) || (a.1 == b.1 && decide (a.2.1 < b.2.1)))
-    let mut out := s!"{{w}} is not a name. Nearest that exist:"
-    for (_, _, n) in sorted.toList.take 5 do
-      if let some ci := env.find? n then
-        let ty ← liftTermElabM (Meta.ppExpr ci.type)
-        out := out ++ s!"\\n  {{n}} : {{ty}}"
-    logInfo out
-"""
 
 
-# The goal's own vocabulary, asked of the environment: every constant whose
-# name carries two or more of the goal's tokens, best first, with its type.
-# Measured in the image: 1 to 3 s a query; [Coprime, divisors, mul] returns
-# Nat.Coprime.divisors_mul first, [Nat, pow, mod, add] Nat.pow_mod and Nat.pow_add.
-LIBRARY_PROBE = """open Lean Elab Command in
-#eval show CommandElabM Unit from do
-  let env ← getEnv
-  let toks : List String := [{tokens}]
-  let skip := ["_proof_", "._", "match_", "proof_", ".eq_", ".rec", ".casesOn", ".noConfusion", ".sizeOf", ".injEq", ".inj", ".below", ".brecOn", ".binductionOn", "Decidable", ".mk", "inst", "Lex"]
-  let mut hits : Array (Nat × Nat × Name) := #[]
-  for (n, _) in env.constants.toList do
-    if n.isInternal then continue
-    let s := n.toString
-    if skip.any (fun k => (s.splitOn k).length > 1) then continue
-    let low := s.toLower
-    let hit := toks.foldl (fun acc t => if (low.splitOn t).length > 1 then acc + 1 else acc) 0
-    if hit ≥ 2 then hits := hits.push (hit, s.length, n)
-  let sorted := hits.qsort (fun a b => decide (a.1 > b.1) || (a.1 == b.1 && decide (a.2.1 < b.2.1)))
-  let mut out := "Library for this goal:"
-  for (_, _, n) in sorted.toList.take {limit} do
-    if let some ci := env.find? n then
-      let ty ← liftTermElabM (Meta.ppExpr ci.type)
-      let t := ((toString ty).replace "\\n" " ").take 160
-      out := out ++ s!"\\n  {{n}} : {{t}}"
-  logInfo out
-"""
-LIBRARY_LIMIT = 12
-# Notation to the word Mathlib spells it with in a name.
-NOTATION_TOKENS = (("∣", "dvd"), ("%", "mod"), ("^", "pow"), ("∑", "sum"), ("∏", "prod"),
-                   ("!", "factorial"), ("√", "sqrt"), ("⌊", "floor"), ("⌈", "ceil"), ("≡", "modeq"),
-                   ("ℕ", "nat"), ("ℤ", "int"), ("ℚ", "rat"), ("ℝ", "real"), ("≤", "le"), ("<", "lt"))
-IDENTIFIER = re.compile(r"\b(?:[A-Z][A-Za-z]+(?:\.[A-Za-z][A-Za-z0-9]*)*|[a-z][A-Za-z]*[A-Z][A-Za-z]*|[a-z]{4,})\b")
-NOT_TOKENS = {"type", "prop", "sort", "true", "false", "with", "have", "show", "this", "then", "else", "card"}
-# Too common to rank a name on their own; they go last and only fill the list.
-WEAK_TOKENS = {"le", "lt", "nat", "int", "rat", "real"}
 
 
-def goal_tokens(goal_text: str) -> list[str]:
-    """The words of the goal a library name could carry: each identifier's
-    components, then the notation's names, the type's name last; at most 6."""
-    target = goal_text.split("⊢", 1)[1] if "⊢" in goal_text else goal_text
-    hyps = "\n".join(v for v in hypotheses(goal_text).values())
-    words: list[str] = []
-    late: list[str] = []
-    for text in (target, hyps):
-        for m in IDENTIFIER.findall(text):
-            for part in m.split("."):
-                low = part.lower()
-                if len(low) > 2 and low not in NOT_TOKENS and low not in words:
-                    words.append(low)
-        for sym, word in NOTATION_TOKENS:
-            if sym in text and word not in words and word not in late:
-                (late if word in WEAK_TOKENS else words).append(word)
-    return (words + late)[:6]
 
 
-def library_file(prefix: str, tokens: Sequence[str]) -> str:
-    quoted = ", ".join('"' + t.replace('"', "") + '"' for t in tokens)
-    return prefix.rstrip("\n") + "\n\n" + LIBRARY_PROBE.format(tokens=quoted, limit=LIBRARY_LIMIT)
 
 
-def read_library(messages: Sequence[dict[str, Any]]) -> str:
-    for m in messages:
-        data = str(m.get("data", ""))
-        if m.get("severity") in INFO and data.startswith("Library for this goal:"):
-            lines = [l for l in data.split("\n")[1:] if l.strip()]
-            return "\n".join(l.strip()[:200] for l in lines)
-    return ""
 
 
-def library_names(messages: Sequence[dict[str, Any]], goal_text: str) -> list[str]:
-    """Unknown names in Lean's messages that look like library declarations:
-    dotted or underscored, and not a variable or hypothesis of the goal."""
-    local = set(hypotheses(goal_text))
-    out: list[str] = []
-    for m in messages:
-        for name in UNKNOWN_NAME.findall(str(m.get("data", ""))):
-            head = name.split(".")[0]
-            if ("." in name or "_" in name) and head not in local and not name.startswith("h") \
-                    and name not in out:
-                out.append(name)
-    return out[:3]
 
 
-def name_probe_file(prefix: str, names: Sequence[str]) -> str:
-    quoted = ", ".join('"' + n.replace('"', "") + '"' for n in names)
-    return prefix.rstrip("\n") + "\n\n" + NAME_PROBE.format(names=quoted)
 
 
-def read_name_probe(messages: Sequence[dict[str, Any]]) -> str:
-    """Each name's answer, one candidate per line, types cut so a long instance
-    chain does not crowd the feedback."""
-    parts = []
-    for m in messages:
-        data = str(m.get("data", ""))
-        if m.get("severity") in INFO and "Nearest that exist" in data:
-            lines = [l for l in data.split("\n") if l.strip()]
-            parts.append("\n".join(l[:200] for l in lines))
-    return "\n\n".join(parts)
 
 
-def witness_file(prefix: str, groups: Sequence[str], values: dict[str, str],
-                 target: str) -> str:
-    """One `example`: the binders the auditor assigned stay binders, pinned to
-    the values; every other binder is a hypothesis to prove there, and the
-    target must fail. Only evaluation closes it, so a pass is a refutation."""
-    keep, hyps = [], []
-    for g in groups:
-        names = binder_names(g)
-        if names and all(n in values for n in names):
-            keep.append("(" + g[1:-1] + ")")
-        else:
-            parts = split_top(g[1:-1], ":")
-            hyps.append((parts[1] if parts else g[1:-1]).strip())
-    fixed = " ".join(f"(w_{n} : {n} = ({v}))" for n, v in values.items())
-    body = " ∧ ".join([f"({h})" for h in hyps] + [f"¬ ({target})"])
-    binders = " ".join([*keep, fixed]).strip()
-    return (prefix.rstrip() + f"\n\nexample {binders} : {body} := by\n  subst_vars\n  first\n"
-            + "".join(f"  | ({t}; done)\n" for t in WITNESS_CLOSERS))
 
 
-def audit_prompt(stmt: str, definitions: str) -> str:
-    parts = ["A goal inside a Lean 4 proof, exactly as Lean states it: every "
-             f"hypothesis in scope is a binder, the target follows the last colon.\n{stmt}"]
-    if definitions.strip():
-        parts.append(f"Definitions in scope:\n{definitions.strip()[:1500]}")
-    parts.append(
-        "Is the target a consequence of the hypotheses? If not, give one "
-        "counterexample: a Lean term for every variable binder (leave the "
-        'hypothesis binders out), as {"counterexample": {"x": "..."}}. Use small '
-        "concrete values and check every hypothesis by hand before answering. "
-        'If the target does follow, answer {"holds": true}.')
-    return "\n\n".join(parts)
 
 
-def read_witness(reply: str) -> dict[str, str] | None:
-    """The values a reply names, or None (holds / unreadable)."""
-    found = re.search(r"\{.*\}", reply, re.S)
-    try:
-        given = json.loads(found.group(0)).get("counterexample") if found else None
-    except (ValueError, AttributeError):
-        return None
-    if not isinstance(given, dict) or not given:
-        return None
-    return {str(n): str(v).strip() for n, v in given.items()}
 
 
-def tagged_closers(cocktail: Sequence[str]) -> str:
-    """The cocktail as one `first`, each alternative announcing itself, so the
-    check that closes the goal also says which closer did it."""
-    return "first\n" + "\n".join(f'| (trace "closer {i}"; {t}; done)'
-                                  for i, t in enumerate(cocktail))
 
 
-def fired_closer(messages: Sequence[Any], span: tuple[int, int],
-                 cocktail: Sequence[str]) -> str | None:
-    """The alternative that closed the goal: the last tag reported inside the
-    block, whether or not Lean kept the tags of the alternatives that failed."""
-    hits = []
-    for m in messages:
-        if not isinstance(m, dict) or m.get("severity") not in INFO:
-            continue
-        tag = CLOSER_TAG.match(str(m.get("data", "")).strip())
-        line = message_line(m)
-        if tag and line is not None and span[0] <= line <= span[1]:
-            hits.append((line, int(tag.group(1))))
-    return cocktail[max(hits)[1]] if hits else None
 
 
-def enclosing_have(lines: Sequence[str], goal: Goal) -> tuple[int | None, re.Match | None]:
-    """The nearest shallower line above the goal, and its `have ... := by` head."""
-    i = goal.line - 1
-    above = next((j for j in range(i - 1, -1, -1) if lines[j].strip()
-                  and len(lines[j]) - len(lines[j].lstrip()) < len(goal.indent)), None)
-    return above, (HAVE_HEAD.match(lines[above]) if above is not None else None)
 
 
-SET_LITERAL = re.compile(r"^\(?\s*\{(.*)\}\s*(?::.*?)?\)?\s*$", re.S)
 TUPLE_IN = re.compile(r"[⟨(]\s*([A-Za-z_][\w']*(?:\s*,\s*[A-Za-z_][\w']*)+)\s*[⟩)]\s*∈")
 
 
-def set_elements(term: str) -> list[list[str]] | None:
-    """The tuples of an explicit finite set literal, or None for any other term."""
-    found = SET_LITERAL.match(term.strip())
-    if not found or "|" in found.group(1):
-        return None
-    items, depth, buf = [], 0, ""
-    for ch in found.group(1):
-        if ch == "," and depth == 0:
-            items.append(buf.strip()); buf = ""
-            continue
-        depth += (ch in OPENERS) - (ch in CLOSERS)
-        buf += ch
-    if buf.strip():
-        items.append(buf.strip())
-    out = []
-    for it in items:
-        inner = it.strip()
-        if inner[:1] in "(⟨" and inner[-1:] in ")⟩":
-            inner = inner[1:-1]
-        parts, depth, buf = [], 0, ""
-        for ch in inner:
-            if ch == "," and depth == 0:
-                parts.append(buf.strip()); buf = ""
-                continue
-            depth += (ch in OPENERS) - (ch in CLOSERS)
-            buf += ch
-        parts.append(buf.strip())
-        out.append(parts)
-    return out
 
 
-def signature(text: str, decl: str) -> str:
-    """A declaration's statement with its name and whitespace taken out."""
-    span = proof_span(text, decl)
-    head = DECL_HEAD.match(text[span[0]:span[1]]) if span else None
-    if not head:
-        return decl
-    stmt = DECL_NAME.sub("", head.group(1), count=1) if DECL_NAME.match(head.group(1)) else head.group(1)
-    return " ".join(stmt.rsplit(":=", 1)[0].split())
 
 
-def drop_declaration(text: str, decl: str) -> str:
-    """The file without one declaration (its head, its proof, its doc comment)."""
-    span = proof_span(text, decl)
-    if not span:
-        return text
-    start = text.rfind("\n\n", 0, span[0])
-    start = 0 if start < 0 else start + 2
-    return text[:start] + text[span[1]:]
 
 
-def shed_unreferenced(text: str, graded: Sequence[str]) -> tuple[str, list[str]]:
-    """The file without the open declarations nothing else uses: a helper a
-    model proposed and never called must not hold a finished proof back.
-    Measured on p09 (v7.95): both graded theorems closed, a shared lemma with
-    a sorry stayed, and the run worked it for 10 more minutes."""
-    shed: list[str] = []
-    while True:
-        open_decls = {owner(text, line_of(text, m.start())) for m in placeholders(text)}
-        for decl in root_names(text):
-            span = proof_span(text, decl)
-            if decl in graded or decl not in open_decls or not span:
-                continue
-            head = text.rfind("\n\n", 0, span[0])
-            rest = strip_techniques(text[:max(head, 0)] + text[span[1]:])
-            if re.search(rf"\b{re.escape(decl)}\b", rest):
-                continue
-            text = drop_declaration(text, decl)
-            shed.append(decl)
-            break
-        else:
-            return text, shed
 
 
-def is_stated(lines: Sequence[str], goal: Goal) -> bool:
-    """Whether the goal is the body of a statement the model wrote."""
-    i = goal.line - 1
-    above = next((j for j in range(i - 1, -1, -1) if lines[j].strip()
-                  and len(lines[j]) - len(lines[j].lstrip()) < len(goal.indent)), None)
-    if above is None:
-        return False
-    if STATED_HEAD.match(lines[above]):
-        return True
-    # A declaration's own root goal (the placeholder right under its head) is a
-    # statement the model wrote when the declaration was hoisted; a goal deeper
-    # in a graded theorem's body is not.
-    return DECLARATION.match(lines[above]) is not None and above == i - 1
 
 
-def enclosing_chain(lines: Sequence[str], goal: Goal) -> list[tuple[int, re.Match]]:
-    """Every `have ... := by` the goal sits inside, nearest first."""
-    chain, probe = [], goal
-    while True:
-        above, head = enclosing_have(lines, probe)
-        if not head:
-            return chain
-        chain.append((above, head))
-        probe = Goal(above + 1, head.group(1), goal.decl, goal.text)
 
 
-INTRO_LIKE = re.compile(r"^\s*(intro|intros|rintro|obtain|rcases|cases'?|induction'?|by_contra'?|"
-                        r"by_cases|interval_cases|fin_cases|match|choose|generalize|set)\b")
 
 
-def context_grows(lines: Sequence[str], chain: Sequence[tuple[int, re.Match]], depth: int,
-                  goal: Goal) -> bool:
-    """Whether a line in the bodies the goal sits in, above it and inside the
-    `have` at `chain[depth - 1]`, adds hypotheses. A fact posted below such a
-    line may be true only under them, and Lean cannot say so once it is moved
-    above the `have`: measured on rmo_2000_2, `y^3 < (x+2)^3` was posted under
-    `intro hxle : x ≤ 8`, lifted above `h1`, then refuted at (9, 11) and the
-    right route withdrawn with it."""
-    for i in range(depth - 1, -1, -1):
-        outer, _ = chain[i]
-        inner_line, inner_indent = ((chain[i - 1][0], len(chain[i - 1][1].group(1))) if i > 0
-                                    else (goal.line - 1, len(goal.indent)))
-        for l in lines[outer + 1:inner_line]:
-            if l.strip() and len(l) - len(l.lstrip()) == inner_indent and INTRO_LIKE.match(l):
-                return True
-    return False
 
 
-def split_facts(block: str) -> tuple[list[str], str]:
-    """The `have ... := by sorry` statements at the top level of a block, and
-    the block without them. A statement below an `intro`-like line of the
-    block stays in the block: it may hold only under what that line named."""
-    lines = normalise_steps(block).split("\n")
-    body = [l for l in lines if l.strip()]
-    base = min((len(l) - len(l.lstrip()) for l in body), default=0)
-    facts, rest, i, grown = [], [], 0, False
-    while i < len(lines):
-        line = lines[i]
-        head = HAVE_HEAD.match(line)
-        nxt = lines[i + 1] if i + 1 < len(lines) else ""
-        grown = grown or (len(line) - len(line.lstrip()) == base and bool(INTRO_LIKE.match(line)))
-        if head and not grown and len(head.group(1)) == base and nxt.strip() == "sorry" \
-                and len(nxt) - len(nxt.lstrip()) > base:
-            facts.append(f"{line.strip()}\n  sorry")
-            i += 2
-            continue
-        rest.append(line)
-        i += 1
-    return facts, "\n".join(rest).strip("\n")
 
 
-MINE_CAP = 6
-HAVE_ANY = re.compile(r"^\s*(have\b.*?)\s*:=")
 
 
-def mine_statements(block: str, known: dict[str, str], withdrawn: Sequence[str]) -> list[str]:
-    """The `have name : P` heads of a rejected block, in order, as facts to
-    post with `sorry`: a reply is read for what it states, not only run as a
-    script that stops at its first error. Measured on putnam_2018_a1 (v7.74):
-    30 replies called the divisor technique and none reached Lean, every call
-    sitting below the first error of a long reply. Statements below an intro-
-    like line, already on the board, withdrawn, or reusing a name are left out."""
-    out, seen, grown = [], set(known.values()), False
-    base = min((len(l) - len(l.lstrip()) for l in normalise_steps(block).split("\n") if l.strip()),
-               default=0)
-    for line in normalise_steps(block).split("\n"):
-        if not line.strip() or len(line) - len(line.lstrip()) != base:
-            continue
-        if INTRO_LIKE.match(line):
-            grown = True
-        head = HAVE_ANY.match(line)
-        name = HAVE_NAME.match(line)
-        if grown or not head or not name:
-            continue
-        claim = " ".join(claim_of(head.group(1)).split())
-        if not claim or claim in known or claim in withdrawn or name.group(1) in seen:
-            continue
-        seen.add(name.group(1))
-        out.append(f"{head.group(1)} := by")
-        if len(out) >= MINE_CAP:
-            break
-    return out
 
 
-def restates(block: str, claims: Sequence[str]) -> bool:
-    """Whether a block posts, at its own top level, a `have` whose claim is one
-    of these. A repeat inside a new claim's body is an alias, not a post."""
-    gone = {" ".join(c.split()) for c in claims}
-    lines = [l for l in block.split("\n") if l.strip()]
-    top = min((len(l) - len(l.lstrip()) for l in lines), default=0)
-    for line in lines:
-        if len(line) - len(line.lstrip()) != top:
-            continue
-        head = HAVE_HEAD.match(line) or re.match(r"^(\s*)(have\b.*?)\s*:=", line)
-        if head and " ".join(claim_of(head.group(2).strip()).split()) in gone:
-            return True
-    return False
 
 
-def proved_facts(text: str, goal: Goal) -> dict[str, str]:
-    """Claim -> name for every proved `have` (no placeholder in its block) that
-    is in scope at the goal: above it, and its block not yet closed."""
-    lines = text.split("\n")
-    out: dict[str, str] = {}
-    for i in range(goal.line - 1):
-        head = HAVE_HEAD.match(lines[i])
-        name = HAVE_NAME.match(lines[i]) if head else None
-        if not (head and name) or len(head.group(1)) > len(goal.indent):
-            continue
-        depth = len(head.group(1))
-        j = i + 1
-        while j < len(lines) and (not lines[j].strip()
-                                  or len(lines[j]) - len(lines[j].lstrip()) > depth):
-            j += 1
-        between = [l for l in lines[j:goal.line - 1] if l.strip()]
-        if any(len(l) - len(l.lstrip()) < depth for l in between):
-            continue
-        if not any(l.strip() == "sorry" for l in lines[i + 1:j]):
-            out[" ".join(claim_of(head.group(2).strip()).split())] = name.group(1)
-    return out
 
 
-def stated_facts(text: str, decl: str) -> dict[str, str]:
-    """Claim -> name for every `have` already inside a declaration's proof."""
-    span = proof_span(text, decl)
-    out: dict[str, str] = {}
-    for line in (text[span[0]:span[1]] if span else "").split("\n"):
-        head = HAVE_HEAD.match(line)
-        name = HAVE_NAME.match(line) if head else None
-        if head and name:
-            out[" ".join(claim_of(head.group(2).strip()).split())] = name.group(1)
-    return out
 
 
-def withdraw(text: str, goal: Goal) -> tuple[str, str]:
-    """The file with the `have` enclosing this goal, and the rest of its block,
-    cut back to one `sorry`; the withdrawn statement second. ("", "") when the
-    nearest shallower line above the goal is not a `have ... := by`."""
-    lines = text.split("\n")
-    i = goal.line - 1
-    above, head = enclosing_have(lines, goal)
-    if not head:
-        return "", ""
-    indent = head.group(1)
-    end = i + 1
-    while end < len(lines) and (not lines[end].strip()
-                                or len(lines[end]) - len(lines[end].lstrip()) >= len(indent)):
-        end += 1
-    while end - 1 > i and not lines[end - 1].strip():
-        end -= 1
-    return "\n".join(lines[:above] + [indent + "sorry"] + lines[end:]), head.group(2).strip()
 
 
-def withdraw_only(text: str, goal: Goal) -> tuple[str, str]:
-    """Like `withdraw`, but only the `have` and its own body go; what follows
-    in the block stays. The block keeps a `sorry` if nothing else is left."""
-    lines = text.split("\n")
-    above, head = enclosing_have(lines, goal)
-    if not head:
-        return "", ""
-    indent = head.group(1)
-    end = above + 1
-    while end < len(lines) and (not lines[end].strip()
-                                or len(lines[end]) - len(lines[end].lstrip()) > len(indent)):
-        end += 1
-    rest = lines[end:]
-    keeps = rest and rest[0].strip() and len(rest[0]) - len(rest[0].lstrip()) == len(indent)
-    middle = [] if keeps else [indent + "sorry"]
-    return "\n".join(lines[:above] + middle + rest), head.group(2).strip()
 
 
-def settled_inside(text: str, goal: Goal) -> int:
-    """Proved facts around the goal: `have`s with no placeholder left inside the
-    nearest enclosing `have` (walking out through `case` and bullet lines), or
-    inside the declaration when no `have` encloses it. What a withdrawal or a
-    restart would throw away."""
-    lines = text.split("\n")
-    i, depth = goal.line - 1, len(goal.indent)
-    start, top = None, 0
-    while i > 0:
-        i -= 1
-        line = lines[i]
-        if not line.strip():
-            continue
-        d = len(line) - len(line.lstrip())
-        if d >= depth:
-            continue
-        depth = d
-        if HAVE_HEAD.match(line) or DECL_HEAD.match(line) or d == 0:
-            start, top = i, d
-            break
-    if start is None:
-        return 0
-    end = start + 1
-    while end < len(lines) and (not lines[end].strip()
-                                or len(lines[end]) - len(lines[end].lstrip()) > top):
-        end += 1
-    count = 0
-    for k in range(start + 1, end):
-        m = HAVE_HEAD.match(lines[k])
-        if not m or k + 1 == goal.line:
-            continue
-        j, d = k + 1, len(m.group(1))
-        body = []
-        while j < end and (not lines[j].strip() or len(lines[j]) - len(lines[j].lstrip()) > d):
-            body.append(lines[j]); j += 1
-        if body and not any(l.strip() in ("sorry", "skip") for l in body):
-            count += 1
-    return count
 
 
 INFLATION = 3.0
 
 
-def hypotheses(goal_text: str) -> dict[str, str]:
-    """Name -> printed type for each hypothesis line of a goal (first case only)."""
-    head = goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
-    out: dict[str, str] = {}
-    for line in head.split("\n"):
-        if line[:1].isspace() or line.startswith("case ") or " : " not in line:
-            continue
-        names, typ = line.split(" : ", 1)
-        for n in names.split():
-            out[n] = typ.strip()
-    return out
-
-
-def groups(text: str) -> list[str]:
-    """Every balanced parenthesised expression in a text, nesting included."""
-    out, stack = [], []
-    for i, ch in enumerate(text):
-        if ch == "(":
-            stack.append(i)
-        elif ch == ")" and stack:
-            out.append(text[stack.pop():i + 1])
-    return [g for g in out if len(g) >= 8]
-
-
-def inflated(before: str, after: str) -> float:
-    """How much larger the hypotheses both goals share became, when the growth
-    is one new bracketed expression repeated 3 times or more: a rewrite that
-    unfolds a variable everywhere. Unfolding a set literal is not repetition."""
-    old, new = hypotheses(before), hypotheses(after)
-    shared = [n for n in old if n in new]
-    was = sum(len(old[n]) for n in shared)
-    now_text = "\n".join(new[n] for n in shared)
-    old_text = "\n".join(old[n] for n in shared)
-    if was < 40:
-        return 1.0
-    fresh = [g for g in set(groups(now_text)) if g not in old_text]
-    if not any(now_text.count(g) >= 3 for g in fresh):
-        return 1.0
-    return len(now_text) / was
-
-
-@dataclass
-class GoalRecord:
-    """What the ladder remembers about one goal.
-
-    One record per goal in place of a container per thing remembered, so that
-    `has this goal been through the leaf sweep` is a field and not a question
-    about which of fifteen tables to look in."""
-
-    tries: int = 0
-    said: Feedback | None = None
-    plan: str | None = None
-    known_stmt: str = ""
-    claimed_by: str | None = None
-    recalled: bool = False
-    swept: bool = False
-    searched: bool = False
-    divided: bool = False
-    unsplittable: bool = False
-    leaf_restarted: bool = False
-    shelved: str = ""
-    hint: str = ""
-    # Measured on putnam_2020_a2: one model sent the same rejected step to the
-    # same goal 274 times in 23 min. A goal a model repeats itself on goes to
-    # the end of that model's line, so the other model sees it first.
-    repeated: set[str] = field(default_factory=set)
-    refused: set[str] = field(default_factory=set)
-
-    def forget(self) -> None:
-        """The attempt history a restart rolls back, and only that: what was
-        tried, what Lean said, the plan. What the harness learned about the
-        goal's shape survives, because the shape did not change."""
-        self.tries, self.said, self.plan = 0, None, None
-
-
-class Notes(dict):
-    """Goal key to record, making one on first mention."""
-
-    def __missing__(self, key: tuple[str, str]) -> GoalRecord:
-        self[key] = GoalRecord()
-        return self[key]
-
-    def busy(self) -> bool:
-        """Whether any worker is mid-step on any goal."""
-        return any(r.claimed_by for r in self.values())
-
-    def claim(self, key: tuple[str, str], model: str) -> None:
-        if self[key].claimed_by is None:
-            self[key].claimed_by = model
-
-    def forget(self, key: tuple[str, str]) -> None:
-        self[key].forget()
-
-    def forget_decl(self, decl: str) -> None:
-        for key, record in self.items():
-            if key[0] == decl:
-                record.forget()
-
-    def forget_repeats(self) -> None:
-        for record in self.values():
-            record.repeated.clear()
-
-
-def author_free(record: GoalRecord, model: str) -> bool:
-    """Whether this model has not already repeated itself on this goal."""
-    return model not in record.repeated
-
-
-def inherit(old: Sequence[Goal], new: Sequence[Goal], notes: Notes) -> None:
-    """A goal whose key vanished because a fact was added above it keeps its
-    history: the one new goal of the same declaration and target whose
-    hypotheses contain the old ones takes over what was tried, what Lean said,
-    and the plan. The rest is about the old key and stays there."""
-    kept = {g.key for g in new}
-    fresh = [g for g in new if g.key not in {o.key for o in old}]
-    for g in old:
-        if g.key in kept:
-            continue
-        hyps, target = set(hypotheses(g.text)), target_of(g.text)
-        matches = [n for n in fresh if n.decl == g.decl and target_of(n.text) == target
-                   and hyps <= set(hypotheses(n.text))]
-        if len(matches) != 1:
-            continue
-        was, now = notes[g.key], notes[matches[0].key]
-        if was.tries and not now.tries:
-            now.tries = was.tries
-        if was.said is not None and now.said is None:
-            now.said = was.said
-        if was.plan is not None and now.plan is None:
-            now.plan = was.plan
-
-
-EXISTS = re.compile(r"^∃\s+(?:\(\s*)?([\w' ]+?)(?:\s*:\s*([^,)]+))?\)?\s*,\s*(.*)$", re.S)
-MEMBER = re.compile(r"^(\d+)\s*∈\s*\{\s*(\w+)\s*\|\s*(.*)\}$", re.S)
-
-
-def existential(goal_text: str) -> tuple[list[str], str] | None:
-    """`∃ a b, body` or `N ∈ {n | ∃ a b, body}` with ℕ binders and a body that
-    binds nothing more and names no hypothesis: what evaluation can search."""
-
-    target = target_of(goal_text)
-    m = MEMBER.match(target)
-    if m:
-        value, var, target = m.groups()
-        target = re.sub(rf"(?<![\w'.]){re.escape(var)}(?![\w'])", value, target.strip())
-    names: list[str] = []
-    while True:
-        m = EXISTS.match(target.strip())
-        if not m:
-            break
-        binders, typ, target = m.groups()
-        if typ and typ.strip() != "ℕ":
-            return None
-        names += binders.split()
-    if not names or len(names) > 3:
-        return None
-    if re.search(r"[∀∃λ→]|\bfun\b", target) or not target.strip():
-        return None
-    if any(re.search(rf"(?<![\w'.]){re.escape(n)}(?![\w'])", target) for n in hypotheses(goal_text)):
-        return None
-    return names, target.strip()
-
-
-WITNESS_BOUND = 40
-
-
-def witness_search_file(prefix: str, names: Sequence[str], body: str) -> str:
-    """A Lean `#eval` that walks the binders over 0..WITNESS_BOUND-1 and keeps the
-    first 3 tuples whose body decides true."""
-
-    loops = "".join(f"{'  ' * (i + 1)}for {n} in List.range {WITNESS_BOUND} do\n"
-                    for i, n in enumerate(names))
-    pad = "  " * (len(names) + 1)
-    tuple_ = ", ".join(names)
-    return (prefix.rstrip("\n") + "\n\n#eval Id.run do\n  let mut found : List (List Nat) := []\n"
-            + loops + f"{pad}if found.length < 3 ∧ decide ({body}) then\n"
-            + f"{pad}  found := found ++ [[{tuple_}]]\n  return found\n")
-
-
-def read_witnesses(messages: Sequence[dict[str, Any]]) -> list[list[str]]:
-    for m in messages:
-        data = str(m.get("data", "")).strip()
-        if m.get("severity") in INFO and data.startswith("[["):
-            return [[v.strip() for v in row.split(",")] for row in re.findall(r"\[([\d, ]+)\]", data)]
-    return []
-
-
-def searched_clean(messages: Sequence[dict[str, Any]]) -> bool:
-    """The walk ran to the end and printed no tuple: `[]`, as an info message."""
-    return any(m.get("severity") in INFO and str(m.get("data", "")).strip() == "[]"
-               for m in messages)
-
-
-PROP_SIGNS = re.compile(r"[=<≤>≥≠∣∧∨¬↔]|\bPrime\b|\bCoprime\b|\bEven\b|\bOdd\b")
-
-
-def counterexample_search(groups: Sequence[str], target: str) -> tuple[list[str], str] | None:
-    """The stated goal as a decidable search: every ℕ binder ranges, every
-    hypothesis binder filters, the target is negated. None if a binder is
-    neither (a real, a function, a quantified fact), which evaluation cannot walk."""
-    names, hyps = [], []
-    for g in groups:
-        parts = split_top(g[1:-1], ":")
-        if len(parts) != 2:
-            return None
-        typ = parts[1].strip()
-        if typ == "ℕ":
-            names += parts[0].split()
-        elif PROP_SIGNS.search(typ) and not re.search(r"[∀∃λ→]|\bfun\b", typ):
-            hyps.append(typ)
-        else:
-            return None
-    if not names or len(names) > 3 or re.search(r"[∀∃λ→]|\bfun\b", target):
-        return None
-    body = " ∧ ".join([f"({h})" for h in hyps] + [f"¬ ({target.strip()})"])
-    return names, body
-
-
-def is_closed(goal_text: str) -> bool:
-    """A goal whose target names none of its hypotheses and binds nothing: a
-    closed proposition, decided by evaluation alone. Measured on rmo_2000_6:
-    `use 2; use 5` left `⊢ 0 < 5 ∧ 2000 ∣ 8 * 5 ^ 4 ∧ 10 = 2 * 5` under proved
-    facts about numerals, and "no hypotheses at all" missed it."""
-    target = target_of(goal_text)
-    if not target or re.search(r"[∀∃λ]|\bfun\b", target) or not re.search(r"\d", target):
-        return False
-    return not any(re.search(rf"(?<![\w'.]){re.escape(n)}(?![\w'])", target)
-                   for n in hypotheses(goal_text))
-
-
-def target_of(goal_text: str) -> str:
-    return goal_text.rsplit("⊢", 1)[-1].strip() if "⊢" in goal_text else ""
-
-
-def hyp_count(goal_text: str) -> int:
-    """Hypothesis lines: those before `⊢` that carry a `:`, `case` lines aside."""
-
-    head = goal_text.rsplit("⊢", 1)[0] if "⊢" in goal_text else goal_text
-    return sum(1 for l in head.split("\n") if ":" in l and not l.startswith("case "))
-
-
-def salvage(reply: str) -> str:
-    """A reply cut mid-statement, less the statement it was cut in. Measured on
-    rmo_2001_2: 37 of 70 step replies from one model ended at the token cap."""
-
-    text = reply + ("\n```" if reply.count("```") % 2 else "")
-    cuts = prefixes(screen_step(text, allow_sorry=True))
-    return cuts[0] if cuts else ""
-
-
-HAVE_OPEN = re.compile(r"^(\s*)(have|suffices|show|obtain)\b")
-
-
-def fold_heads(block: str) -> str:
-    """A statement split over several lines, joined onto its first line, so
-    that every reader of the board (audit, lift, withdraw, restate) sees it.
-    Lean does not mind the line length."""
-    lines, out, i = block.split("\n"), [], 0
-    while i < len(lines):
-        line = lines[i]
-        head = HAVE_OPEN.match(line)
-        if head and ":=" not in line:
-            depth, j, joined = len(head.group(1)), i + 1, line.rstrip()
-            while j < len(lines) and lines[j].strip() and \
-                    len(lines[j]) - len(lines[j].lstrip()) > depth:
-                joined += " " + lines[j].strip()
-                if ":=" in lines[j]:
-                    j += 1
-                    break
-                j += 1
-            if ":=" in joined:
-                out.append(joined)
-                i = j
-                continue
-        out.append(line)
-        i += 1
-    return "\n".join(out)
-
-
-BIG_OPERATOR_IN = re.compile(r"([∑∏]\s*(?:\([^()]*\)|[^\s,()]+))\s+in\s+")
-
-
-OPENERS, CLOSERS = "([{⟨", ")]}⟩"
-
-
-def dialect(block: str) -> str:
-    """Spellings the models learned that Lean 4 Mathlib does not read: `∑ x in
-    s` is `∑ x ∈ s`, and a tactic line does not end in a comma. Lexical only;
-    a comma inside an open bracket or continuing a list on the next line stays."""
-    lines = BIG_OPERATOR_IN.sub(r"\1 ∈ ", block).split("\n")
-    for i, line in enumerate(lines):
-        body = line.rstrip()
-        if not body.endswith(",") or "--" in body:
-            continue
-        balanced = sum(body.count(c) for c in OPENERS) == sum(body.count(c) for c in CLOSERS)
-        nxt = lines[i + 1] if i + 1 < len(lines) else ""
-        continues = nxt.strip() and len(nxt) - len(nxt.lstrip()) > len(line) - len(line.lstrip())
-        if balanced and not continues:
-            lines[i] = body[:-1]
-    return "\n".join(lines)
-
-
-CASE_LINE = re.compile(r"^(\s*)case\s+([\w.]+)\s*=>\s*$")
-
-
-def unwrap(block: str, text: str, goal: Goal) -> str:
-    """A reply that opens by rewriting the context the goal sits in (its `case`
-    tag, the `have` it is the body of) loses that opening; the body is the step."""
-    lines = text.split("\n")
-    above = [l for l in lines[:goal.line - 1] if l.strip()
-             and len(l) - len(l.lstrip()) < len(goal.indent)]
-    context = {" ".join(l.split()) for l in above}
-    out = block.split("\n")
-    while out and out[0].strip():
-        first = " ".join(out[0].split())
-        head = CASE_LINE.match(out[0]) or HAVE_HEAD.match(out[0])
-        if not head or first not in context:
-            break
-        depth = len(out[0]) - len(out[0].lstrip())
-        rest = out[1:]
-        inner = min((len(l) - len(l.lstrip()) for l in rest if l.strip()), default=depth)
-        if inner <= depth:
-            break
-        out = [l[inner - depth:] if l.strip() else l for l in rest]
-    return "\n".join(out)
-
-
-def put(text: str, goal: Goal, block: str, trailing: bool = True,
-        cell_id: int | None = None) -> tuple[str, tuple[int, int]]:
-    """The block where the goal's placeholder is (under a cell marker when it
-    gets one), and the lines it now covers."""
-
-    lines = text.split("\n")
-    body = reindent(normalise_steps(fold_heads(unwrap(block, text, goal))), goal.indent)
-    if trailing:
-        body = f"{body}\n{goal.indent}sorry"
-    if cell_id is not None:
-        body = f"{marker(goal.indent, cell_id)}\n{body}"
-    lines[goal.line - 1] = body
-    return "\n".join(lines), (goal.line, goal.line + body.count("\n"))
-
-
-def view(source: str, decl: str) -> tuple[str, int]:
-    """The file as the model should read it: every statement in full, and only
-    the body of the declaration being worked on. The `skip` line is recomputed.
-    Measured on p09: the last 8000 chars of the file cut the shared lemma's
-    statement off the top, and the model cited a lemma it could not see."""
-
-    out, kept_lines = [], 0
-    for name in root_names(source):
-        span = proof_span(source, name)
-        if not span or name == decl:
-            continue
-        body = source[span[0]:span[1]]
-        head = DECL_HEAD.match(body)
-        if not head or "skip" in body or "sorry" in body:
-            continue
-        lines = len([l for l in body[head.end():].split("\n") if l.strip()])
-        out.append((span, f"{head.group(1)}\n  -- proved, {lines} lines elided\n\n"))
-    for (start, end), replacement in sorted(out, reverse=True):
-        source = source[:start] + replacement + source[end:]
-    source, _ = without_techniques(strip_markers(source))
-    at = next((i for i, l in enumerate(source.split("\n"), start=1) if l.strip() == "skip"), 0)
-    return source, at
-
-
-@dataclass
-class Edit:
-    """What one reply asks for: a step at a goal, a proof of a named
-    declaration, or a new lemma with its proof."""
-
-    kind: str
-    body: str
-    name: str = ""
-    block: str = ""
-
-
-def interpret(reply: str, board: Board, goal: Goal, graded: Sequence[str]) -> list[Edit]:
-    """Read a reply once, as proofs of whatever it names."""
-
-    block = dialect(screen_step(reply, allow_sorry=True))
-    if not block:
-        return []
-    if is_probe(block):
-        return [Edit("probe", block)]
-    lines, edits, plain, current = block.split("\n"), [], [], None
-    for line in lines + [None]:
-        head = DECLARATION.match(line) if line is not None else None
-        if line is not None and not head:
-            (current[1] if current else plain).append(line)
-            continue
-        if current:
-            name, body = current[0], "\n".join(current[1])
-            raw = "\n".join([current[2]] + current[1])
-            if name in open_names(board.text):
-                edits.append(Edit("prove", proof_body(raw, name), name))
-            elif name in root_names(board.text) or name in graded:
-                edits.append(Edit("drop", "", name))
-            else:
-                edits.append(Edit("hoist", proof_body(raw, name), name, as_goal(raw) or raw))
-        current = [head.group(1), [], line] if head else None
-    plain_body = "\n".join(plain).strip()
-    if plain_body:
-        edits.insert(0, Edit("step", plain_body))
-    return edits
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class BoardAgent(FrameworkAgent):
