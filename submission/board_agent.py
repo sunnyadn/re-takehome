@@ -151,6 +151,11 @@ STALL_SHARE = 0.12
 # A worker with no goal to take waits this long for the board to change.
 IDLE_WAIT_S = 2.0
 # What the model is told when its step ran the whole check into the timeout.
+# A block that does not parse desynchronises the parser for the rest of the
+# file (measured on rmo_2000_6: one unclosed bracket, 1151 `Unknown identifier`
+# messages over 82 checks of its prefixes and retries). Only the parse error is
+# worth reading, and no shorter cut of the same text parses either.
+PARSE_FAULT = "that block does not parse, so Lean read nothing after the fault: "
 TIMED_OUT = ("that step timed out: the file no longer checks in time. The tactic "
              "is far too expensive (decide, omega or nlinarith over a large range, "
              "simp with a wide lemma set); the step was removed. Use interval_cases "
@@ -2089,6 +2094,9 @@ class BoardAgent(FrameworkAgent):
                               "cold compile times out" if over_cap else "") +
                               ". Use a cheaper tactic: a targeted rw or "
                               "exact, not simp with a wide lemma set or decide")
+            parse = [m for m in failures if str(m.get("data", "")).startswith("unexpected")]
+            if parse:
+                return None, PARSE_FAULT + format_messages(parse[:1])[:FEEDBACK_CHARS]
             if failures or expensive:
                 # Every other open goal is an `unsolved goals` error too; the
                 # model is told about its own step, not the rest of the board.
@@ -2332,7 +2340,7 @@ class BoardAgent(FrameworkAgent):
                 return None, (f"`{opening[:80]}` was tried here and taken back after the goals "
                               "under it went nowhere; open with a different step")
             nxt, why = await judge(base, goal, block)
-            if nxt is None and why not in (BUDGET_RETRY, TIMED_OUT):
+            if nxt is None and why not in (BUDGET_RETRY, TIMED_OUT) and not why.startswith(PARSE_FAULT):
                 # The first error's line says where to cut; one check instead of
                 # eight. Measured: 3.7 checks per model call, most of them here.
                 cuts = prefixes(block)

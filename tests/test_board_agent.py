@@ -2737,3 +2737,36 @@ def test_a_goal_already_proved_in_a_closed_cell_is_closed_again_by_recall_not_by
     # Two scripted replies; the second `False` goal never reached a model.
     asked = [p for _, p in llm.calls if "What Lean reports as open" in p]
     assert len(asked) == 2
+
+
+def test_a_block_that_does_not_parse_gets_the_parse_error_alone_and_no_prefix_hunt():
+    # Measured on rmo_2000_6 (frame120 rmo6b): one step with an unclosed bracket
+    # (`unexpected token 'have'; expected '}'`) desynchronised the parser, every
+    # later line of the file reported `Unknown identifier`, and prefixes and
+    # retries of the same block were checked 82 times, 1151 such messages.
+
+    class ParseLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            check = await super().check_file(source, timeout_s)
+            lines = source.split("\n")
+            at = next((i for i, l in enumerate(lines, start=1) if l.strip().startswith("refine ⟨oops")), None)
+            if at is None:
+                return check
+            msgs = [{"severity": "error", "pos": {"line": at + 1, "column": 4}, "endPos": {"line": at + 1},
+                     "data": "unexpected token 'have'; expected '}'"}]
+            msgs += [{"severity": "error", "pos": {"line": k, "column": 4}, "endPos": {"line": k},
+                      "data": "Unknown identifier `a`"} for k in range(max(1, at - 3), at)]
+            return LeanCheck(False, msgs + check.messages, check.has_sorry, False, 1)
+
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    bad = "have h1 : True := by trivial\nrefine ⟨oops, {\nhave h2 : True := by trivial\nexact h2"
+    lean, llm = ParseLean(), ScriptLLM({"model-a": [bad, "have key : True := by trivial\nexact key"]})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0, audit=False))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=challenge),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["solved_by"] == "board_loop"
+    checked = [s for s in lean.sources if "refine ⟨oops" in s]
+    assert len(checked) <= 2, f"{len(checked)} checks of a block that does not parse"
+    rejected = [e for e in steps(result) if not e["accepted"]]
+    assert rejected and "unexpected token" in rejected[0]["why"] and "Unknown identifier" not in rejected[0]["why"]
+    assert not any(e.get("kind") in ("prefix", "search-retry") for e in result.metadata["events"])
