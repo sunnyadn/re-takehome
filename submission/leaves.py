@@ -361,6 +361,8 @@ FACTOR = r"\((?:[^()]|\([^()]*\))+\)|[A-Za-z_][\w']*"
 
 SET_FORALL = re.compile(r"^∀ (\w+) ∈ \{(\w+) \| ∃ ([\w ]+?), (.+)\}, (.+)$")
 LOWER_BOUNDS = re.compile(r"^(.+?) ∈ lowerBounds \{(\w+) \| ∃ ([\w ]+?), (.+)\}$")
+# The same after membership is unfolded: `∀ (n : ℕ), (∃ a b, P) → T`.
+FORALL_EXISTS = re.compile(r"^∀ \((\w+) : ℕ\), \(∃ ([\w ]+?), (.+)\) → (.+)$")
 
 
 def _conjuncts(prop: str) -> list[str]:
@@ -390,10 +392,13 @@ def _destructured(goal_text: str) -> list[tuple[str, str]]:
     hyps, target = _hyps(goal_text), _target(goal_text)
     head = goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
     out: list[tuple[str, str]] = []
-    m = SET_FORALL.match(target) or LOWER_BOUNDS.match(target)
+    m = SET_FORALL.match(target) or LOWER_BOUNDS.match(target) or FORALL_EXISTS.match(target)
     if m:
         if m.re is SET_FORALL:
             n, bound, exist, body, inner = m.groups()
+        elif m.re is FORALL_EXISTS:
+            n, exist, body, inner = m.groups()
+            bound = n
         else:
             c, bound, exist, body = m.groups()
             n, inner = "n", f"{c} ≤ n"
