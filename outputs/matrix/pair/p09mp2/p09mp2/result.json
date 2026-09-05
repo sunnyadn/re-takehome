@@ -1,0 +1,1365 @@
+{
+  "schema_version": 1,
+  "problem_id": "p09mp2",
+  "status": "passed",
+  "passed": true,
+  "points": 1,
+  "comparator": {
+    "passed": true,
+    "exit_code": 0,
+    "timed_out": false,
+    "duration_ms": 19653,
+    "output": {
+      "passed": true,
+      "exit_code": 0,
+      "stdout": "Building Challenge\n⚠ [8655/8656] Built Challenge (2.7s)\nwarning: Challenge.lean:4:8: declaration uses `sorry`\nwarning: Challenge.lean:8:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[p09_a, p09_b, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge\nBuilding Solution\n⚠ [8655/8656] Built Solution (3.0s)\nwarning: Solution.lean:14:63: This simp argument is unused:\n  Nat.add_mod\n\nHint: Omit it from the simp argument list.\n  simp [h_r, pow_add, pow_mul, Nat.pow_mod, Nat.mul_mod,̵ ̵N̵a̵t̵.̵a̵d̵d̵_̵m̵o̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:21:63: This simp argument is unused:\n  Nat.add_mod\n\nHint: Omit it from the simp argument list.\n  simp [h_r, pow_add, pow_mul, Nat.pow_mod, Nat.mul_mod,̵ ̵N̵a̵t̵.̵a̵d̵d̵_̵m̵o̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:27:52: This simp argument is unused:\n  Nat.add_mod\n\nHint: Omit it from the simp argument list.\n  simp [pow_add, pow_mul, Nat.pow_mod, Nat.mul_mod,̵ ̵N̵a̵t̵.̵a̵d̵d̵_̵m̵o̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:30:8: This simp argument is unused:\n  pow_add\n\nHint: Omit it from the simp argument list.\n  simp [pow_a̵d̵d̵,̵ ̵p̵o̵w̵_̵mul, Nat.pow_mod, Nat.mul_mod, Nat.add_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:30:17: This simp argument is unused:\n  pow_mul\n\nHint: Omit it from the simp argument list.\n  simp [pow_add, p̵o̵w̵_̵m̵u̵l̵,̵ ̵Nat.pow_mod, Nat.mul_mod, Nat.add_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:30:39: This simp argument is unused:\n  Nat.mul_mod\n\nHint: Omit it from the simp argument list.\n  simp [pow_add, pow_mul, Nat.pow_mod, N̵a̵t̵.̵m̵u̵l̵_̵m̵o̵d̵,̵ ̵Nat.add_mod]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:33:8: This simp argument is unused:\n  pow_add\n\nHint: Omit it from the simp argument list.\n  simp [pow_a̵d̵d̵,̵ ̵p̵o̵w̵_̵mul, Nat.pow_mod, Nat.mul_mod, Nat.add_mod] at *\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:33:17: This simp argument is unused:\n  pow_mul\n\nHint: Omit it from the simp argument list.\n  simp [pow_add, p̵o̵w̵_̵m̵u̵l̵,̵ ̵Nat.pow_mod, Nat.mul_mod, Nat.add_mod] at *\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:33:39: This simp argument is unused:\n  Nat.mul_mod\n\nHint: Omit it from the simp argument list.\n  simp [pow_add, pow_mul, Nat.pow_mod, N̵a̵t̵.̵m̵u̵l̵_̵m̵o̵d̵,̵ ̵Nat.add_mod] at *\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:15:12: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:16:12: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:22:12: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:23:12: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:28:2: Used `tac1 <;> tac2` where `(tac1; tac2)` would suffice\n\nNote: This linter can be disabled with `set_option linter.unnecessarySeqFocus false`\nwarning: Solution.lean:31:2: Used `tac1 <;> tac2` where `(tac1; tac2)` would suffice\n\nNote: This linter can be disabled with `set_option linter.unnecessarySeqFocus false`\nwarning: Solution.lean:34:2: Used `tac1 <;> tac2` where `(tac1; tac2)` would suffice\n\nNote: This linter can be disabled with `set_option linter.unnecessarySeqFocus false`\nwarning: Solution.lean:15:12: 'norm_num' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:16:12: 'omega' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:22:12: 'norm_num' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:23:12: 'omega' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:46:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:47:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:48:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:49:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:46:10: '(try omega)' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:47:10: '(try { left; omega\n  })' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:48:10: '(try { right; left; omega\n  })' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:49:10: '(try { right; right; omega\n  })' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:56:23: Variable name `hn` is not explicitly referenced.\n\nThe binding can be removed (if unused) or named `_` (if used implicitly).\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`\nwarning: Solution.lean:68:14: This simp argument is unused:\n  Nat.pow_mod\n\nHint: Omit it from the simp argument list.\n  simp [̵N̵a̵t̵.̵p̵o̵w̵_̵m̵o̵d̵,̵ ̵N̵a̵t̵.̵m̵u̵l̵_̵m̵o̵d̵,̵[̲N̲a̲t̲.̲m̲u̲l̲_̲m̲o̲d̲,̲ Nat.add_mod, Nat.mod_eq_of_lt] at hmod ⊢\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:68:27: This simp argument is unused:\n  Nat.mul_mod\n\nHint: Omit it from the simp argument list.\n  simp [Nat.pow_mod, N̵a̵t̵.̵m̵u̵l̵_̵m̵o̵d̵,̵ ̵Nat.add_mod, Nat.mod_eq_of_lt] at hmod ⊢\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:68:53: This simp argument is unused:\n  Nat.mod_eq_of_lt\n\nHint: Omit it from the simp argument list.\n  simp [Nat.pow_mod, Nat.mul_mod, Nat.add_mod,̵ ̵N̵a̵t̵.̵m̵o̵d̵_̵e̵q̵_̵o̵f̵_̵l̵t̵] at hmod ⊢\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:69:8: Used `tac1 <;> tac2` where `(tac1; tac2)` would suffice\n\nNote: This linter can be disabled with `set_option linter.unnecessarySeqFocus false`\nwarning: Solution.lean:90:23: Variable name `hn` is not explicitly referenced.\n\nThe binding can be removed (if unused) or named `_` (if used implicitly).\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`\nwarning: Solution.lean:98:33: This simp argument is unused:\n  Nat.mod_mod\n\nHint: Omit it from the simp argument list.\n  simp [h_case, Nat.add_mod,̵ ̵N̵a̵t̵.̵m̵o̵d̵_̵m̵o̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:104:33: This simp argument is unused:\n  Nat.mod_mod\n\nHint: Omit it from the simp argument list.\n  simp [h_case, Nat.add_mod,̵ ̵N̵a̵t̵.̵m̵o̵d̵_̵m̵o̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:110:33: This simp argument is unused:\n  Nat.mod_mod\n\nHint: Omit it from the simp argument list.\n  simp [h_case, Nat.add_mod,̵ ̵N̵a̵t̵.̵m̵o̵d̵_̵m̵o̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:99:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:105:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:111:10: this tactic is never executed\n\nNote: This linter can be disabled with `set_option linter.unreachableTactic false`\nwarning: Solution.lean:99:10: 'norm_num' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:105:10: 'norm_num' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nwarning: Solution.lean:111:10: 'norm_num' tactic does nothing\n\nNote: This linter can be disabled with `set_option linter.unusedTactic false`\nBuild completed successfully (8656 jobs).\nExporting #[p09_a, p09_b, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution\nRunning Lean default kernel on solution.\nLean default kernel accepts the solution\nYour solution is okay!\n",
+      "stderr": "WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Challenge\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Challenge -- p09_a p09_b propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Solution\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Solution -- p09_a p09_b propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\n"
+    }
+  },
+  "answer_shape": {
+    "passed": true,
+    "errors": []
+  },
+  "budget": {
+    "limit_usd": 1.0,
+    "spent_usd": 0.022030054999999996,
+    "reserved_usd": 0,
+    "accounting_complete": true
+  },
+  "within_time": true,
+  "wall_s": 755.566,
+  "models_used": [
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.5-flash-02-23"
+  ],
+  "both_required_models_used": true,
+  "agent_error": null,
+  "agent_metadata": {
+    "strategy": "board",
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.02203,
+    "wall_s": 733.8,
+    "turns": 232,
+    "events": [
+      {
+        "stage": "share",
+        "name": "mod7_pow2_cases",
+        "kept": true
+      },
+      {
+        "stage": "share",
+        "name": "two_pow_mod_seven_eq_one_iff_three_dvd",
+        "kept": true
+      },
+      {
+        "stage": "share-audit",
+        "name": "two_pow_mod_seven_eq_one_iff_three_dvd",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "stage": "share-audit",
+        "name": "mod7_pow2_cases",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 355
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 356
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "two_pow_mod_seven_eq_one_iff_three_dvd"
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 2
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 342
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 9138
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 822
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 575
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "two_pow_mod_seven_eq_one_iff_three_dvd"
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "mod7_pow2_cases"
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "p09_a"
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "p09_b"
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "((2 : ℕ) ^ n + (1 : ℕ)) % (7 : ℕ) = (0 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(2 : ℕ) ^ n % (7 : ℕ) = (1 : ℕ) ∨ (2 : ℕ) ^ n % (7 : ℕ) = (2 : ℕ) ∨ (2 : ℕ) ^ n % (7 : ℕ) = (4 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "((2 : ℕ) ^ n + (1 : ℕ)) % (7 : ℕ) = (2 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "((2 : ℕ) ^ n + (1 : ℕ)) % (7 : ℕ) = (3 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "((2 : ℕ) ^ n + (1 : ℕ)) % (7 : ℕ) = (5 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 2
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 495
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 559
+      },
+      {
+        "kind": "leaf",
+        "goal": "n : ℕ\nhn : 0 < n\nh : 7 ∣ 2 ^ n - 1\n⊢ 3 ∣ n",
+        "accepted": false,
+        "tried": 1,
+        "ms": 2251
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "two_pow_mod_seven_eq_one_iff_three_dvd"
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 2
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "mod7_pow2_cases"
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "p09_a"
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "drop",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "name": "p09_b"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 399
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "two_pow_mod_seven_eq_one_iff_three_dvd"
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "n % (3 : ℕ) = (0 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "2 ^ n % 7 = 2",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "2 ^ n % 7 = 4",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "mod7_pow2_cases"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "p09_a"
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "drop",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "name": "p09_b"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 631
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 3
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 920
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 3
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1014
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 3
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 1116
+      },
+      {
+        "kind": "collapse",
+        "tactic": "simp_all",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1003
+      },
+      {
+        "kind": "drop",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "name": "two_pow_mod_seven_eq_one_iff_three_dvd"
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "mod7_pow2_cases"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "route",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "to": "p09_a"
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "drop",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "name": "p09_b"
+      },
+      {
+        "kind": "library",
+        "goal": "n : ℕ\n⊢ 2 ^ n % 7 = 1 ∨ 2 ^ n % 7 = 2 ∨ 2 ^ n % 7 = 4",
+        "found": 58,
+        "accepted": false,
+        "ms": 824
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "mod",
+          "pow",
+          "nat"
+        ],
+        "lines": 12,
+        "ms": 6799
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(2 : ℕ) ^ n % (7 : ℕ) = (1 : ℕ) ∨ (2 : ℕ) ^ n % (7 : ℕ) = (2 : ℕ) ∨ (2 : ℕ) ^ n % (7 : ℕ) = (4 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "∀ k : ℕ, 2 ^ k % 7 = 1 ∨ 2 ^ k % 7 = 2 ∨ 2 ^ k % 7 = 4",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "library",
+        "goal": "n : ℕ\nhn : 0 < n\n⊢ 3 ∣ n → 7 ∣ 2 ^ n - 1",
+        "found": 154,
+        "accepted": false,
+        "ms": 1138
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "dvd",
+          "pow",
+          "nat",
+          "lt"
+        ],
+        "lines": 12,
+        "ms": 6971
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 621
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 1279
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 4
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(2 : ℕ) ^ n % (7 : ℕ) = (1 : ℕ)",
+        "verdict": "refuted",
+        "values": {
+          "n": "1"
+        }
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "library",
+        "goal": "n : ℕ\nhn : 0 < n\nh : 7 ∣ 2 ^ n - 1\n⊢ 3 ∣ n",
+        "found": 100,
+        "accepted": false,
+        "ms": 1198
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 4
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "∃ k, n = (3 : ℕ) * k",
+        "verdict": "unverified",
+        "values": {
+          "n": "1"
+        }
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(7 : ℕ) ∣ (2 : ℕ) ^ n - (1 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 995
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1281
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "library",
+        "goal": "n : ℕ\nhn : 0 < n\n⊢ ∃ k, n = 3 * k",
+        "found": 24,
+        "accepted": false,
+        "ms": 1773
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "nat",
+          "lt"
+        ],
+        "lines": 12,
+        "ms": 7274
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "library",
+        "goal": "n : ℕ\nhn : 0 < n\nh : ∃ k, n = 3 * k\n⊢ 7 ∣ 2 ^ n - 1",
+        "found": 102,
+        "accepted": false,
+        "ms": 1375
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 757
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 808
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 537
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 444
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 742
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 681
+      },
+      {
+        "kind": "skeleton",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "withdraw",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "have": "have h2 : 7 ∣ 2 ^ n - 1",
+        "tries": 4,
+        "whole_block": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1428
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1684
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "library",
+        "goal": "n : ℕ\nhn : 0 < n\nh : ∃ k, n = 3 * k\n⊢ 3 ∣ n % 3 + 3 * (n / 3) → 7 ∣ 2 ^ (n % 3 + 3 * (n / 3)) - 1",
+        "found": 154,
+        "accepted": false,
+        "ms": 1339
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "dvd",
+          "mod",
+          "pow",
+          "nat",
+          "lt"
+        ],
+        "lines": 12,
+        "ms": 7083
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(3 : ℕ) ∣ n",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(2 : ℕ) ^ n % (7 : ℕ) = (1 : ℕ)",
+        "verdict": "refuted",
+        "values": {
+          "n": "1"
+        }
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "withdraw",
+        "by": "openai/gpt-oss-120b",
+        "have": "have h : ∃ k, n = 3 * k",
+        "tries": 4,
+        "whole_block": false
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 6
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "n % (3 : ℕ) = (0 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "fork",
+        "from": 0,
+        "to": 5,
+        "goal": "n : ℕ\nhn : 0 < n\nh : ∃ k, n = 3 * k\n⊢ 3 ∣ n % 3 + 3 * (n / 3"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1448
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1735
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "library",
+        "goal": "n : ℕ\nhn : 0 < n\nh : ∃ k, n = 3 * k\nh3 : 0 = 0\n⊢ 3 ∣ 0 + 3 * (n / 3) → 7 ∣ 2 ^ (0 + 3 * (n / 3)) - 1",
+        "found": 154,
+        "accepted": false,
+        "ms": 1398
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "pow_squeeze",
+          "pow_mod"
+        ],
+        "ms": 8176,
+        "found": true
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2042
+      },
+      {
+        "kind": "leaf",
+        "goal": "n : ℕ\nhn : 0 < n\nh : ∃ k, n = 3 * k\nh3 : 0 = 0\nh3dvd : 3 ∣ 0 + 3 * (n / 3)\n⊢ 7 ∣ 2 ^ (0 + 3 * (n / 3)) - 1",
+        "accepted": false,
+        "tried": 1,
+        "ms": 2715
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 2
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2355
+      },
+      {
+        "kind": "leaf",
+        "goal": "h : ∃ k, n = 3 * k\nh3 : 0 = 0\nh3dvd : (0 + 3 * (n / 3)) % 3 = 0\nh2 : 2 ^ 3 % 7 = 1\n⊢ (2 ^ (0 + 3 * (n / 3)) - 1) % 7 = 0",
+        "accepted": false,
+        "tried": 1,
+        "ms": 3104
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "names",
+        "asked": [
+          "Nat.ModEq.dvd_iff_dvd_sub"
+        ],
+        "ms": 6327,
+        "found": true
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 3
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 1462
+      },
+      {
+        "kind": "collapse",
+        "tactic": "omega",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2950
+      },
+      {
+        "kind": "leaf",
+        "goal": "(0 + 3 * (n / 3)) % 3 = 0\nh2 : 2 ^ 3 % 7 = 1\n⊢ (2 ^ (0 + 3 * (n / 3)) % 7 + 7 * (2 ^ (0 + 3 * (n / 3)) / 7) - 1) % 7 = 0",
+        "accepted": false,
+        "tried": 1,
+        "ms": 3681
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "library",
+        "goal": "(0 + 3 * (n / 3)) % 3 = 0\nh2 : 2 ^ 3 % 7 = 1\n⊢ (2 ^ (0 + 3 * (n / 3)) % 7 + 7 * (2 ^ (0 + 3 * (n / 3)) / 7) - 1) % 7 = 0",
+        "found": 252,
+        "accepted": false,
+        "ms": 7772
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "mod",
+          "pow",
+          "nat",
+          "lt"
+        ],
+        "lines": 0,
+        "ms": 90776
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 15
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "∀ (k : ℕ), (2 : ℕ) ^ ((3 : ℕ) * k) % (7 : ℕ) = (1 : ℕ)",
+        "verdict": "unverified",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(2 : ℕ) ^ ((0 : ℕ) + (3 : ℕ) * (n / (3 : ℕ))) % (7 : ℕ) = (1 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1491
+      },
+      {
+        "kind": "leaf",
+        "goal": "n : ℕ\nhn : 0 < n\nh : 7 ∣ 2 ^ n - 1\n⊢ 2 ^ n % 7 = 1",
+        "accepted": false,
+        "tried": 2,
+        "ms": 5580
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 3557
+      },
+      {
+        "kind": "collapse",
+        "tactic": "simp_all",
+        "accepted": true
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 7
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 2
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1572
+      },
+      {
+        "kind": "leaf",
+        "goal": "n : ℕ\nhn : 0 < n\nh : 7 ∣ 2 ^ n - 1\nhmod : (2 ^ n - 1) % 7 = 0\n⊢ 2 ^ n % 7 = 1",
+        "accepted": false,
+        "tried": 2,
+        "ms": 5629
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1535
+      },
+      {
+        "kind": "leaf",
+        "goal": "n : ℕ\nhn : 0 < n\nh : 7 ∣ 2 ^ n - 1\nh_mod : n % 3 = 1\n⊢ 3 ∣ n % 3 + 3 * (n / 3)",
+        "accepted": false,
+        "tried": 1,
+        "ms": 2665
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1777
+      },
+      {
+        "kind": "leaf",
+        "goal": "n : ℕ\nhn : 0 < n\nh : 7 ∣ 2 ^ n - 1\nhmod : (2 ^ (n % 7 + 7 * (n / 7)) - 1) % 7 = 0\n⊢ 2 ^ n % 7 = 1",
+        "accepted": false,
+        "tried": 2,
+        "ms": 5390
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 150,
+        "elapsed_s": 618
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 150,
+        "elapsed_s": 618
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2738
+      },
+      {
+        "kind": "leaf",
+        "goal": "h : 7 ∣ 2 ^ n - 1\nhmod : (2 ^ ((n % 7 + 7 * (n / 7)) % 7 + 7 * ((n % 7 + 7 * (n / 7)) / 7)) - 1) % 7 = 0\n⊢ 2 ^ n % 7 = 1",
+        "accepted": false,
+        "tried": 2,
+        "ms": 5551
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 150,
+        "elapsed_s": 628
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 150,
+        "elapsed_s": 628
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1169
+      },
+      {
+        "kind": "leaf",
+        "goal": "n : ℕ\nhn : 0 < n\nh : 7 ∣ 2 ^ n - 1\nh_mod : n % 3 = 1\n⊢ 3 ∣ n",
+        "accepted": false,
+        "tried": 1,
+        "ms": 2696
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 928
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 549
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 3380
+      },
+      {
+        "kind": "leaf",
+        "goal": " 7 * (((n % 7 + 7 * (n / 7)) % 7 + 7 * ((n % 7 + 7 * (n / 7)) / 7)) / 7)) -\n        1) %\n      7 =\n    0\n⊢ 2 ^ n % 7 = 1",
+        "accepted": false,
+        "tried": 2,
+        "ms": 5533
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 3
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "False",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "audit",
+        "by": "evaluation",
+        "goal": "(2 : ℕ) ^ n % (7 : ℕ) = (1 : ℕ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(2 ^ n - 1) % 7 = 0",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(2 ^ n) % 7 = 1",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(2 ^ n) % 7 = 1",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "2 ^ n ≥ 1",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(2 ^ n - 1 + 1) % 7 = 1",
+        "verdict": "unstated",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 950,
+        "slow": false,
+        "techniques": "dropped"
+      }
+    ]
+  }
+}

@@ -1,0 +1,874 @@
+{
+  "schema_version": 1,
+  "problem_id": "rmo6mn1",
+  "status": "passed",
+  "passed": true,
+  "points": 1,
+  "comparator": {
+    "passed": true,
+    "exit_code": 0,
+    "timed_out": false,
+    "duration_ms": 19557,
+    "output": {
+      "passed": true,
+      "exit_code": 0,
+      "stdout": "Building Challenge\n⚠ [410/411] Built Challenge (557ms)\nwarning: Challenge.lean:4:8: declaration uses `sorry`\nBuild completed successfully (411 jobs).\nExporting #[rmo_2000_6, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge\nBuilding Solution\n⚠ [8655/8656] Built Solution (7.1s)\nwarning: Solution.lean:20:52: This simp argument is unused:\n  Nat.mul_assoc\n\nHint: Omit it from the simp argument list.\n  simp [Nat.pow_succ,̵ ̵N̵a̵t̵.̵m̵u̵l̵_̵a̵s̵s̵o̵c̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:24:52: This simp argument is unused:\n  Nat.mul_assoc\n\nHint: Omit it from the simp argument list.\n  simp [Nat.pow_succ,̵ ̵N̵a̵t̵.̵m̵u̵l̵_̵a̵s̵s̵o̵c̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:79:52: This simp argument is unused:\n  Nat.mul_assoc\n\nHint: Omit it from the simp argument list.\n  simp [Nat.pow_succ,̵ ̵N̵a̵t̵.̵m̵u̵l̵_̵a̵s̵s̵o̵c̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:83:52: This simp argument is unused:\n  Nat.mul_assoc\n\nHint: Omit it from the simp argument list.\n  simp [Nat.pow_succ,̵ ̵N̵a̵t̵.̵m̵u̵l̵_̵a̵s̵s̵o̵c̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:131:50: This simp argument is unused:\n  Nat.mul_assoc\n\nHint: Omit it from the simp argument list.\n  simp [Nat.pow_succ,̵ ̵N̵a̵t̵.̵m̵u̵l̵_̵a̵s̵s̵o̵c̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:135:50: This simp argument is unused:\n  Nat.mul_assoc\n\nHint: Omit it from the simp argument list.\n  simp [Nat.pow_succ,̵ ̵N̵a̵t̵.̵m̵u̵l̵_̵a̵s̵s̵o̵c̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nBuild completed successfully (8656 jobs).\nExporting #[rmo_2000_6, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution\nRunning Lean default kernel on solution.\nLean default kernel accepts the solution\nYour solution is okay!\n",
+      "stderr": "WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Challenge\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Challenge -- rmo_2000_6 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Solution\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Solution -- rmo_2000_6 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\n"
+    }
+  },
+  "answer_shape": {
+    "passed": true,
+    "errors": []
+  },
+  "budget": {
+    "limit_usd": 1.0,
+    "spent_usd": 0.02863969399999999,
+    "reserved_usd": 0,
+    "accounting_complete": true
+  },
+  "within_time": true,
+  "wall_s": 630.993,
+  "models_used": [
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.5-flash-02-23"
+  ],
+  "both_required_models_used": true,
+  "agent_error": null,
+  "agent_metadata": {
+    "strategy": "board",
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.02864,
+    "wall_s": 610.7,
+    "turns": 147,
+    "events": [
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2084
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 2
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1389
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1331
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "library",
+        "goal": "⊢ IsLeast {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b} 10",
+        "found": 3,
+        "accepted": false,
+        "ms": 45890
+      },
+      {
+        "stage": "library",
+        "tokens": [
+          "isleast",
+          "dvd",
+          "pow",
+          "lt"
+        ],
+        "lines": 12,
+        "ms": 89957
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "fork",
+        "from": 0,
+        "to": 1,
+        "goal": "⊢ IsLeast {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1569
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "mined",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 2
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 3
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1297
+      },
+      {
+        "kind": "witnesses",
+        "goal": "⊢ 10 ∈ {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b}",
+        "found": [
+          [
+            "1",
+            "10"
+          ]
+        ],
+        "accepted": true,
+        "ms": 55
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 906
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 4278
+      },
+      {
+        "kind": "leaf",
+        "goal": " 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b}\n⊢ ∀ n ∈ {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b}, 10 ≤ n",
+        "accepted": false,
+        "tried": 1,
+        "ms": 2003
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 14
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 2
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1047
+      },
+      {
+        "kind": "leaf",
+        "goal": "0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b}\na b : ℕ\nha : 0 < a\nhb : 0 < b\nhdiv : 2000 ∣ a ^ 2 * b ^ 5\n⊢ 10 ≤ a * b",
+        "accepted": false,
+        "tried": 2,
+        "ms": 12961
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 11
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "split",
+        "goals": 3
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 952
+      },
+      {
+        "kind": "leaf",
+        "goal": " ∣ a ^ 2 * b ^ 5\nh2 : 2 ∣ a ^ 2 * b ^ 5\nh5 : 5 ∣ a ^ 2 * b ^ 5\nh2a : 2 ∣ a ^ 2\nh5a : 5 ∣ a ^ 2\nh2a' : 2 ∣ a\n⊢ 10 ≤ a * b",
+        "accepted": false,
+        "tried": 6,
+        "ms": 20359
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 8
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1182
+      },
+      {
+        "kind": "leaf",
+        "goal": " b}\na b : ℕ\nha : 0 < a\nhb : 0 < b\nhdiv : 2000 ∣ a ^ 2 * b ^ 5\nh2 : 2 ∣ a ^ 2 * b ^ 5\nh5 : 5 ∣ a ^ 2 * b ^ 5\n⊢ 10 ≤ a * b",
+        "accepted": false,
+        "tried": 4,
+        "ms": 18592
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 881
+      },
+      {
+        "kind": "leaf",
+        "goal": "b\nhdiv : 2000 ∣ a ^ 2 * b ^ 5\nh2 : 2 ∣ a ^ 2 * b ^ 5\nh5 : 5 ∣ a ^ 2 * b ^ 5\nh2a : 2 ∣ a ^ 2\nh5b : 5 ∣ b ^ 5\n⊢ 10 ≤ a * b",
+        "accepted": false,
+        "tried": 5,
+        "ms": 15524
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "mined",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 5
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1274
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "leaf",
+        "spent_s": 69,
+        "elapsed_s": 315
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1170
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "leaf",
+        "spent_s": 69,
+        "elapsed_s": 319
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 572
+      },
+      {
+        "kind": "collapse",
+        "tactic": "omega",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 721
+      },
+      {
+        "kind": "collapse",
+        "tactic": "positivity",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 696
+      },
+      {
+        "kind": "collapse",
+        "tactic": "omega",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 574
+      },
+      {
+        "kind": "collapse",
+        "tactic": "trivial",
+        "accepted": true
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 326
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 326
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 330
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 330
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 662
+      },
+      {
+        "kind": "collapse",
+        "tactic": "trivial",
+        "accepted": true
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 334
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1612
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 345
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 345
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1620
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 352
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 352
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 903
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 702
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 736
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "leaf",
+        "spent_s": 69,
+        "elapsed_s": 366
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "stage": "route",
+        "from": 0,
+        "to": 2,
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "stage": "prune",
+        "bid": 1,
+        "goals": 4
+      },
+      {
+        "kind": "lifted",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "facts": 3,
+        "dup": 1,
+        "from_depth": 2,
+        "to_depth": 1
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1245
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 690
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h₁",
+          "h₂"
+        ]
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h₁",
+          "h₂"
+        ]
+      },
+      {
+        "kind": "leaf_restart",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "goal": "case refine_2\n⊢ 10 ∈ lowerBounds {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 3 * b ^ 4 ∧ n = a * b}",
+        "settled": 31
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h₁"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "plan",
+        "by": "openai/gpt-oss-120b",
+        "chars": 1536
+      },
+      {
+        "kind": "plan",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "chars": 1677
+      },
+      {
+        "kind": "skeleton",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h₁",
+          "h₂"
+        ]
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h₁",
+          "h₂"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "cut",
+        "by": "openai/gpt-oss-120b",
+        "kept": 0
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2129
+      },
+      {
+        "kind": "leaf",
+        "goal": "\nha : 0 < a\nhb : 0 < b\nhdiv : 2000 ∣ a ^ 2 * b ^ 5\nh2 : 2 ∣ a ^ 2 * b ^ 5\nh5 : 5 ∣ a ^ 2 * b ^ 5\n⊢ 2 ∣ a ^ 2 ∨ 2 ∣ b ^ 5",
+        "accepted": false,
+        "tried": 4,
+        "ms": 23359
+      },
+      {
+        "kind": "cut",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "kept": 0
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h₂"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1735
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "leaf",
+        "spent_s": 93,
+        "elapsed_s": 500
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2047
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "leaf",
+        "spent_s": 93,
+        "elapsed_s": 506
+      },
+      {
+        "kind": "prefix",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "lines": 2
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1074
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "leaf",
+        "spent_s": 93,
+        "elapsed_s": 509
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "kind": "search-retry",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 519
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 519
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2486
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "leaf",
+        "spent_s": 93,
+        "elapsed_s": 521
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 521
+      },
+      {
+        "stage": "probe_skipped",
+        "kind": "scan",
+        "spent_s": 136,
+        "elapsed_s": 521
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "restated",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "of": [
+          "h₁"
+        ]
+      },
+      {
+        "kind": "repeat",
+        "by": "qwen/qwen3.5-flash-02-23"
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "search-retry",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false
+      },
+      {
+        "kind": "stale",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 811,
+        "slow": false,
+        "techniques": "dropped"
+      }
+    ]
+  }
+}

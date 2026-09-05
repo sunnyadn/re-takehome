@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "problem_id": "rmo6mg1",
+  "description": "# rmo_2000_6\n\n1. Consider positive integers $a$ and $b$ such that $a^2b^5$ is divisible by\n   $2000$. Find the least possible value of $ab$.\n2. Consider positive integers $a$ and $b$ such that $a^3b^4$ is divisible by\n   $2000$. Find the least possible value of $ab$.\n",
+  "challenge": "import Mathlib.Data.Nat.Basic\nimport Mathlib.Order.Bounds.Basic\n\ntheorem rmo_2000_6 :\n  (IsLeast {n | ∃ a b : ℕ, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b} 10) ∧\n  (IsLeast {n | ∃ a b : ℕ, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 3 * b ^ 4 ∧ n = a * b} 10) := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "rmo_2000_6"
+  ],
+  "definition_names": [],
+  "numeric_answer_names": [],
+  "out_dir": "/home/sunny/frame91/out/rmo6mg1/board_agent/20260904T044240Z/rmo6mg1",
+  "budget_usd": 1.0,
+  "time_limit_s": 1800.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.board_agent:create_agent",
+  "session_id": "956c4e23e7a04e0f96604cf431f70f91"
+}

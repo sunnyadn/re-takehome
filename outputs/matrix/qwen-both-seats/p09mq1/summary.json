@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "set": "sample",
+  "problems": [
+    {
+      "problem_id": "p09mq1",
+      "status": "passed",
+      "passed": true,
+      "points": 1,
+      "actual_cost_usd": 0.00203177,
+      "wall_s": 156.436,
+      "models_used": [
+        "qwen/qwen3.5-flash-02-23"
+      ],
+      "failure_reason": null
+    }
+  ],
+  "total_points": 1,
+  "max_points": 1,
+  "actual_cost_usd": 0.00203177,
+  "wall_s_sum": 156.436,
+  "run_id": "066f632a1d074195af9434bbbb355570",
+  "wall_s": 156.637,
+  "finished_at": "2026-09-04T03:02:06.337971+00:00"
+}

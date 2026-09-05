@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "problem_id": "p10mp1",
+  "description": "# p10_factorial_pow\n\nFind the largest natural number $n$ such that $n! < 3^n$.\n\nFill in `p10_answer` with a numeric literal and prove the theorem. `IsGreatest S a`\nmeans `a ∈ S` and `a` is an upper bound of `S`; the upper-bound half needs an\nargument that works for every larger `n`, not a finite check.\n",
+  "challenge": "import Mathlib\n\n/-- The largest natural `n` with `n ! < 3 ^ n`. Must be a numeric literal. -/\nabbrev p10_answer : ℕ := sorry\n\n/-- `p10_answer` is the greatest element of `{n : ℕ | n ! < 3 ^ n}`. -/\ntheorem p10_factorial_pow :\n    IsGreatest {n : ℕ | Nat.factorial n < 3 ^ n} p10_answer := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "p10_factorial_pow"
+  ],
+  "definition_names": [
+    "p10_answer"
+  ],
+  "numeric_answer_names": [
+    "p10_answer"
+  ],
+  "out_dir": "/home/sunny/frame91/out/p10mp1/board_agent/20260904T032219Z/p10mp1",
+  "budget_usd": 1.0,
+  "time_limit_s": 1800.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.board_agent:create_agent",
+  "session_id": "936f4bc58f3b40929e419febe66e8d32"
+}
