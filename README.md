@@ -7,10 +7,10 @@ everything Lean can decide alone is tried before a token is spent.
 
 ```mermaid
 flowchart LR
-    G(["an open goal"]) --> FREE["<b>six deterministic rungs</b><br/>recall · tactic cocktail · shape leaf<br/>witness search · conjecture · library search"]
+    G(["an open goal"]) --> FREE["six deterministic rungs<br/>recall · tactic cocktail · shape leaf<br/>witness search · conjecture · library search"]
     FREE -- closed --> LEAN(["Lean decides"])
-    FREE -- "still open" --> M["<b>ask ONE model<br/>for ONE step</b>"]
-    M --> AUDIT["<b>audit the claim</b><br/>evaluate · sample · the other model"]
+    FREE -- "still open" --> M["ask ONE model<br/>for ONE step"]
+    M --> AUDIT["audit the claim<br/>evaluate · sample · the other model"]
     AUDIT --> LEAN
     LEAN -- rejected --> G
     LEAN -- accepted --> CELL["the step becomes<br/>its own theorem"]
@@ -22,8 +22,9 @@ flowchart LR
     class M,AUDIT paid
 ```
 
-**16 of 16 sample problems · slowest 421 s against an 8 h cap · ten of the sixteen
-finish without a single model reply.**
+**All 16 sample problems proved, every proof accepted by the kit's Comparator.
+Median 31 s per problem, 13 of the 16 under a minute, the slowest 7 minutes against
+the 8-hour budget.**
 
 [How it works](docs/ARCHITECTURE.md) · [What the two models each contributed](docs/PART2.md) ·
 [Design notes](docs/APPROACH.md) · runs under [`outputs/board/`](outputs/board)

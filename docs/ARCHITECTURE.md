@@ -12,15 +12,15 @@ goal ends the turn, and only the last two rungs cost tokens.
 flowchart TD
     START["challenge.lean<br/>one theorem, one sorry"] --> BOARD
 
-    BOARD["The board<br/><i>the one file both models read</i><br/>every open sorry is a goal"]
+    BOARD["The board<br/>the one file both models read<br/>every open sorry is a goal"]
     BOARD --> PICK{"a worker picks<br/>one open goal"}
 
-    PICK --> R1["1 · recall<br/><i>proved earlier this run</i>"]
-    R1 -- miss --> R2["2 · closing cocktail<br/><i>norm_num · omega · linarith · decide</i>"]
-    R2 -- miss --> R3["3 · shape leaf<br/><i>a tactic block built from the goal's shape</i>"]
-    R3 -- miss --> R4["4 · witness search<br/><i>decidable existential, searched in Lean</i>"]
-    R4 -- miss --> R5["5 · mechanical conjecture<br/><i>tabulate in Lean · fit in Python · verify in Lean</i>"]
-    R5 -- miss --> R6["6 · library search<br/><i>apply? and a name scan</i>"]
+    PICK --> R1["1 · recall<br/>proved earlier this run"]
+    R1 -- miss --> R2["2 · closing cocktail<br/>norm_num · omega · linarith · decide"]
+    R2 -- miss --> R3["3 · shape leaf<br/>a tactic block built from the goal's shape"]
+    R3 -- miss --> R4["4 · witness search<br/>decidable existential, searched in Lean"]
+    R4 -- miss --> R5["5 · mechanical conjecture<br/>tabulate in Lean · fit in Python · verify in Lean"]
+    R5 -- miss --> R6["6 · library search<br/>apply? and a name scan"]
     R6 -- miss --> ASK["7 · ask ONE model<br/>for ONE step"]
 
     ASK --> AUDIT{"audit the statement"}
@@ -34,7 +34,7 @@ flowchart TD
 
     LEAN{"Lean checks the edit"}
     LEAN -- rejected --> PICK
-    LEAN -- accepted --> CELL["commit<br/><i>the block becomes a cell</i>"]
+    LEAN -- accepted --> CELL["commit<br/>the block becomes a cell"]
     CELL --> BOARD
     CELL --> DONE{"no sorry left?"}
     DONE -- yes --> CMP["comparator"]
@@ -45,8 +45,8 @@ flowchart TD
     class ASK,AUDIT paid
 ```
 
-Green closes a goal with no model asked; amber spends tokens. Ten of the sixteen
-problems finish without a single model reply.
+Green closes a goal with no model asked; amber spends tokens. Most goals never reach
+the amber rungs, which is why most problems finish in well under a minute.
 
 ## Cells: the file Lean checks is not the file the models read
 
@@ -56,9 +56,9 @@ stood.
 
 ```mermaid
 flowchart LR
-    A["<b>What the models read</b><br/>one theorem<br/>marked blocks<br/>open sorry"]
-    A -- render_check --> B["<b>What Lean checks</b><br/>each marked block lifted to<br/>theorem vm_cell_N … := by …<br/>linked from where it stood"]
-    B -- "markers stripped, probes off" --> C["<b>What the comparator gets</b><br/>the same shape<br/>each cell in its own budget"]
+    A["What the models read<br/>one theorem<br/>marked blocks<br/>open sorry"]
+    A -- render_check --> B["What Lean checks<br/>each marked block lifted to<br/>theorem vm_cell_N … := by …<br/>linked from where it stood"]
+    B -- "markers stripped, probes off" --> C["What the comparator gets<br/>the same shape<br/>each cell in its own budget"]
 ```
 
 One declaration is one heartbeat budget and one re-elaboration. Measured on
@@ -95,8 +95,9 @@ next change, and it is not built.
 
 ## Where the sixteen problems land
 
-One run per problem, one worker, commit `4e3e4c7`. The slowest finishes in seven
-minutes against an eight-hour cap, and ten of the sixteen never ask a model anything.
+One run per problem, one worker, commit `4e3e4c7`. Every proof was accepted by the
+kit's Comparator. The median problem takes 31 s, 13 of the 16 finish under a minute,
+and the slowest takes seven minutes of the eight-hour budget.
 
 | Problem | Wall | Model replies | Problem | Wall | Model replies |
 | --- | --- | --- | --- | --- | --- |
@@ -108,11 +109,11 @@ minutes against an eight-hour cap, and ten of the sixteen never ask a model anyt
 | p06_pow_mod | 59.9 s | 0 | rmo_2000_6 | 31.1 s | 0 |
 | p07_least_divisible | 56.2 s | 2 | rmo_2001_2 | 421.1 s | 9 |
 | p08_sum_products | 19.8 s | 4 | | | |
-| p09_imo1964 | 73.4 s | 3 | **16 of 16** | | **10 at zero** |
+| p09_imo1964 | 73.4 s | 3 | **16 of 16** | **median 31 s** | |
 
-Every one of those free rungs was written after watching both models fail the same step
-in a measured run, so a zero in that column is a model's contribution spent once rather
-than every run. A holdout problem off any of these shapes reaches rung 7 immediately.
+The reply counts are here as measurement, not as a claim. Every deterministic rung was
+written after watching both models fail the same step in a measured run, and a holdout
+problem off those shapes reaches the model rung immediately.
 
 `rmo_2000_3` carries a caveat that belongs with its number. As published, its
 challenge file does not build in the comparator at all: it answers
