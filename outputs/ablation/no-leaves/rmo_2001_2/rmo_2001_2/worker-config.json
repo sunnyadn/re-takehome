@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "problem_id": "rmo_2001_2",
+  "description": "# rmo_2001_2\n\nFind all primes $p$ and $q$ such that\n\n$$p^2 + 7pq + q^2$$\n\nis the square of an integer.\n",
+  "challenge": "import Mathlib\n\nopen Nat\n\ntheorem rmo_2001_2 (p q : ℕ) (hp : Nat.Prime p) (hq : Nat.Prime q) :\n  (∃ m : ℕ, p^2 + 7*p*q + q^2 = m^2) ↔\n    (p = q ∨ (p = 3 ∧ q = 11) ∨ (p = 11 ∧ q = 3)) := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "rmo_2001_2"
+  ],
+  "definition_names": [],
+  "numeric_answer_names": [],
+  "out_dir": "/home/sunny/frame132/out/rmo_2001_2/board_agent/20260905T104442Z/rmo_2001_2",
+  "budget_usd": 1.0,
+  "time_limit_s": 3600.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.board_agent:create_agent",
+  "session_id": "2a2a2c53a7c14a4e824af4e30a18008d"
+}
