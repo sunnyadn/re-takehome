@@ -359,6 +359,62 @@ BLOCKS = re.compile(r"∑ \w+ ∈ Finset\.Ico \S+ \((\w+) \+ 1\), ∑ \w+ ∈ Fi
 FACTOR = r"\((?:[^()]|\([^()]*\))+\)|[A-Za-z_][\w']*"
 
 
+SQUARE_SUM = re.compile(r"^∑ (\w+) ∈ Finset\.Ico (\d+) \((\w+) \+ 1\), ([A-Za-z_][\w']*) \1 / (?:↑\1|\(\1 : ℝ\)) ≤ (\d+)$")
+
+
+def _square_blocks(hyps: list[tuple[str, str]], target: str) -> str | None:
+    """`∑_{i ∈ Ico a (k+1)} f i / i ≤ C` from a hypothesis bounding the same sum
+    over the squares, `∀ N, ∑_{i ∈ Ico a (N+1)} f (i*i) / i ≤ B`, f positive and
+    non-increasing: extend to `Ico a ((k+1)*(k+1))`, split into the blocks
+    `[j², (j+1)²)`, bound each by `3 f(j²)/j` (length 2j+1 over j², the whole
+    block at its first term) and sum. Needs 3B ≤ C. Measured on rmo_2000_3:
+    both models decompose by √k instead and withdraw the block bound."""
+
+    found = SQUARE_SUM.match(target)
+    if not found:
+        return None
+    i, a, k, f, c = found.groups()
+    sq = re.compile(rf"^∀ (?:\((\w+) : ℕ\)|(\w+)), ∑ (\w+) ∈ Finset\.Ico {a} \(\1?\2? \+ 1\), "
+                    rf"{re.escape(f)} \(\3 \* \3\) / (?:↑\3|\(\3 : ℝ\)) ≤ (\d+)$")
+    bound = next(((n, m.group(4)) for n, t in hyps for m in [sq.match(t)] if m), None)
+    pos = next((n for n, t in hyps if re.match(rf"^∀ (?:\w+|\(\w+ : ℕ\)), 0 < {re.escape(f)} \w+$", t)), None)
+    anti = next((n for n, t in hyps if t == f"Antitone {f}"), None)
+    mono = next((n for n, t in hyps
+                 if re.match(rf"^∀ (?:\w+|\(\w+ : ℕ\)), {re.escape(f)} \w+ ≥ {re.escape(f)} \(\w+ \+ 1\)$", t)), None)
+    if bound is None or pos is None or (anti is None and mono is None) or a != "1":
+        return None
+    hb, b = bound
+    if 3 * int(b) > int(c):
+        return None
+    anti = anti or "vm_anti"
+    lines = ([] if anti != "vm_anti" else
+             [f"have vm_anti : Antitone {f} := antitone_nat_of_succ_le (fun vm_n => {mono} vm_n)"])
+    blk = (f"∑ vm_i ∈ Finset.Ico (vm_j * vm_j) ((vm_j + 1) * (vm_j + 1)), {f} vm_i / (vm_i : ℝ)")
+    full = f"∑ {i} ∈ Finset.Ico 1 (({k} + 1) * ({k} + 1)), {f} {i} / ({i} : ℝ)"
+    lines += [
+        f"have vm_split : {full} = ∑ vm_j ∈ Finset.Ico 1 ({k} + 1), {blk} := (by ico_blocks {k})",
+        f"have vm_ext : ∑ {i} ∈ Finset.Ico 1 ({k} + 1), {f} {i} / ({i} : ℝ) ≤ {full} := "
+        f"Finset.sum_le_sum_of_subset_of_nonneg (Finset.Ico_subset_Ico le_rfl (Nat.le_mul_self _)) "
+        f"(fun vm_i _ _ => div_nonneg ({pos} vm_i).le (Nat.cast_nonneg vm_i))",
+        f"have vm_block : ∀ vm_j ∈ Finset.Ico 1 ({k} + 1), {blk} ≤ 3 * ({f} (vm_j * vm_j) / (vm_j : ℝ)) := "
+        f"(by intro vm_j vm_hj; obtain ⟨vm_j1, vm_j2⟩ := Finset.mem_Ico.mp vm_hj; "
+        f"refine le_trans (vm_sum_div_block {f} {pos} {anti} (vm_j * vm_j) ((vm_j + 1) * (vm_j + 1)) "
+        f"(by positivity)) ?_; have vm_le : vm_j * vm_j ≤ (vm_j + 1) * (vm_j + 1) := (by nlinarith); "
+        f"rw [Nat.cast_sub vm_le]; push_cast; have vm_xp := {pos} (vm_j * vm_j); "
+        f"have vm_j1r : (1 : ℝ) ≤ vm_j := (by exact_mod_cast vm_j1); "
+        f"first | (rw [div_le_div_iff₀ (by positivity) (by positivity)]; nlinarith) "
+        f"| (rw [ge_iff_le, ← sub_nonneg]; field_simp; rw [div_le_div_iff₀ (by positivity) (by positivity)]; nlinarith) "
+        f"| (field_simp; rw [div_le_div_iff₀ (by positivity) (by positivity)]; nlinarith) "
+        f"| (field_simp; nlinarith [vm_xp, vm_j1r, mul_pos vm_xp vm_xp]) "
+        f"| nlinarith [vm_xp, vm_j1r])",
+        f"have vm_sum := Finset.sum_le_sum vm_block",
+        f"rw [← Finset.mul_sum] at vm_sum",
+        f"have vm_sq := {hb} {k}",
+        "linarith",
+    ]
+    return "\n".join(lines)
+
+
 SET_FORALL = re.compile(r"^∀ (\w+) ∈ \{(\w+) \| ∃ ([\w ]+?), (.+)\}, (.+)$")
 LOWER_BOUNDS = re.compile(r"^(.+?) ∈ lowerBounds \{(\w+) \| ∃ ([\w ]+?), (.+)\}$")
 # The same after membership is unfolded: `∀ (n : ℕ), (∃ a b, P) → T`.
@@ -478,6 +534,10 @@ def leaf_candidates(goal_text: str) -> list[str]:
                 radical = _radical_bound(hyps, "≤", lo.strip(), m.group(1))
                 if radical:
                     out.append(f"subst {n}\n{radical}")
+    # A sum bounded through its subsequence at the squares (rmo_2000_3's shape).
+    blocks = _square_blocks(hyps, target)
+    if blocks:
+        out.append(blocks)
     dv = re.match(r"^(?:\((\d+) : ℕ\)|(\d+)) ∣ (.+)$", target)
     if dv:
         radical = _radical_bound(hyps, "∣", dv.group(1) or dv.group(2), dv.group(3))
