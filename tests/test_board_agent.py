@@ -2770,3 +2770,27 @@ def test_a_block_that_does_not_parse_gets_the_parse_error_alone_and_no_prefix_hu
     rejected = [e for e in steps(result) if not e["accepted"]]
     assert rejected and "unexpected token" in rejected[0]["why"] and "Unknown identifier" not in rejected[0]["why"]
     assert not any(e.get("kind") in ("prefix", "search-retry") for e in result.metadata["events"])
+
+
+def test_a_step_that_closes_its_goal_is_not_refused_for_its_own_check_time():
+    # Measured on rmo_2001_2 (frame125 rmo12b, 0/1): seven steps that closed
+    # the reverse direction's goal were refused as slow at 12-13 s (from 0.2 s).
+    # A closing step is never re-elaborated by a later focused check; only the
+    # comparator's cold compile pays it, which the absolute cap guards.
+
+    class SlowCloseLean(BoardLean):
+        async def check_file(self, source, timeout_s=None):
+            check = await super().check_file(source, timeout_s)
+            if "theorem demo" in source and "exact key" in source:
+                return LeanCheck(check.accepted, check.messages, check.has_sorry, False, 15_000)
+            return check
+
+    challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
+    lean, llm = SlowCloseLean(), ScriptLLM({"model-a": ["have key : True := by trivial\nexact key"] * 3})
+    agent = BoardAgent(Config(lines=("model-a",), budget_usd=1.0, time_limit_s=600.0, audit=False))
+    result = asyncio.run(agent.solve(Problem(id="demo", description="p", challenge=challenge),
+                                     FakeServices(lean, llm)))
+    assert result.metadata["solved_by"] == "board_loop"
+    assert not any(e.get("stage") == "slow" for e in result.metadata["events"])
+    from submission.agent import COCKTAIL
+    assert "subst_vars <;> ring" in COCKTAIL and "subst_vars <;> nlinarith" in COCKTAIL

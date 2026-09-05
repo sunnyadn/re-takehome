@@ -2070,10 +2070,12 @@ class BoardAgent(FrameworkAgent):
 
             candidate, span, nxt = await placed(True)
             _, surplus, expensive, failures = classify(nxt.messages)
+            closing = False
             if not failures and {message_line(m) for m in surplus if in_span(m, span)} == {span[1]}:
                 # Only the trailing placeholder has no goal: the step closed it.
                 candidate, span, nxt = await placed(False)
                 _, surplus, expensive, failures = classify(nxt.messages)
+                closing = True
             last_span = span
             lines = [l for l in (message_line(m) for m in failures) if l and span[0] <= l <= span[1]]
             failed_at = (min(lines) - span[0]) if lines else 0
@@ -2084,9 +2086,12 @@ class BoardAgent(FrameworkAgent):
             if expensive and not failures:
                 return None, BUDGET_RETRY
             over_cap = nxt.ms > CHECK_CAP_MS and nxt.ms - base.ms > SLOW_STEP_MS // 5
-            if heavy["leaf"]:
+            if heavy["leaf"] or closing:
+                # A closed goal is never re-elaborated by a later focused check;
+                # only the comparator's cold compile pays it (measured on
+                # rmo_2001_2: seven closing steps refused at 12-13 s from 0.2 s).
                 over_cap = nxt.ms > LEAF_CAP_MS
-            if not failures and ((nxt.ms - base.ms > SLOW_STEP_MS and not heavy["leaf"]) or over_cap):
+            if not failures and ((nxt.ms - base.ms > SLOW_STEP_MS and not (heavy["leaf"] or closing)) or over_cap):
                 events.append({"stage": "slow", "ms": nxt.ms, "was": base.ms})
                 return None, (f"that step makes the file take {nxt.ms // 1000}s to "
                               f"check, up from {base.ms // 1000}s; every later step "

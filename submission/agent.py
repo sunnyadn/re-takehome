@@ -333,7 +333,7 @@ COCKTAIL = (
     "norm_num; omega", "constructor <;> norm_num", "simp_all", "aesop",
     "decide", "gcongr", "bound", "norm_cast", "push_cast; ring",
     "interval_cases <;> norm_num", "exact le_refl _", "tauto",
-    "subst_vars <;> omega", "constructor <;> omega",
+    "subst_vars <;> omega", "subst_vars <;> ring", "subst_vars <;> nlinarith", "constructor <;> omega",
     "refine ⟨?_, ?_⟩ <;> norm_num", "simp_all <;> omega", "zify; omega",
     "push_cast; omega", "ring_nf; omega", "ring_nf; nlinarith",
     "interval_cases <;> omega", "simp_arith", "constructor <;> simp",
