@@ -30,6 +30,10 @@ macro_rules
       | (rw [show $l = $r by norm_num] at $h:ident; divisor_split $h : $r)
       | divisor_cases $h)
   | `(tactic| divisor_cases $h : $e) => `(tactic| first | divisor_split $h : $e | divisor_cases $h)
+-- Unhygienic so that each case's `hx : d = ±m` and `hm` can be named by what
+-- follows (measured: hygienic `hx✝` left h_factor unrewritten in every case).
+set_option hygiene false in
+macro_rules
   | `(tactic| divisor_cases $h for $x : $l = $r) => `(tactic| (
       have hn : ($x).natAbs ∣ $r := by
         have hh := Int.natAbs_dvd_natAbs.mpr $h
@@ -266,6 +270,138 @@ macro_rules
         | (apply Nat.lt_succ_iff.mp; apply (Nat.pow_lt_pow_iff_left (by norm_num : (3 : ℕ) ≠ 0)).1
            first | omega | (norm_num at *; omega) | (norm_num at *; done))
       interval_cases $x <;> first | omega | (norm_num at *; done) | nlinarith | simp_all))
+
+-- `pow_cycle a m k n` (numerals a m k with a ^ k % m = 1): a ^ n % m cycles with period k;
+-- every case of n % k is finished by norm_num and omega (a ^ n generalised to an atom).
+syntax "pow_cycle" num num num ident : tactic
+macro_rules
+  | `(tactic| pow_cycle $a $m $k $n) => `(tactic| (
+      have hcyc : $a ^ $k % $m = 1 := by norm_num
+      have hpow : $a ^ $n % $m = $a ^ ($n % $k) % $m := by
+        conv_lhs => rw [← Nat.div_add_mod $n $k, pow_add, pow_mul]
+        rw [Nat.mul_mod, Nat.pow_mod, hcyc, one_pow, ← Nat.mul_mod, one_mul]
+      have hlt : $n % $k < $k := Nat.mod_lt _ (by norm_num)
+      generalize hr : $n % $k = r at hpow hlt
+      interval_cases r <;> norm_num at hpow <;> (try simp only [Nat.ModEq] at *) <;>
+        first | omega | (generalize $a ^ $n = x at *; omega) | (generalize $a ^ $n = x at *; split_ifs at * <;> omega)))
+
+-- `sum_induct k`: an identity between sums over `range (k + 1)` (or `Icc 0 k`) by induction
+-- on k. The step is mechanical: every sum over `range (j + 1)` in sight is peeled at both
+-- ends as facts, `2 ^ (k + 1 - x)` under a binder becomes `2 ^ (k - x) * 2` and the factor
+-- leaves the sum, Pascal splits `choose (a + 1) (x + 1)`, the new sums are peeled once more,
+-- and omega closes the linear system over the sums.
+section SumInduct
+open Lean Elab Tactic Meta
+
+elab "sum_peel_facts" : tactic => withMainContext do
+  let g ← getMainGoal
+  let mut targets : Array Expr := #[← instantiateMVars (← g.getType)]
+  for d in (← getLCtx) do
+    if !d.isImplementationDetail then
+      targets := targets.push (← instantiateMVars d.type)
+  let rec visit (e : Expr) (acc : Array (Expr × Expr)) : MetaM (Array (Expr × Expr)) := do
+    let mut acc := acc
+    if e.isAppOfArity ``Finset.sum 5 then
+      let args := e.getAppArgs
+      let s := args[3]!
+      let f := args[4]!
+      if s.isAppOfArity ``Finset.range 1 then
+        let n := s.appArg!
+        if n.isAppOfArity ``HAdd.hAdd 6 then
+          let k := n.getAppArgs[4]!
+          let one := n.getAppArgs[5]!
+          if one.nat? == some 1 || one.rawNatLit? == some 1 then
+            if !(acc.any fun p => p.1 == f && p.2 == k) then
+              acc := acc.push (f, k)
+    match e with
+    | .app a b => acc ← visit a acc; acc ← visit b acc
+    | .lam _ t b _ => acc ← visit t acc; acc ← visit b acc
+    | .forallE _ t b _ => acc ← visit t acc; acc ← visit b acc
+    | .letE _ t v b _ => acc ← visit t acc; acc ← visit v acc; acc ← visit b acc
+    | .mdata _ b => acc ← visit b acc
+    | .proj _ _ b => acc ← visit b acc
+    | _ => pure ()
+    return acc
+  let mut found : Array (Expr × Expr) := #[]
+  for t in targets do
+    found ← visit t found
+  let mut hyps : Array Hypothesis := #[]
+  for (f, k) in found do
+    if f.hasLooseBVars || k.hasLooseBVars then continue
+    try
+      let v1 ← mkAppM ``Finset.sum_range_succ #[f, k]
+      let v2 ← mkAppM ``Finset.sum_range_succ' #[f, k]
+      hyps := hyps.push { userName := `peel, type := ← inferType v1, value := v1 }
+      hyps := hyps.push { userName := `peel, type := ← inferType v2, value := v2 }
+    catch _ => pure ()
+  let (_, g') ← g.assertHypotheses hyps
+  replaceMainGoal [g']
+end SumInduct
+
+syntax "sum_induct" ident : tactic
+macro_rules
+  | `(tactic| sum_induct $k) => `(tactic| (
+      (try simp only [← Nat.range_succ_eq_Icc_zero] at *)
+      induction $k:ident with
+      | zero => first | simp | (simp; omega) | decide | norm_num
+      | succ k ih =>
+        sum_peel_facts
+        (try simp (disch := simp only [Finset.mem_range] at *; omega) only [Nat.succ_sub, pow_succ] at *)
+        (try simp only [mul_right_comm, ← Finset.sum_mul] at *)
+        (try simp only [← Nat.add_assoc, Nat.succ_eq_add_one, Nat.sub_self, Nat.add_sub_cancel_left,
+                        Nat.add_sub_cancel, pow_zero, pow_one, one_mul, mul_one, Nat.choose_zero_right] at *)
+        (try simp only [Nat.choose_succ_succ, Finset.sum_add_distrib] at *)
+        (try simp only [Nat.succ_eq_add_one, ← Nat.add_assoc] at *)
+        sum_peel_facts
+        (try simp only [Nat.choose_succ_succ, Finset.sum_add_distrib, Nat.succ_eq_add_one, ← Nat.add_assoc] at *)
+        first | omega | linarith | (ring_nf at *; omega)))
+
+-- `ico_blocks m`: a sum over `Ico a (g (m + 1))` equals the sum over j < m + 1 of the
+-- block sums over `Ico (g j) (g (j + 1))`, for g monotone with a ≤ g 1 (omega/nlinarith side
+-- goals): induction on m, the last block peeled off and joined by `sum_Ico_consecutive`.
+syntax "ico_blocks" ident : tactic
+macro_rules
+  | `(tactic| ico_blocks $m) => `(tactic| (
+      induction $m:ident with
+      | zero => simp
+      | succ k ih =>
+        first
+          | (rw [Finset.sum_Ico_succ_top (by omega), ← ih]
+             rw [Finset.sum_Ico_consecutive _ (by nlinarith) (by nlinarith)])
+          | (rw [Finset.sum_Ico_succ_top (by omega), ← ih]
+             rw [Finset.sum_Ico_consecutive _ (by omega) (by omega)])
+          | (symm; rw [Finset.sum_Ico_succ_top (by omega), ih]
+             rw [Finset.sum_Ico_consecutive _ (by nlinarith) (by nlinarith)])))
+
+-- `prime_to_bases p h`: from `h : m ∣ E` (m a numeral p divides, E a product of powers
+-- of at most two atoms) prove `p ∣ <the atoms' product>` or `p ∣ <the atom>`: Euclid's lemma
+-- down the product, `Nat.Prime.dvd_of_dvd_pow` at each base.
+syntax "prime_to_bases " num ppSpace term : tactic
+macro_rules
+  | `(tactic| prime_to_bases $p $h) => `(tactic| (
+      have vm_h : $p ∣ _ := Nat.dvd_trans (by norm_num) $h
+      repeat' (rcases (Nat.Prime.dvd_mul (by norm_num)).1 vm_h with vm_h | vm_h)
+      all_goals first
+        | exact vm_h
+        | exact Nat.Prime.dvd_of_dvd_pow (by norm_num) vm_h
+        | exact Dvd.dvd.mul_right vm_h _
+        | exact Dvd.dvd.mul_left vm_h _
+        | exact Dvd.dvd.mul_right (Nat.Prime.dvd_of_dvd_pow (by norm_num) vm_h) _
+        | exact Dvd.dvd.mul_left (Nat.Prime.dvd_of_dvd_pow (by norm_num) vm_h) _))
+
+-- `vm_sum_div_block`: a sum of x i / i over `Ico a b`, x positive and antitone, is at most
+-- the block's length times its first term (each term ≤ x a / a).
+private theorem vm_sum_div_block (x : ℕ → ℝ) (hpos : ∀ n, 0 < x n) (hanti : Antitone x) (a b : ℕ) (ha : 0 < a) :
+    ∑ i ∈ Finset.Ico a b, x i / (i : ℝ) ≤ ((b - a : ℕ) : ℝ) * (x a / (a : ℝ)) := by
+  have hapos : (0 : ℝ) < a := by exact_mod_cast ha
+  have hstep : ∀ i ∈ Finset.Ico a b, x i / (i : ℝ) ≤ x a / (a : ℝ) := by
+    intro i hi
+    rw [Finset.mem_Ico] at hi
+    have hi' : (a : ℝ) ≤ i := by exact_mod_cast hi.1
+    calc x i / (i : ℝ) ≤ x a / (i : ℝ) := div_le_div_of_nonneg_right (hanti hi.1) (by linarith)
+      _ ≤ x a / (a : ℝ) := div_le_div_of_nonneg_left (hpos _).le hapos hi'
+  calc ∑ i ∈ Finset.Ico a b, x i / (i : ℝ) ≤ ∑ i ∈ Finset.Ico a b, x a / (a : ℝ) := Finset.sum_le_sum hstep
+    _ = ((b - a : ℕ) : ℝ) * (x a / (a : ℝ)) := by rw [Finset.sum_const, Nat.card_Ico, nsmul_eq_mul]
 -- end of techniques
 
 
@@ -275,21 +411,4 @@ theorem rmo_2000_2
   (hy : 0 < y)
   (h : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8) :
   x = 9 ∧ y = 11 := by
-  have h_lower : (x + 1) ^ 3 < y ^ 3 := by
-    set_option maxHeartbeats 60000 in (nat_sub_exact; first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; omega))
-  have h_upper : y ^ 3 < (x + 3) ^ 3 := by
-    ring_nf; omega
-  have h_cases : x ≤ 9 := by
-    set_option maxHeartbeats 60000 in (by_contra hc; push_neg at hc; pow_squeeze y 3 (x + 2) with hc)
-  have h_main : x = 9 ∧ y = 11 := by
-    have hy_eq : y = x + 2 := by
-      have h1 : x + 1 < y :=
-        (Nat.pow_lt_pow_iff_left (by decide : (3 : ℕ) ≠ 0)).1 h_lower
-      have h2 : y < x + 3 :=
-        (Nat.pow_lt_pow_iff_left (by decide : (3 : ℕ) ≠ 0)).1 h_upper
-      have hle1 : x + 2 ≤ y := Nat.succ_le_iff.mpr h1
-      have hle2 : y ≤ x + 2 := (Nat.lt_succ_iff).mp h2
-      exact le_antisymm hle2 hle1
-    set_option maxHeartbeats 60000 in (interval_cases x <;> first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; omega))
-  trivial
-
+  set_option maxHeartbeats 400000 in (have hle : x ≤ 9 := (by by_contra hc; push_neg at hc; pow_squeeze y 3 (x + 2) with hc); have hge : 9 ≤ x := (by by_contra hc; push_neg at hc; nat_sub_exact; pow_squeeze y 3 (x + 1)); have hv : x = 9 := (by omega); subst hv; norm_num at h ⊢; first | done | omega | (pow_squeeze y 3 11) | nlinarith)

@@ -8,7 +8,7 @@
       "passed": true,
       "points": 1,
       "actual_cost_usd": 0.0,
-      "wall_s": 17.941,
+      "wall_s": 25.709,
       "models_used": [],
       "failure_reason": null
     }
@@ -16,8 +16,8 @@
   "total_points": 1,
   "max_points": 1,
   "actual_cost_usd": 0.0,
-  "wall_s_sum": 17.941,
-  "run_id": "28ee685a988845e48103ea7db15a06af",
-  "wall_s": 18.123,
-  "finished_at": "2026-09-03T10:05:00.552294+00:00"
+  "wall_s_sum": 25.709,
+  "run_id": "36b20dab52b44c4dbab45be689f11ca2",
+  "wall_s": 25.871,
+  "finished_at": "2026-09-05T09:27:12.779810+00:00"
 }

@@ -30,6 +30,10 @@ macro_rules
       | (rw [show $l = $r by norm_num] at $h:ident; divisor_split $h : $r)
       | divisor_cases $h)
   | `(tactic| divisor_cases $h : $e) => `(tactic| first | divisor_split $h : $e | divisor_cases $h)
+-- Unhygienic so that each case's `hx : d = ±m` and `hm` can be named by what
+-- follows (measured: hygienic `hx✝` left h_factor unrewritten in every case).
+set_option hygiene false in
+macro_rules
   | `(tactic| divisor_cases $h for $x : $l = $r) => `(tactic| (
       have hn : ($x).natAbs ∣ $r := by
         have hh := Int.natAbs_dvd_natAbs.mpr $h
@@ -265,59 +269,172 @@ macro_rules
         | (apply Nat.lt_succ_iff.mp; apply (Nat.pow_lt_pow_iff_left (by norm_num : (3 : ℕ) ≠ 0)).1
            first | omega | (norm_num at *; omega) | (norm_num at *; done))
       interval_cases $x <;> first | omega | (norm_num at *; done) | nlinarith | simp_all))
+
+-- `pow_cycle a m k n` (numerals a m k with a ^ k % m = 1): a ^ n % m cycles with period k;
+-- every case of n % k is finished by norm_num and omega (a ^ n generalised to an atom).
+syntax "pow_cycle" num num num ident : tactic
+macro_rules
+  | `(tactic| pow_cycle $a $m $k $n) => `(tactic| (
+      have hcyc : $a ^ $k % $m = 1 := by norm_num
+      have hpow : $a ^ $n % $m = $a ^ ($n % $k) % $m := by
+        conv_lhs => rw [← Nat.div_add_mod $n $k, pow_add, pow_mul]
+        rw [Nat.mul_mod, Nat.pow_mod, hcyc, one_pow, ← Nat.mul_mod, one_mul]
+      generalize hr : $n % $k = r at hpow hlt
+      interval_cases r <;> norm_num at hpow <;> (try simp only [Nat.ModEq] at *) <;>
+        first | omega | (generalize $a ^ $n = x at *; omega) | (generalize $a ^ $n = x at *; split_ifs at * <;> omega)))
+
+-- `sum_induct k`: an identity between sums over `range (k + 1)` (or `Icc 0 k`) by induction
+-- on k. The step is mechanical: every sum over `range (j + 1)` in sight is peeled at both
+-- ends as facts, `2 ^ (k + 1 - x)` under a binder becomes `2 ^ (k - x) * 2` and the factor
+-- leaves the sum, Pascal splits `choose (a + 1) (x + 1)`, the new sums are peeled once more,
+-- and omega closes the linear system over the sums.
+section SumInduct
+open Lean Elab Tactic Meta
+
+elab "sum_peel_facts" : tactic => withMainContext do
+  let g ← getMainGoal
+  let mut targets : Array Expr := #[← instantiateMVars (← g.getType)]
+  for d in (← getLCtx) do
+    if !d.isImplementationDetail then
+      targets := targets.push (← instantiateMVars d.type)
+  let rec visit (e : Expr) (acc : Array (Expr × Expr)) : MetaM (Array (Expr × Expr)) := do
+    let mut acc := acc
+    if e.isAppOfArity ``Finset.sum 5 then
+      let args := e.getAppArgs
+      let s := args[3]!
+      let f := args[4]!
+      if s.isAppOfArity ``Finset.range 1 then
+        let n := s.appArg!
+        if n.isAppOfArity ``HAdd.hAdd 6 then
+          let k := n.getAppArgs[4]!
+          let one := n.getAppArgs[5]!
+          if one.nat? == some 1 || one.rawNatLit? == some 1 then
+            if !(acc.any fun p => p.1 == f && p.2 == k) then
+              acc := acc.push (f, k)
+    match e with
+    | .app a b => acc ← visit a acc; acc ← visit b acc
+    | .lam _ t b _ => acc ← visit t acc; acc ← visit b acc
+    | .forallE _ t b _ => acc ← visit t acc; acc ← visit b acc
+    | .letE _ t v b _ => acc ← visit t acc; acc ← visit v acc; acc ← visit b acc
+    | .mdata _ b => acc ← visit b acc
+    | .proj _ _ b => acc ← visit b acc
+    | _ => pure ()
+    return acc
+  let mut found : Array (Expr × Expr) := #[]
+  for t in targets do
+    found ← visit t found
+  let mut hyps : Array Hypothesis := #[]
+  for (f, k) in found do
+    if f.hasLooseBVars || k.hasLooseBVars then continue
+    try
+      let v1 ← mkAppM ``Finset.sum_range_succ #[f, k]
+      let v2 ← mkAppM ``Finset.sum_range_succ' #[f, k]
+      hyps := hyps.push { userName := `peel, type := ← inferType v1, value := v1 }
+      hyps := hyps.push { userName := `peel, type := ← inferType v2, value := v2 }
+    catch _ => pure ()
+  let (_, g') ← g.assertHypotheses hyps
+  replaceMainGoal [g']
+end SumInduct
+
+syntax "sum_induct" ident : tactic
+macro_rules
+  | `(tactic| sum_induct $k) => `(tactic| (
+      (try simp only [← Nat.range_succ_eq_Icc_zero] at *)
+      induction $k:ident with
+      | zero => first | simp | (simp; omega) | decide | norm_num
+      | succ k ih =>
+        sum_peel_facts
+        (try simp (disch := simp only [Finset.mem_range] at *; omega) only [Nat.succ_sub, pow_succ] at *)
+        (try simp only [mul_right_comm, ← Finset.sum_mul] at *)
+        (try simp only [← Nat.add_assoc, Nat.succ_eq_add_one, Nat.sub_self, Nat.add_sub_cancel_left,
+                        Nat.add_sub_cancel, pow_zero, pow_one, one_mul, mul_one, Nat.choose_zero_right] at *)
+        (try simp only [Nat.choose_succ_succ, Finset.sum_add_distrib] at *)
+        (try simp only [Nat.succ_eq_add_one, ← Nat.add_assoc] at *)
+        sum_peel_facts
+        (try simp only [Nat.choose_succ_succ, Finset.sum_add_distrib, Nat.succ_eq_add_one, ← Nat.add_assoc] at *)
+        first | omega | linarith | (ring_nf at *; omega)))
+
+-- `ico_blocks m`: a sum over `Ico a (g (m + 1))` equals the sum over j < m + 1 of the
+-- block sums over `Ico (g j) (g (j + 1))`, for g monotone with a ≤ g 1 (omega/nlinarith side
+-- goals): induction on m, the last block peeled off and joined by `sum_Ico_consecutive`.
+syntax "ico_blocks" ident : tactic
+macro_rules
+  | `(tactic| ico_blocks $m) => `(tactic| (
+      induction $m:ident with
+      | zero => simp
+      | succ k ih =>
+        first
+          | (rw [Finset.sum_Ico_succ_top (by omega), ← ih]
+             rw [Finset.sum_Ico_consecutive _ (by nlinarith) (by nlinarith)])
+          | (rw [Finset.sum_Ico_succ_top (by omega), ← ih]
+             rw [Finset.sum_Ico_consecutive _ (by omega) (by omega)])
+          | (symm; rw [Finset.sum_Ico_succ_top (by omega), ih]
+             rw [Finset.sum_Ico_consecutive _ (by nlinarith) (by nlinarith)])))
+
+-- `prime_to_bases p h`: from `h : m ∣ E` (m a numeral p divides, E a product of powers
+-- of at most two atoms) prove `p ∣ <the atoms' product>` or `p ∣ <the atom>`: Euclid's lemma
+-- down the product, `Nat.Prime.dvd_of_dvd_pow` at each base.
+syntax "prime_to_bases " num ppSpace term : tactic
+macro_rules
+  | `(tactic| prime_to_bases $p $h) => `(tactic| (
+      have vm_h : $p ∣ _ := Nat.dvd_trans (by norm_num) $h
+      repeat' (rcases (Nat.Prime.dvd_mul (by norm_num)).1 vm_h with vm_h | vm_h)
+      all_goals first
+        | exact vm_h
+        | exact Nat.Prime.dvd_of_dvd_pow (by norm_num) vm_h
+        | exact Dvd.dvd.mul_right vm_h _
+        | exact Dvd.dvd.mul_left vm_h _
+        | exact Dvd.dvd.mul_right (Nat.Prime.dvd_of_dvd_pow (by norm_num) vm_h) _
+        | exact Dvd.dvd.mul_left (Nat.Prime.dvd_of_dvd_pow (by norm_num) vm_h) _))
+
+-- `vm_sum_div_block`: a sum of x i / i over `Ico a b`, x positive and antitone, is at most
+-- the block's length times its first term (each term ≤ x a / a).
+private theorem vm_sum_div_block (x : ℕ → ℝ) (hpos : ∀ n, 0 < x n) (hanti : Antitone x) (a b : ℕ) (ha : 0 < a) :
+    ∑ i ∈ Finset.Ico a b, x i / (i : ℝ) ≤ ((b - a : ℕ) : ℝ) * (x a / (a : ℝ)) := by
+  have hapos : (0 : ℝ) < a := by exact_mod_cast ha
+  have hstep : ∀ i ∈ Finset.Ico a b, x i / (i : ℝ) ≤ x a / (a : ℝ) := by
+    intro i hi
+    rw [Finset.mem_Ico] at hi
+    have hi' : (a : ℝ) ≤ i := by exact_mod_cast hi.1
+    calc x i / (i : ℝ) ≤ x a / (i : ℝ) := div_le_div_of_nonneg_right (hanti hi.1) (by linarith)
+      _ ≤ x a / (a : ℝ) := div_le_div_of_nonneg_left (hpos _).le hapos hi'
+  calc ∑ i ∈ Finset.Ico a b, x i / (i : ℝ) ≤ ∑ i ∈ Finset.Ico a b, x a / (a : ℝ) := Finset.sum_le_sum hstep
+    _ = ((b - a : ℕ) : ℝ) * (x a / (a : ℝ)) := by rw [Finset.sum_const, Nat.card_Ico, nsmul_eq_mul]
 -- end of techniques
 
 
 open Nat
 
+theorem vm_cell_11 (p q : ℕ) (hp : Nat.Prime p) (hq : Nat.Prime q) : p = q ∨ p = (3 : ℕ) ∧ q = (11 : ℕ) ∨ p = (11 : ℕ) ∧ q = (3 : ℕ) → ∃ m, p ^ (2 : ℕ) + (7 : ℕ) * p * q + q ^ (2 : ℕ) = m ^ (2 : ℕ) := by
+  intro h
+  rcases h with h_eq | h_cases
+  · refine ⟨3 * p, ?_⟩
+    subst h_eq
+    ring
+  · rcases h_cases with ⟨hp3, hq11⟩ | ⟨hp11, hq3⟩
+    · refine ⟨19, ?_⟩
+      subst hp3
+      subst hq11
+      norm_num
+    · refine ⟨19, ?_⟩
+      subst hp11
+      subst hq3
+      norm_num
+
+set_option maxHeartbeats 400000 in
+theorem vm_cell_5 (p q : ℕ) (hp : Nat.Prime p) (hq : Nat.Prime q) (m : ℕ) (hm : p ^ (2 : ℕ) + (7 : ℕ) * p * q + q ^ (2 : ℕ) = m ^ (2 : ℕ)) : p = q ∨ p = (3 : ℕ) ∧ q = (11 : ℕ) ∨ p = (11 : ℕ) ∧ q = (3 : ℕ) := by
+  set_option maxHeartbeats 400000 in (have hle : p + q ≤ m := (by nlinarith [Nat.Prime.two_le hp, Nat.Prime.two_le hq]); have hfac : (m - p - q) * (m + p + q) = 5 * p * q := (by obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le hle; subst hk; have hk' : p + q + k - p - q = k := (by omega); rw [hk']; ring_nf at hm ⊢; omega); have hdvd : m - p - q ∣ 5 * p * q := Dvd.intro _ hfac; prime_facts; divisor_cases hdvd <;> (first | (solve_sub; first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; omega) | (left; nlinarith) | (right; left; constructor <;> nlinarith) | (right; right; constructor <;> nlinarith) | (right; nlinarith) | (have hb_p : p ≤ 11 := (by rcases Nat.lt_or_ge q 3 with h3 | h3 <;> [(interval_cases q <;> nlinarith); nlinarith]); have hb_q : q ≤ 11 := (by rcases Nat.lt_or_ge p 3 with h3 | h3 <;> [(interval_cases p <;> nlinarith); nlinarith]); interval_cases p <;> interval_cases q <;> first | omega | (norm_num at *; done) | (simp_all; done))) | (first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (norm_num [Set.mem_insert_iff] at *; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; omega) | (left; nlinarith) | (right; left; constructor <;> nlinarith) | (right; right; constructor <;> nlinarith) | (right; nlinarith) | (have hb_p : p ≤ 11 := (by rcases Nat.lt_or_ge q 3 with h3 | h3 <;> [(interval_cases q <;> nlinarith); nlinarith]); have hb_q : q ≤ 11 := (by rcases Nat.lt_or_ge p 3 with h3 | h3 <;> [(interval_cases p <;> nlinarith); nlinarith]); interval_cases p <;> interval_cases q <;> first | omega | (norm_num at *; done) | (simp_all; done)))))
+
+theorem vm_cell_3 (p q : ℕ) (hp : Nat.Prime p) (hq : Nat.Prime q) : (∃ m, p ^ (2 : ℕ) + (7 : ℕ) * p * q + q ^ (2 : ℕ) = m ^ (2 : ℕ)) → p = q ∨ p = (3 : ℕ) ∧ q = (11 : ℕ) ∨ p = (11 : ℕ) ∧ q = (3 : ℕ) := by
+  intro h
+  rcases h with ⟨m, hm⟩
+  first | (exact vm_cell_5 p q ‹_› ‹_› m ‹_›) | (exact vm_cell_5 p q hp hq m hm) | (apply vm_cell_5 <;> assumption)
+
 theorem rmo_2001_2 (p q : ℕ) (hp : Nat.Prime p) (hq : Nat.Prime q) :
   (∃ m : ℕ, p^2 + 7*p*q + q^2 = m^2) ↔
     (p = q ∨ (p = 3 ∧ q = 11) ∨ (p = 11 ∧ q = 3)) := by
   constructor
-  intro h
-  rcases h with ⟨m, hm⟩
-  have h1 : m > p + q := by
-    nlinarith [Nat.Prime.two_le hp, Nat.Prime.two_le hq]
   case mp =>
-    have h3 : (m - p - q) * (m + p + q) = 5 * p * q := by
-      have h4 : m ≥ p + q := by omega
-      have h5 : m ^ 2 - (p + q) ^ 2 = 5 * p * q := by
-        have h6 : m ^ 2 = p ^ 2 + 7 * p * q + q ^ 2 := by linarith
-        have h7 : (p + q) ^ 2 = p ^ 2 + 2 * p * q + q ^ 2 := by ring
-        rw [h6, h7]
-        ring_nf
-        <;> omega
-      have h8 : m - p - q ≥ 0 := by omega
-      have h9 : m + p + q > 0 := by nlinarith [Nat.Prime.pos hp, Nat.Prime.pos hq]
-      have h10 : (m - p - q) * (m + p + q) = m ^ 2 - (p + q) ^ 2 := by
-        cases' le_iff_exists_add.mp h4 with k hk
-        simp [hk, Nat.mul_sub_left_distrib, Nat.mul_sub_right_distrib, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm, Nat.sub_add_cancel]
-        <;> ring_nf at * <;> omega
-      rw [h10] at *
-      exact h5
-
-    have h4 : m - p - q ∣ 5 * p * q := by
-      use m + p + q
-      exact h3.symm ▸ by ring
-    have h5 : m - p - q = 1 ∨ m - p - q = 5 ∨ m - p - q = p ∨ m - p - q = q ∨ m - p - q = 5 * p ∨ m - p - q = 5 * q ∨ m - p - q = p * q ∨ m - p - q = 5 * p * q := by
-      set_option maxHeartbeats 60000 in (prime_facts; divisor_cases h4 <;> (first | (solve_sub; first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; done) | (norm_num [Set.mem_insert_iff] at *; omega) | (left; nlinarith) | (right; left; constructor <;> nlinarith) | (right; right; constructor <;> nlinarith) | (right; nlinarith) | (have hb_p : p ≤ 5 := (by rcases Nat.lt_or_ge q 3 with h3 | h3 <;> [(interval_cases q <;> nlinarith); nlinarith]); have hb_q : q ≤ 5 := (by rcases Nat.lt_or_ge p 3 with h3 | h3 <;> [(interval_cases p <;> nlinarith); nlinarith]); interval_cases p <;> interval_cases q <;> first | omega | (norm_num at *; done) | (simp_all; done))) | (first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; omega) | (left; nlinarith) | (right; left; constructor <;> nlinarith) | (right; right; constructor <;> nlinarith) | (right; nlinarith) | (have hb_p : p ≤ 5 := (by rcases Nat.lt_or_ge q 3 with h3 | h3 <;> [(interval_cases q <;> nlinarith); nlinarith]); have hb_q : q ≤ 5 := (by rcases Nat.lt_or_ge p 3 with h3 | h3 <;> [(interval_cases p <;> nlinarith); nlinarith]); interval_cases p <;> interval_cases q <;> first | omega | (norm_num at *; done) | (simp_all; done)))))
-    set_option maxHeartbeats 60000 in (prime_facts; rcases h5 with hc | hc | hc | hc | hc | hc | hc | hc <;> (solve_sub; first | (simp only [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; first | omega | (simp_all <;> omega)) | omega | (norm_num at *; done) | nlinarith | (simp_all; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; done) | (norm_num [Set.mem_insert_iff, Set.mem_singleton_iff, Prod.mk.injEq, Finset.mem_insert, Finset.mem_singleton] at *; omega) | (left; nlinarith) | (right; left; constructor <;> nlinarith) | (right; right; constructor <;> nlinarith) | (right; nlinarith) | (have hb_p : p ≤ 11 := (by rcases Nat.lt_or_ge q 3 with h3 | h3 <;> [(interval_cases q <;> nlinarith); nlinarith]); have hb_q : q ≤ 11 := (by rcases Nat.lt_or_ge p 3 with h3 | h3 <;> [(interval_cases p <;> nlinarith); nlinarith]); interval_cases p <;> interval_cases q <;> first | omega | (norm_num at *; done) | (simp_all; done))))
+    first | (exact vm_cell_3 p q ‹_› ‹_›) | (exact vm_cell_3 p q hp hq) | (apply vm_cell_3 <;> assumption)
   case mpr =>
-    intro h
-    rcases h with h_eq | h_cases | h_cases'
-    case inl =>
-      refine ⟨3 * p, ?_⟩
-      simp [h_eq, pow_two, mul_comm, mul_left_comm, mul_assoc]
-      ring
-    case inr.inl =>
-      rcases h_cases with ⟨hp3, hq11⟩
-      subst hp3
-      subst hq11
-      exact ⟨19, by norm_num⟩
-    case inr.inr =>
-      rcases h_cases' with ⟨hp11, hq3⟩
-      subst hp11
-      subst hq3
-      refine ⟨19, ?_⟩
-      norm_num
-
+    first | (exact vm_cell_11 p q ‹_› ‹_›) | (exact vm_cell_11 p q hp hq) | (apply vm_cell_11 <;> assumption)

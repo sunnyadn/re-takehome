@@ -4,19 +4,25 @@
     "solved_by": "deterministic_sweep",
     "accepted_by_repl": true,
     "spend_usd": 0.0,
-    "wall_s": 3.4,
-    "turns": 2,
+    "wall_s": 4.7,
+    "turns": 3,
     "events": [
       {
         "stage": "sweep",
         "accepted": true
       },
       {
+        "stage": "memory",
+        "checks": 53,
+        "mb": 712
+      },
+      {
         "stage": "verify",
         "accepted": true,
         "faults": [],
-        "compile_ms": 118,
-        "slow": false
+        "compile_ms": 138,
+        "slow": false,
+        "techniques": "dropped"
       }
     ]
   }

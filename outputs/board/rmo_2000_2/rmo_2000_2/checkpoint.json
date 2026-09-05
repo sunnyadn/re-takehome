@@ -3,439 +3,48 @@
     "strategy": "board",
     "solved_by": "board_loop",
     "accepted_by_repl": true,
-    "spend_usd": 0.008229,
-    "wall_s": 344.0,
-    "turns": 70,
+    "spend_usd": 0.0,
+    "wall_s": 31.9,
+    "turns": 7,
     "events": [
       {
+        "stage": "memory",
+        "checks": 42,
+        "mb": 694
+      },
+      {
+        "stage": "memory",
+        "checks": 44,
+        "mb": 702
+      },
+      {
+        "stage": "memory",
+        "checks": 48,
+        "mb": 711
+      },
+      {
         "kind": "closers",
         "by": "harness",
         "accepted": false,
-        "ms": 694
+        "ms": 1078
+      },
+      {
+        "stage": "memory",
+        "checks": 52,
+        "mb": 857
       },
       {
         "kind": "leaf",
         "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ x = 9 ∧ y = 11",
-        "accepted": false,
-        "tried": 1,
-        "ms": 1961
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.lt_of_pow_lt_pow_left"
-        ],
-        "ms": 1724,
-        "found": true
-      },
-      {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) < y ^ (3 : ℕ)",
-        "verdict": "refuted",
-        "values": {
-          "x": "9",
-          "y": "11"
-        }
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "y ^ (3 : ℕ) < (x + (3 : ℕ)) ^ (3 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "x + (2 : ℕ) < y",
-        "verdict": "refuted",
-        "values": {
-          "x": "9",
-          "y": "11"
-        }
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "library",
-        "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ x = 9 ∧ y = 11",
-        "found": 58,
-        "accepted": false,
-        "ms": 1132
-      },
-      {
-        "stage": "library",
-        "tokens": [
-          "pow",
-          "nat",
-          "lt"
-        ],
-        "lines": 12,
-        "ms": 67560
-      },
-      {
-        "kind": "restated",
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "plan",
-        "by": "openai/gpt-oss-120b",
-        "chars": 1832
-      },
-      {
-        "kind": "plan",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 1733
-      },
-      {
-        "kind": "skeleton",
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "route",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "to": "rmo_2000_2"
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "(x + (1 : ℕ)) ^ (3 : ℕ) < y ^ (3 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "x ≤ (9 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "x = (9 : ℕ) ∧ y = (11 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": true
-      },
-      {
-        "stage": "route",
-        "from": 0,
-        "to": 1,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "route",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "to": "rmo_2000_2"
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "y ^ (3 : ℕ) - (x + (2 : ℕ)) ^ (3 : ℕ) = (2 : ℕ) * x * (x - (9 : ℕ))",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "(x + (3 : ℕ)) ^ (3 : ℕ) > y ^ (3 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "x = (9 : ℕ) ∨ x > (9 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "x = (9 : ℕ) → y = (11 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "x > (9 : ℕ) → False",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": true
-      },
-      {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 70,
-        "elapsed_s": 191
-      },
-      {
-        "kind": "search-retry",
-        "by": "openai/gpt-oss-120b",
-        "accepted": false
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "x + (1 : ℕ) < y",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "y < x + (3 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "x + (2 : ℕ) ≤ y",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "y ≤ x + (2 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "mined",
-        "by": "openai/gpt-oss-120b",
-        "facts": 6
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "stage": "fork",
-        "from": 0,
-        "to": 2,
-        "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 "
-      },
-      {
-        "stage": "prune",
-        "bid": 2,
-        "goals": 7
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 2128
-      },
-      {
-        "kind": "leaf",
-        "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ y ^ 3 - (x + 2) ^ 3 = 2 * x * (x - 9)",
-        "accepted": false,
-        "tried": 1,
-        "ms": 2326
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 1148
-      },
-      {
-        "kind": "leaf",
-        "goal": "x y : ℕ\nhx : 0 < x\nhy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\n⊢ (x + 1) ^ 3 < y ^ 3",
-        "block": "set_option maxHeartbeats 60000 in (nat_sub_exact; first | (simp only [Set.mem_in",
+        "block": "set_option maxHeartbeats 400000 in (have hle : x ≤ 9 := (by by_contra hc; push_n",
         "accepted": true,
-        "ms": 4020
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "(x + (2 : ℕ)) ^ (3 : ℕ) = x ^ (3 : ℕ) + (6 : ℕ) * x ^ (2 : ℕ) + (12 : ℕ) * x + (8 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "x ^ (3 : ℕ) + (8 : ℕ) * x ^ (2 : ℕ) - (6 : ℕ) * x + (8 : ℕ) - (x ^ (3 : ℕ) + (6 : ℕ) * x ^ (2 : ℕ) +",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": true,
-        "ms": 3845
-      },
-      {
-        "kind": "collapse",
-        "tactic": "ring_nf; omega",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 2643
-      },
-      {
-        "kind": "leaf",
-        "goal": "^ 3 + 8 * x ^ 2 - 6 * x + 8\nh_diff : y ^ 3 - (x + 2) ^ 3 = 2 * x * (x - 9)\nh_upper : (x + 3) ^ 3 > y ^ 3\n⊢ x = 9 ∨ x > 9",
-        "accepted": false,
-        "tried": 1,
-        "ms": 3674
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": true,
-        "ms": 6350
-      },
-      {
-        "kind": "collapse",
-        "tactic": "ring_nf; omega",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 3383
-      },
-      {
-        "kind": "leaf",
-        "goal": "hy : 0 < y\nh : y ^ 3 = x ^ 3 + 8 * x ^ 2 - 6 * x + 8\nh_lower : (x + 1) ^ 3 < y ^ 3\nh_upper : y ^ 3 < (x + 3) ^ 3\n⊢ x ≤ 9",
-        "block": "set_option maxHeartbeats 60000 in (by_contra hc; push_neg at hc; pow_squeeze y 3",
-        "accepted": true,
-        "ms": 5120
-      },
-      {
-        "kind": "restated",
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 4025
-      },
-      {
-        "kind": "leaf",
-        "goal": "^ 3 + 8 * x ^ 2 - 6 * x + 8\nh_lower : (x + 1) ^ 3 < y ^ 3\nh_upper : y ^ 3 < (x + 3) ^ 3\nh_cases : x ≤ 9\n⊢ x = 9 ∧ y = 11",
-        "accepted": false,
-        "tried": 3,
-        "ms": 9971
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 1192
-      },
-      {
-        "kind": "restated",
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 1625
-      },
-      {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 70,
-        "elapsed_s": 296
-      },
-      {
-        "kind": "prefix",
-        "by": "openai/gpt-oss-120b",
-        "lines": 8
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "y = x + (2 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "x = (9 : ℕ) ∧ y = (11 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 4002
-      },
-      {
-        "kind": "leaf",
-        "goal": "6 * x + 8\nh_lower : (x + 1) ^ 3 < y ^ 3\nh_upper : y ^ 3 < (x + 3) ^ 3\nh_cases : x ≤ 9\nhy_eq : y = x + 2\n⊢ x = 9 ∧ y = 11",
-        "block": "set_option maxHeartbeats 60000 in (interval_cases x <;> first | (simp only [Set.",
-        "accepted": true,
-        "ms": 16531
-      },
-      {
-        "kind": "cut",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "kept": 17
-      },
-      {
-        "kind": "restated",
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": true,
-        "ms": 7771
-      },
-      {
-        "kind": "collapse",
-        "tactic": "trivial",
-        "accepted": true
+        "ms": 10675
       },
       {
         "stage": "verify",
         "accepted": true,
         "faults": [],
-        "compile_ms": 4019,
+        "compile_ms": 5205,
         "slow": false,
         "techniques": "kept"
       }

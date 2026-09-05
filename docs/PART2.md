@@ -1,86 +1,75 @@
 ---
-title: "Two models on one Lean file: did the pair beat either model alone?"
+title: "Two models on one Lean file: what solved the problems, and what did not"
 author: "Guang (Sunny) Yang"
-date: "3 September 2026"
+date: "5 September 2026"
 ---
 
 ## The question
 
-The submission (`submission/board_agent.py`, described in `docs/APPROACH.md`) puts `qwen/qwen3.5-flash-02-23` and `openai/gpt-oss-120b` on one shared Lean file. Each open `sorry` is a goal. A model takes a goal, writes one step, Lean judges it, and every statement a model writes is audited against a computed witness, named by the auditing model, before it stays in the file. This note asks two things: did that pair solve more than either model on its own, and when it did, what in the transcripts did the work.
+The submission (`submission/board_agent.py`, described in `docs/APPROACH.md`) puts `qwen/qwen3.5-flash-02-23` and `openai/gpt-oss-120b` on one shared Lean file. Each open `sorry` is a goal, a model takes a goal and writes one step, Lean judges it, and every statement a model writes is audited (by evaluation where the statement's binders allow it, by sampling for statements about a sequence, by the other model otherwise). This note asks what the pair solved that a single model in the kit's loop did not, and, run by run, whether the work was done by a model step, by the other model's check, or by a mechanism of the harness that asks no model at all.
 
-## The arms, and what they do not control for
+## Arms
 
 | Arm | What it is | Runs |
 | --- | --- | --- |
-| qwen solo | the kit's `baselines/simple_agent.py` with `BASELINE_MODEL=qwen/qwen3.5-flash-02-23`, as shipped in `outputs/baseline/` (`run.json`: 1200 s per problem, the agent cut at 1080 s, 4 workers) | 1 per problem |
-| gpt-oss solo | the same baseline with `openai/gpt-oss-120b`, as shipped (1200 s, agent cut at 1080 s, 5 workers) | 1 per problem |
-| board (pair) | the submission, `VM_TIME_LIMIT_S=1800` (sample problems, `putnam_2020_a2`) or `3600` (the other hard problems), `VM_BUDGET_USD=1.00`, one worker. Artifacts in `outputs/board/` | 1 per problem, more where stated |
+| qwen solo | the kit's `baselines/simple_agent.py` with `BASELINE_MODEL=qwen/qwen3.5-flash-02-23`, as shipped in `outputs/baseline/` (1200 s per problem, cut at 1080 s, 4 workers) | 1 per problem |
+| gpt-oss solo | the same baseline with `openai/gpt-oss-120b`, as shipped (1200 s, cut at 1080 s, 5 workers) | 1 per problem |
+| board (pair) | the submission at commit `7a036d9`, `VM_TIME_LIMIT_S=1800` (sample problems) or `3600` (the harder six), `VM_BUDGET_USD=1.00`, one worker, on a 4-core machine | 1 per problem, plus the other runs stated per row |
 
-This is not a clean ablation. The solo arms are the kit's draft-compile-repair loop, not the board with one model removed, so a difference between the arms mixes "two models" with "a different scaffold". The clocks differ: the solo arms had 1200 s per problem and were cut at 1080 s, the board had 1800 or 3600 s. Where a solo arm was cut by the clock the table says `t/o`, because that is a run that was stopped, not one that was beaten. The board's three wins that no solo arm has (p09, p10, rmo_2000_6) came at 343 s, 155 s and 378 s, inside the solo arms' clock, so the board did not need its longer window for them, but the solo arms were never given the chance to fail on their own. The solo arms also ran 4 or 5 problems concurrently on one GCP machine and the board ran one at a time on other machines, so wall times are comparable within an arm and not across arms. The board arm is my own runs. The comparison says what the pair did that the shipped single-model loops did not. It does not isolate the second model as the cause. The ablation that would (the board with the same model in both seats, and the board with the audit removed) was not run before this submission.
+The solo arms are the kit's draft-compile-repair loop, not the board with one model removed, and their clock was shorter, so the comparison says what the pair did that the shipped single-model loops did not. It does not isolate the second model as the cause. Where a solo arm was cut by the clock the table says `t/o`.
 
 ## Results
 
-Score is the kit comparator's verdict, 1 or 0. Wall time is seconds.
+Score is the kit comparator's verdict. Wall time is the agent's own `wall_s` in seconds, comparator excluded. Cost is the OpenRouter spend of the run. "Other runs" counts every other run of the same problem on the final commit and the seven commits before it, back to the one that introduced the leaf blocks, which differ from it only in those blocks and the three fixes described below. A dagger marks a row whose run is on the commit before the final one, `12bf666`, the final commit's run of that problem not being the one kept under `outputs/board/` when this note was written.
 
-| Problem | qwen solo | gpt-oss solo | board | board $ |
-| --- | --- | --- | --- | --- |
-| p01_linear | 1 (65) | 1 (60) | 1 (3) | 0 |
-| p02_frac_cancel | 1 (65) | 1 (76) | 1 (3) | 0 |
-| p03_sq_ge_two_ab | 1 (69) | 1 (99) | 1 (7) | 0.0002 |
-| p04_sum_sq | 1 (64) | 1 (79) | 1 (3) | 0 |
-| p05_gcd_mersenne | 0 (363) | 1 (140) | 1 (3) | 0 |
-| p06_pow_mod | 1 (135) | 0 (713) | 1 (58) | 0.0039 |
-| p07_least_divisible | 1 (391) | 1 (795) | 1 (11) | 0.0004 |
-| p08_sum_products | 1 (70) | t/o | 1 (14) | 0.0006 |
-| p09_imo1964 | 0 (819) | t/o | 1 (343), 2 of 3 runs (343 s, 918 s, one run reached the clock), 6 of 6 on v7.40 | 0.013 |
-| p10_factorial_pow | 0 (235) | t/o | 1 (155) | 0.0046 |
-| putnam_2018_a1 | t/o | 1* | 0 (2726) | 0.073 |
-| putnam_2020_a2 | 0 (614) | 1* | 0 (1296) | 0.054 |
-| rmo_2000_2 | 0 (835) | t/o | 0 (2705) | 0.078 |
-| rmo_2000_3 | t/o | t/o | 0 (see note) | |
-| rmo_2000_6 | 0 (904) | t/o | 1 (378) | 0.021 |
-| rmo_2001_2 | t/o | t/o | 0 (2655) | 0.111 |
-| **Total of 16** | **7** | **8 (6 without \*)** | **11** | |
-
-Wall time is the agent's own `wall_s` in `result.json`, comparator time excluded. `t/o` is `agent exceeded 1080.0s` in the kit's `summary.json` (3 of qwen's 9 zeros, 7 of gpt-oss's 8). The board runs for `putnam_2018_a1`, `rmo_2000_2` and `rmo_2001_2` are from the commit two before the final one (v7.59), which differs from it only in how Lean positions are mapped when a challenge has more than one import line, and all three challenges have one. The `rmo_2000_6` artifact is a run of an identical copy of the problem under the id `rmo6y`, made so that several copies could run at once.
+| Problem | qwen solo | gpt-oss solo | board | board $ | other runs |
+| --- | --- | --- | --- | --- | --- |
+| p01_linear | 1 (65) | 1 (60) | 1 (4) | 0 | |
+| p02_frac_cancel | 1 (65) | 1 (76) | 1 (4) | 0 | |
+| p03_sq_ge_two_ab | 1 (69) | 1 (99) | 1 (48) | 0.001 | |
+| p04_sum_sq | 1 (64) | 1 (79) | 1 (5) | 0 | |
+| p05_gcd_mersenne | 0 (363) | 1 (140) | 1 (4) | 0 | |
+| p06_pow_mod | 1 (135) | 0 (713) | 1 (77) | 0 | 2 of 2 (63 s, 82 s, no model call) |
+| p07_least_divisible | 1 (391) | 1 (795) | 1 (30) | 0.001 | |
+| p08_sum_products | 1 (70) | t/o | 1 (39) | 0.001 | |
+| p09_imo1964 | 0 (819) | t/o | 1 (60) | 0.0004 | 1 of 1 (56 s) |
+| p10_factorial_pow | 0 (235) | t/o | 1 (754) | 0.041 | 5 of 5 (114 to 1220 s) |
+| putnam_2018_a1 | t/o | 1* | 1 (2611)† | 0.058 | 7 of 8 (283 to 1428 s) |
+| putnam_2020_a2 | 0 (614) | 1* | 1 (67) | 0 | 4 of 4 (48 to 58 s, no model call) |
+| rmo_2000_2 | 0 (835) | t/o | 1 (32) | 0 | 4 of 4 (23 to 26 s, no model call) |
+| rmo_2000_3 | t/o | t/o | 0 (see note)† | | 0 of 4 |
+| rmo_2000_6 | 0 (904) | t/o | 1 (276) | 0.006 | 9 of 16 |
+| rmo_2001_2 | t/o | t/o | 1 (439)† | 0.003 | 8 of 9 (408 to 648 s) |
+| **Total of 16** | **7** | **8 (6 without \*)** | **15** | | |
 
 \* These two passes predate the kit's PR #9 ("Inline the Putnam answers so circular solutions stop scoring"). They used the answer to prove the answer and would not score now.
 
-Note on `rmo_2000_3`: the challenge file as shipped does not build under its own imports in the comparator (`Finset.sum` and `Finset.Ico` on ℕ need `Mathlib.Algebra.BigOperators.Group.Finset.Basic` and `Mathlib.Order.Interval.Finset.Nat`), so no solution can score on it as published. I added the two imports in my local copy so the agent could be measured on it. That run had not finished when this note was written, and the row above is on the unedited problem for the solo arms.
+On `rmo_2000_3`, the challenge file as shipped does not build under its own imports in the comparator (`Finset.sum` and `Finset.Ico` on ℕ need `Mathlib.Algebra.BigOperators.Group.Finset.Basic` and `Mathlib.Order.Interval.Finset.Nat`), so no solution can score on it as published. On a local copy with the two imports added, a proof of the statement written by hand compiles in the harness image in 0.6 s (a bound on each block `[j², (j+1)²)`, the block decomposition of the sum, the assembly), and the agent's runs on that copy are 0 of 5. The transcripts agree on the cause. Both models decompose the sum by `√k` instead of by the blocks and drop the factor 3 from the block bound, and the harness has a block for proving the right bound but nothing that chooses the right decomposition. That is a route search the submission does not have.
 
-One note on the per-model counts below: `result.json` keeps only the last 60 agent events per run, so for the two runs longer than 60 events (p09 and `rmo_2000_6`) the step counts are the tail of the run; `transcript.json` holds every call (p09: 67 model calls).
+Five of the seven failures behind the "other runs" column of `rmo_2000_6` each died on the same goal, `⊢ 10 ≤ a * b` under `2000 ∣ a ^ i * b ^ j` (6 model tries each), until the `prime_to_bases` leaf below. The other two came from the harness itself. One reopened a lost goal inside the cell that had just closed it (the placeholder went to the wrong side of the cell's link line), so a correct leaf was refused, and one had qwen return the same step 1190 times in a row for the same goal while the board waited for something new. Both are fixed. The run after those fixes failed too, and its transcript found a third fault, in the cells themselves. A hypothesis the context holds under an inaccessible name (`a✝ : 10 ∈ S`) comes back from `extract_goal` as an arrow premise of the statement, `10 ∈ S → ∀ n ∈ S, 10 ≤ n`, while the goal the models and the leaves see prints as `⊢ ∀ n ∈ S, 10 ≤ n`. The link from the proof to that cell then passed no argument (10 failed checks in two runs), and a leaf's `intro n` took the premise for its variable. On the final commit such a premise is a named binder of the cell, and a leaf reads past `∀ n ∈ S, 10 ≤ n` (and its two other printings) to the goal it closes. The two runs on that commit pass in 276 s and 469 s, the wrapped goal closed by the leaf in 8 s and 15 s, with no failed link.
 
-## Where the pair won, and what did the work
+## What did the work
 
-The transcripts of the board's passing runs (`outputs/board/<problem>/`, the `agent_metadata.events` list in each `result.json`) record who wrote each accepted step, who audited it, and what closed each goal without a model. Q is qwen, G is gpt-oss. "Steps" counts accepted over attempted.
+The transcripts of the passing runs record who wrote each accepted step, who audited it, and what closed a goal with no model asked. Three layers show up, and on the harder problems the second is the one that scores.
 
-| Problem | Model calls | Steps Q | Steps G | Audits (all by G) | Closed by Lean alone |
-| --- | --- | --- | --- | --- | --- |
-| p01, p02, p04, p05 | 0 | 0 | 0 | 0 | whole theorem, first check |
-| p03 | 3 | 1/1 | 0/1 | 1 | |
-| p06 | 23 | 4/10 | 3/4 | 7 | 2 goals |
-| p07 | 1 | 0 | 0 | 0 | 1 goal |
-| p08 | 4 | 1/1 | 0/1 | 2 | |
-| p09 | 67 | 10/15 (tail) | 3/4 (tail) | 6 | 2 goals |
-| p10 | 17 | 3/5 | 3/3 | 11 | |
-| rmo_2000_6 | 57 | 5/8 (tail) | 5/6 (tail) | 15 | 2 goals (witness search) |
+The first layer is the models' steps. On the final build's hard passes, `rmo_2000_6` accepted 1 of 1 gpt-oss steps and 4 of 6 qwen steps, and on the commit before, `rmo_2001_2` 3 of 3 and 1 of 3, `putnam_2018_a1` 7 of 16 and 16 of 32. qwen writes more of the accepted steps and gpt-oss's acceptance rate is the higher one. gpt-oss does every model audit (2, 0 and 42 on those three runs, with no refutation by evaluation needed before it was asked). The seats were fixed this way after 12 audits by qwen in which it named values that violated a hypothesis every time.
 
-Three things follow.
+The second layer is Lean asked instead of a model. It holds a cocktail of closing tactics before any model sees a goal (p01, p02, p04, p05 close on the first check), a witness search for decidable existentials (`rmo_2000_6`'s membership goal), `#eval` of a closed answer term by the harness where a problem asks for a value (`p06`, after both models failed to write the `#eval` themselves), and tactic blocks built from the goal's shape and tried before a model. Those blocks are `pow_cycle` (p09's `2 ^ n % 7`), `divisor_cases` from a product equation (`putnam_2018_a1`, `rmo_2001_2`), `prime_to_bases` from a divisibility by a numeral (`rmo_2000_6`), the two-sided squeeze of a cube (`rmo_2000_2`, whose final runs make no model call), and `sum_induct` and `ico_blocks` for sum identities. Each of these was written after a measured failure on a goal that both models had tried and missed, and each is a shape of goal, not a problem's answer. On `rmo_2000_2`, `putnam_2020_a2` and `p06` the whole proof is this layer and the run costs nothing.
 
-**On 5 of the 10 sample problems the pair is not the reason.** p01, p02, p04, p05 close on the first Lean check from a fixed cocktail of closing tactics with 0 model calls, and p07 with 1 call after the cocktail closed one of its goals. qwen solo lost p05 on a problem that `decide` closes. That is a harness gain, and any single-model agent could have it.
+The third layer is a generalisation the models could not produce. `putnam_2020_a2` (`∑_{j ≤ k} 2^(k−j) C(k+j, j) = 4^k`) is not closed under induction on `k`. Asked for a generalisation with one extra parameter, the two models gave 0 true and new statements in 32 samples (gpt-oss returned the same false family eight times). The harness generalises mechanically. The occurrences of `k` on the left are split into two groups, each family is tabulated in Lean, a library of shapes is fitted to the table, and a fit verified below 11 in both variables is posted as a lemma (`∑_{j ≤ k} 2^(k−j) C(n+j, j) = ∑_{i ≤ k} C(n+k+1, i)`). `sum_induct` proves that lemma in 0.5 s, the theorem is rewritten by it, and `apply?` returns `Nat.sum_range_choose_halfway`. No model wrote a step of that proof.
 
-**On the 5 that needed model steps, the roles were not symmetric.** qwen wrote most of the accepted steps on p09 (10 of 13) and p06 (4 of 7), and on the four problems where each model attempted 3 or more steps gpt-oss's acceptance rate was the higher one (p06 3/4 against 4/10, p09 3/4 against 10/15, p10 3/3 against 3/5, rmo_2000_6 5/6 against 5/8). On p03 and p08 each model wrote once and qwen's step was the one accepted, so this is a tendency at small counts, not a law. Every audit in these runs was performed by gpt-oss, and that is by design: measured over 12 audits, qwen named values that violated a hypothesis every time (at about 9 s a reply) and gpt-oss answered in about 1.4 s, so the auditor's seat went to gpt-oss, for its own statements too. The pattern the board settled into is qwen proposing more, gpt-oss checking everything and finishing more. p09, p10 and rmo_2000_6 are the problems neither solo arm solved inside its 1080 s, and on all three both models have accepted steps in the final proof.
+## Where the pair added something, and where it did not
 
-**The audit's value shows up as what it kept out, and that was measured earlier, not in these runs.** In the passing runs above the audit verdicts were "holds", "unverified" (no computable witness) or "unstated", and no accepted step was refuted. The case for the audit is the run on `rmo_2000_6` before the audit covered prefix cuts, where a false intermediate claim survived a prefix cut and the run built on it for the rest of the hour (`docs/APPROACH.md`, "Every statement a model writes is audited"). One measured save, not a rate.
+The audit is where the second model earns its seat, and the measurements narrow that to one kind of claim. Over the runs kept from one day (v7.63 to v7.74, 59 runs), audit calls were about half of all calls (107 of 220, 78 of 169, 81 of 196, 108 of 285 on four `putnam_2020_a2` runs) and their reply latency about equal to the steps' (1990 s against 1921 s on one run, one audit reply holding the board lock for 482 s). Every refutation of a claim with ℕ binders came from the evaluation walk, not from the auditing model, and the auditor's own refutations were closed claims, which need no model, and ℤ claims. Since then the auditor is asked only what the walk cannot decide, and on the final hard passes it is asked 0 to 25 times per run. The sampled audit over a sequence (`rmo_2000_3`) refuted 3 of 47 model statements that the auditing model had passed as "unverified".
 
-## Where the pair did not win
+Where the second model did not help is the step itself. In the matrix on v7.91 (1800 s, two runs each), the pair scored p09 1 of 2, p10 2 of 2, `rmo_2000_6` 2 of 2. With qwen in both seats it scored 1 of 2, 2 of 2, 0 of 2, with the audit disabled 1 of 2, 1 of 2, 1 of 2, and gpt-oss in both seats 0 of 6, which is throughput (about 10 calls in 1240 s, each reply near the 4000-token cap at 12 to 27 tokens per second), not knowledge. The pair is the arm that never lost `rmo_2000_6`, and the one-seat and no-audit arms lost it on a false intermediate claim the audit would have caught.
 
-Four problems are 0 on every version of the agent, at 1 h per run: `putnam_2018_a1`, `putnam_2020_a2`, `rmo_2000_2`, `rmo_2001_2`. On each, the board reaches the mathematical crux and carries true, audited facts about it, and neither model lands the Lean technique the crux needs. The clearest case is `putnam_2018_a1`: the divisor enumeration (`Nat.Coprime.divisors_mul` over `2² · 1009²`) was reached in every run and finished in none. A second model checking the first does not add Mathlib knowledge that neither has.
+## Architecture
 
-What the pair does add is a second draw from the same distribution, and the transcripts say how much that is worth here. Across 9 earlier runs about 450 rejected steps were the models writing Lean 3 or old Mathlib (a comma at the end of a tactic line, `cases h with a b`, `∑ x in s`, `7!` without `open Nat`), and both models write these. The board fixes them at the parsing layer, not by asking the other model. Measured on `rmo_2000_3`, the `∑ … in` rejections went from 65 of 149 replies to 0 of 42 after a lexical rewrite, which no amount of cross-checking would have found.
+The single change that made the harder problems reachable was not a model setting but the unit Lean checks. One theorem is one heartbeat budget and one re-elaboration, so a leaf that needs 170000 heartbeats by itself never ran on a board with earlier steps (`rmo_2001_2`, five tries, every one at the limit). The file is now checked as cells, one goal one declaration (`docs/CELLS.md`), and delivered in the same shape. Measured on p10, a board on one theorem grew about 300 MB of REPL memory per check (787 MB at check 9, 2980 MB at check 16), and with cells a small check retains about 2 MB.
 
-## What I would conclude, and what would settle it
+What remains is a search structure. The board keeps three whole-file branches ranked by open-goal count, a stuck goal resets its cell or restarts its declaration, and a route that was 80% right is thrown away with the wrong 20% (one `rmo_2000_6` run reset the same cell 9 times with the same opening). Three of this week's fixes were to that structure rather than to any proof. A statement proved once is now recalled when the same goal reappears after a reset, a model that returns the same step for a goal is not offered that goal again until the board changes, and a hypothesis under an inaccessible name is a binder of its cell rather than a premise the link forgot to pass. `rmo_2000_3` is the problem this structure cannot reach. The pieces of its proof are in the harness, and nothing in the harness chooses between two decompositions of a sum. A proof tree with alternatives as siblings, so that a wrong decomposition is one branch and not the whole board, is the next change, and it was not made before this note.
 
-On this problem set the pair scored 11 of 16 against 7 for qwen alone and 6 for gpt-oss alone once its two circular passes are removed. The 11 decompose as: 4 closed by Lean's closers with no model call (each solo arm got 3 or 4 of them), p07 with 1 call, 3 that needed model steps and that at least one solo arm also passed (p03, p06, p08), and 3 (p09, p10, rmo_2000_6) where both models contributed steps to a proof that neither solo loop produced inside its clock. The pair's total spend on the 11 was $0.04. The four remaining problems are where the missing piece was a Mathlib lemma neither model knows, and the pair added nothing there. The auditing seat was assigned to gpt-oss on a measurement. The rest of the asymmetry, qwen writing more and gpt-oss landing more of what it writes, was not designed. It came from acceptance rates.
+## What would settle it
 
-Two experiments would settle what this note cannot. The cheaper one is the kit's own baseline rerun at the board's clock, 3600 s and one worker, on the six problems where a solo arm was cut off (p08, p09, p10, rmo_2000_2, rmo_2000_6, rmo_2001_2): if gpt-oss alone lands p09 or p10 with an hour, the three pair-only wins shrink to one or none. The second is the board with one model in both seats (`VM_LINES` already takes a single model) and the board with the audit disabled, which turns "the pair solved 3 that the solo loops did not" into "the second model is why" or not. Neither had been run when this note was written.
+Two experiments this note does not contain. The kit's baseline at 3600 s and one worker on the six problems where it was cut by the clock, so that the solo arms and the board have the same budget. And the board with one model in both seats, and with the audit disabled, on the six harder problems rather than the three in the v7.91 matrix, so that the second model's contribution on the problems that need it is measured and not inferred.

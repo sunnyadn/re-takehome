@@ -8,11 +8,11 @@
     "passed": true,
     "exit_code": 0,
     "timed_out": false,
-    "duration_ms": 20064,
+    "duration_ms": 30224,
     "output": {
       "passed": true,
       "exit_code": 0,
-      "stdout": "Building Challenge\n⚠ [8655/8656] Built Challenge (2.1s)\nwarning: Challenge.lean:4:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[p08_sum_products, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge\nBuilding Solution\n⚠ [8655/8656] Built Solution (2.3s)\nwarning: Solution.lean:4:38: Variable name `ha` is not explicitly referenced.\n\nThe binding can be removed (if unused) or named `_` (if used implicitly).\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`\nwarning: Solution.lean:4:51: Variable name `hb` is not explicitly referenced.\n\nThe binding can be removed (if unused) or named `_` (if used implicitly).\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`\nwarning: Solution.lean:4:64: Variable name `hc` is not explicitly referenced.\n\nThe binding can be removed (if unused) or named `_` (if used implicitly).\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`\nBuild completed successfully (8656 jobs).\nExporting #[p08_sum_products, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution\nRunning Lean default kernel on solution.\nLean default kernel accepts the solution\nYour solution is okay!\n",
+      "stdout": "Building Challenge\n⚠ [8655/8656] Built Challenge (3.6s)\nwarning: Challenge.lean:4:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[p08_sum_products, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge\nBuilding Solution\n⚠ [8655/8656] Built Solution (3.4s)\nwarning: Solution.lean:4:38: Variable name `ha` is not explicitly referenced.\n\nThe binding can be removed (if unused) or named `_` (if used implicitly).\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`\nwarning: Solution.lean:4:51: Variable name `hb` is not explicitly referenced.\n\nThe binding can be removed (if unused) or named `_` (if used implicitly).\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`\nwarning: Solution.lean:4:64: Variable name `hc` is not explicitly referenced.\n\nThe binding can be removed (if unused) or named `_` (if used implicitly).\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`\nBuild completed successfully (8656 jobs).\nExporting #[p08_sum_products, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution\nRunning Lean default kernel on solution.\nLean default kernel accepts the solution\nYour solution is okay!\n",
       "stderr": "WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Challenge\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Challenge -- p08_sum_products propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Solution\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Solution -- p08_sum_products propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\n"
     }
   },
@@ -22,12 +22,12 @@
   },
   "budget": {
     "limit_usd": 1.0,
-    "spent_usd": 0.000596851,
+    "spent_usd": 0.000546741,
     "reserved_usd": 0,
     "accounting_complete": true
   },
   "within_time": true,
-  "wall_s": 34.625,
+  "wall_s": 69.946,
   "models_used": [
     "openai/gpt-oss-120b",
     "qwen/qwen3.5-flash-02-23"
@@ -38,14 +38,30 @@
     "strategy": "board",
     "solved_by": "board_loop",
     "accepted_by_repl": true,
-    "spend_usd": 0.000597,
-    "wall_s": 14.2,
-    "turns": 7,
+    "spend_usd": 0.000547,
+    "wall_s": 39.1,
+    "turns": 11,
     "events": [
+      {
+        "stage": "memory",
+        "checks": 43,
+        "mb": 701
+      },
       {
         "kind": "closers",
         "by": "harness",
-        "accepted": false
+        "accepted": false,
+        "ms": 439
+      },
+      {
+        "stage": "memory",
+        "checks": 47,
+        "mb": 710
+      },
+      {
+        "stage": "memory",
+        "checks": 49,
+        "mb": 725
       },
       {
         "kind": "audit",
@@ -57,8 +73,15 @@
       {
         "kind": "audit",
         "by": "openai/gpt-oss-120b",
+        "goal": "a ^ (2 : ℕ) + b ^ (2 : ℕ) + c ^ (2 : ℕ) + (2 : ℝ) * (a * b + b * c + c * a) = (9 : ℝ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
         "goal": "a * b + b * c + c * a ≤ (3 : ℝ)",
-        "verdict": "unverified",
+        "verdict": "holds",
         "values": {}
       },
       {
@@ -69,7 +92,8 @@
       {
         "kind": "step",
         "by": "openai/gpt-oss-120b",
-        "accepted": false
+        "accepted": false,
+        "why": "error at {'line': 411, 'column': 2}: linarith failed to find a contradiction\na b c : ℝ\nha : 0 < a\nhb : 0 < b\nhc : 0 < c\nh : a + b + c = 3\na✝ : 3 < a * b + b * c"
       },
       {
         "kind": "stale",
@@ -79,8 +103,9 @@
         "stage": "verify",
         "accepted": true,
         "faults": [],
-        "compile_ms": 189,
-        "slow": false
+        "compile_ms": 466,
+        "slow": false,
+        "techniques": "dropped"
       }
     ]
   }

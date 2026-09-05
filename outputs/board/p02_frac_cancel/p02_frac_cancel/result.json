@@ -8,11 +8,11 @@
     "passed": true,
     "exit_code": 0,
     "timed_out": false,
-    "duration_ms": 18674,
+    "duration_ms": 24997,
     "output": {
       "passed": true,
       "exit_code": 0,
-      "stdout": "Building Challenge\n⚠ [8655/8656] Built Challenge (2.2s)\nwarning: Challenge.lean:4:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[p02_frac_cancel, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge\nBuilding Solution\n✔ [8655/8656] Built Solution (2.2s)\nBuild completed successfully (8656 jobs).\nExporting #[p02_frac_cancel, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution\nRunning Lean default kernel on solution.\nLean default kernel accepts the solution\nYour solution is okay!\n",
+      "stdout": "Building Challenge\n⚠ [8655/8656] Built Challenge (2.9s)\nwarning: Challenge.lean:4:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[p02_frac_cancel, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge\nBuilding Solution\n✔ [8655/8656] Built Solution (3.1s)\nBuild completed successfully (8656 jobs).\nExporting #[p02_frac_cancel, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution\nRunning Lean default kernel on solution.\nLean default kernel accepts the solution\nYour solution is okay!\n",
       "stderr": "WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Challenge\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Challenge -- p02_frac_cancel propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Solution\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Solution -- p02_frac_cancel propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\n"
     }
   },
@@ -27,7 +27,7 @@
     "accounting_complete": true
   },
   "within_time": true,
-  "wall_s": 22.226,
+  "wall_s": 29.39,
   "models_used": [],
   "both_required_models_used": false,
   "agent_error": null,
@@ -36,7 +36,7 @@
     "solved_by": "deterministic_sweep",
     "accepted_by_repl": true,
     "spend_usd": 0.0,
-    "wall_s": 3.1,
+    "wall_s": 3.9,
     "turns": 2,
     "events": [
       {
@@ -47,8 +47,9 @@
         "stage": "verify",
         "accepted": true,
         "faults": [],
-        "compile_ms": 41,
-        "slow": false
+        "compile_ms": 46,
+        "slow": false,
+        "techniques": "dropped"
       }
     ]
   }

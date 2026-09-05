@@ -3,14 +3,30 @@
     "strategy": "board",
     "solved_by": "board_loop",
     "accepted_by_repl": true,
-    "spend_usd": 0.000597,
-    "wall_s": 14.2,
-    "turns": 7,
+    "spend_usd": 0.000547,
+    "wall_s": 39.1,
+    "turns": 11,
     "events": [
+      {
+        "stage": "memory",
+        "checks": 43,
+        "mb": 701
+      },
       {
         "kind": "closers",
         "by": "harness",
-        "accepted": false
+        "accepted": false,
+        "ms": 439
+      },
+      {
+        "stage": "memory",
+        "checks": 47,
+        "mb": 710
+      },
+      {
+        "stage": "memory",
+        "checks": 49,
+        "mb": 725
       },
       {
         "kind": "audit",
@@ -22,8 +38,15 @@
       {
         "kind": "audit",
         "by": "openai/gpt-oss-120b",
+        "goal": "a ^ (2 : ℕ) + b ^ (2 : ℕ) + c ^ (2 : ℕ) + (2 : ℝ) * (a * b + b * c + c * a) = (9 : ℝ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
         "goal": "a * b + b * c + c * a ≤ (3 : ℝ)",
-        "verdict": "unverified",
+        "verdict": "holds",
         "values": {}
       },
       {
@@ -34,7 +57,8 @@
       {
         "kind": "step",
         "by": "openai/gpt-oss-120b",
-        "accepted": false
+        "accepted": false,
+        "why": "error at {'line': 411, 'column': 2}: linarith failed to find a contradiction\na b c : ℝ\nha : 0 < a\nhb : 0 < b\nhc : 0 < c\nh : a + b + c = 3\na✝ : 3 < a * b + b * c"
       },
       {
         "kind": "stale",
@@ -44,8 +68,9 @@
         "stage": "verify",
         "accepted": true,
         "faults": [],
-        "compile_ms": 189,
-        "slow": false
+        "compile_ms": 466,
+        "slow": false,
+        "techniques": "dropped"
       }
     ]
   }

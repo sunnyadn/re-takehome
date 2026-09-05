@@ -9,7 +9,7 @@
   ],
   "definition_names": [],
   "numeric_answer_names": [],
-  "out_dir": "/home/sunny/frame/out/p04_sum_sq/board_agent/20260903T100418Z/p04_sum_sq",
+  "out_dir": "/home/sunny/frame131/out/p04_sum_sq/board_agent/20260905T092616Z/p04_sum_sq",
   "budget_usd": 1.0,
   "time_limit_s": 1800.0,
   "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
@@ -17,5 +17,5 @@
   "comparator_timeout_s": 180,
   "verify_reserve_s": 120,
   "agent": "submission.board_agent:create_agent",
-  "session_id": "dff433ca52f94a5fa3b5e1fa17937daf"
+  "session_id": "84beb74489174d0dbbace51cd748994f"
 }

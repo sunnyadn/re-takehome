@@ -3,13 +3,18 @@
     "strategy": "board",
     "solved_by": "board_loop",
     "accepted_by_repl": true,
-    "spend_usd": 0.000413,
-    "wall_s": 10.7,
-    "turns": 4,
+    "spend_usd": 0.000934,
+    "wall_s": 30.2,
+    "turns": 5,
     "events": [
       {
+        "stage": "memory",
+        "checks": 42,
+        "mb": 691
+      },
+      {
         "stage": "probe",
-        "by": "qwen/qwen3.5-flash-02-23",
+        "by": "openai/gpt-oss-120b",
         "asked": [
           "p07_answer"
         ],
@@ -21,7 +26,8 @@
       {
         "kind": "closers",
         "by": "harness",
-        "accepted": true
+        "accepted": true,
+        "ms": 103
       },
       {
         "kind": "collapse",
@@ -32,8 +38,9 @@
         "stage": "verify",
         "accepted": true,
         "faults": [],
-        "compile_ms": 19,
-        "slow": false
+        "compile_ms": 28,
+        "slow": false,
+        "techniques": "dropped"
       }
     ]
   }

@@ -9,7 +9,7 @@
   ],
   "definition_names": [],
   "numeric_answer_names": [],
-  "out_dir": "/home/sunny/frame/out/p03_sq_ge_two_ab/board_agent/20260903T100348Z/p03_sq_ge_two_ab",
+  "out_dir": "/home/sunny/frame131/out/p03_sq_ge_two_ab/board_agent/20260905T092459Z/p03_sq_ge_two_ab",
   "budget_usd": 1.0,
   "time_limit_s": 1800.0,
   "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
@@ -17,5 +17,5 @@
   "comparator_timeout_s": 180,
   "verify_reserve_s": 120,
   "agent": "submission.board_agent:create_agent",
-  "session_id": "1c472c0913214d3e9ee1272b5143e227"
+  "session_id": "37eee10c9f2b4609b5e54245645f4fa2"
 }

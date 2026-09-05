@@ -3,15 +3,30 @@
     "strategy": "board",
     "solved_by": "board_loop",
     "accepted_by_repl": true,
-    "spend_usd": 0.024111,
-    "wall_s": 1678.0,
-    "turns": 154,
+    "spend_usd": 0.002555,
+    "wall_s": 438.7,
+    "turns": 45,
     "events": [
+      {
+        "stage": "memory",
+        "checks": 43,
+        "mb": 709
+      },
+      {
+        "stage": "memory",
+        "checks": 45,
+        "mb": 723
+      },
+      {
+        "stage": "memory",
+        "checks": 49,
+        "mb": 743
+      },
       {
         "kind": "closers",
         "by": "harness",
         "accepted": false,
-        "ms": 798
+        "ms": 913
       },
       {
         "kind": "prefix",
@@ -26,6 +41,86 @@
       {
         "stage": "split",
         "goals": 2
+      },
+      {
+        "stage": "memory",
+        "checks": 54,
+        "mb": 757
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 710
+      },
+      {
+        "kind": "prefix",
+        "by": "openai/gpt-oss-120b",
+        "lines": 2
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": true
+      },
+      {
+        "stage": "memory",
+        "checks": 58,
+        "mb": 765
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1425
+      },
+      {
+        "stage": "memory",
+        "checks": 60,
+        "mb": 983
+      },
+      {
+        "stage": "memory",
+        "checks": 64,
+        "mb": 1304
+      },
+      {
+        "kind": "leaf",
+        "goal": "hp : Nat.Prime p\nhq : Nat.Prime q\nm : ℕ\nhm : p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2\n⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3",
+        "block": "set_option maxHeartbeats 400000 in (have hle : p + q ≤ m := (by nlinarith [Nat.P",
+        "accepted": true,
+        "ms": 49581
+      },
+      {
+        "stage": "proven",
+        "cell": 3,
+        "stmt": "= m ^ (2 : ℕ)) → p = q ∨ p = (3 : ℕ) ∧ q = (11 : ℕ) ∨ p = (11 : ℕ) ∧ q = (3 : ℕ)",
+        "lines": 3
+      },
+      {
+        "stage": "proven",
+        "cell": 5,
+        "stmt": "= m ^ (2 : ℕ)) : p = q ∨ p = (3 : ℕ) ∧ q = (11 : ℕ) ∨ p = (11 : ℕ) ∧ q = (3 : ℕ)",
+        "lines": 1
+      },
+      {
+        "stage": "render_fault",
+        "said": "unexpected identifier; expected command",
+        "lines": [
+          "                -- For now, we......",
+          "                (set_option pp.numericTypes true in extract_goal *); focus skip",
+          "              exact h₁₃"
+        ]
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": false,
+        "why": "that block does not parse, so Lean read nothing after the fault: error at {'line': 516, 'column': 51}: unexpected identifier; expected command"
+      },
+      {
+        "kind": "stale",
+        "by": "qwen/qwen3.5-flash-02-23"
       },
       {
         "kind": "closers",
@@ -35,33 +130,6 @@
       },
       {
         "kind": "prefix",
-        "by": "openai/gpt-oss-120b",
-        "lines": 2
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 589
-      },
-      {
-        "kind": "cut",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "kept": 0
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 632
-      },
-      {
-        "kind": "prefix",
         "by": "qwen/qwen3.5-flash-02-23",
         "lines": 1
       },
@@ -71,169 +139,15 @@
         "accepted": true
       },
       {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 529
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "library",
-        "goal": "ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\nh : p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3\n⊢ ∃ m, p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2",
-        "found": 22,
-        "accepted": false,
-        "ms": 16740
-      },
-      {
-        "stage": "library",
-        "tokens": [
-          "pow",
-          "nat",
-          "prime"
-        ],
-        "lines": 12,
-        "ms": 51229
-      },
-      {
-        "kind": "search-retry",
-        "by": "openai/gpt-oss-120b",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 68,
-        "elapsed_s": 127
-      },
-      {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 68,
-        "elapsed_s": 127
-      },
-      {
-        "kind": "plan",
-        "by": "openai/gpt-oss-120b",
-        "chars": 1856
-      },
-      {
-        "kind": "plan",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 932
-      },
-      {
-        "kind": "skeleton",
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "route",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "to": "rmo_2001_2"
-      },
-      {
-        "kind": "prefix",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "lines": 1
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": true
-      },
-      {
-        "stage": "route",
-        "from": 0,
-        "to": 1,
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "prefix",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "lines": 6
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "p = q → ∃ m, p ^ (2 : ℕ) + (7 : ℕ) * p * q + q ^ (2 : ℕ) = m ^ (2 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "p = (3 : ℕ) ∧ q = (11 : ℕ) → ∃ m, p ^ (2 : ℕ) + (7 : ℕ) * p * q + q ^ (2 : ℕ) = m ^ (2 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "p = (11 : ℕ) ∧ q = (3 : ℕ) → ∃ m, p ^ (2 : ℕ) + (7 : ℕ) * p * q + q ^ (2 : ℕ) = m ^ (2 : ℕ)",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": true
+        "stage": "memory",
+        "checks": 71,
+        "mb": 1434
       },
       {
         "kind": "closers",
         "by": "harness",
         "accepted": false,
-        "ms": 1057
-      },
-      {
-        "kind": "search-retry",
-        "by": "openai/gpt-oss-120b",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": false
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 894
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "stage": "slow",
-        "ms": 24869,
-        "was": 66
-      },
-      {
-        "kind": "prefix",
-        "by": "openai/gpt-oss-120b",
-        "lines": 1
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "∃ m, p ^ (2 : ℕ) + (7 : ℕ) * p * q + q ^ (2 : ℕ) = m ^ (2 : ℕ)",
-        "verdict": "holds",
-        "values": {}
+        "ms": 13693
       },
       {
         "kind": "step",
@@ -241,638 +155,98 @@
         "accepted": true
       },
       {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 68,
-        "elapsed_s": 276
+        "stage": "proven",
+        "cell": 11,
+        "stmt": ") ∧ q = (3 : ℕ) → ∃ m, p ^ (2 : ℕ) + (7 : ℕ) * p * q + q ^ (2 : ℕ) = m ^ (2 : ℕ)",
+        "lines": 14
       },
       {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 68,
-        "elapsed_s": 276
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 894
-      },
-      {
-        "kind": "prefix",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "lines": 6
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "m > p + q",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "m < p + q + (5 : ℕ) * p * q",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": true
-      },
-      {
-        "stage": "split",
-        "goals": 2
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 1364
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 859
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 1121
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "kind": "plan",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 3040
-      },
-      {
-        "kind": "plan",
-        "by": "openai/gpt-oss-120b",
-        "chars": 1723
-      },
-      {
-        "kind": "skeleton",
-        "by": "openai/gpt-oss-120b"
-      },
-      {
-        "kind": "cut",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "kept": 20
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "(m - p - q) * (m + p + q) = (5 : ℕ) * p * q",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "m ^ 2 - (p + q) ^ 2 = 5 * p * q",
-        "verdict": "unstated",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "(m - p - q) * (m + p + q) = m ^ 2 - (p + q) ^ 2",
-        "verdict": "unstated",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "m - p - q ∣ (5 : ℕ) * p * q",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 3778
-      },
-      {
-        "stage": "slow",
-        "ms": 11587,
-        "was": 1226
-      },
-      {
-        "kind": "leaf",
-        "goal": " * p * q\nh3 : (m - p - q) * (m + p + q) = 5 * p * q\nh4 : m - p - q ∣ 5 * p * q\n⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3",
-        "accepted": false,
-        "tried": 2,
-        "ms": 31206
-      },
-      {
-        "kind": "prefix",
-        "by": "openai/gpt-oss-120b",
-        "lines": 4
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "m - p - q ∣ (5 : ℕ) * p * q",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "stage": "route",
+        "stage": "fork",
         "from": 0,
         "to": 2,
-        "by": "openai/gpt-oss-120b"
+        "goal": "p q : ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\n⊢ p = q ∨ p = 3 ∧ "
       },
       {
-        "stage": "prune",
-        "bid": 2,
-        "goals": 4
+        "stage": "memory",
+        "checks": 75,
+        "mb": 1575
       },
       {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
+        "stage": "memory",
+        "checks": 76,
+        "mb": 1593
       },
       {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
+        "stage": "inline",
+        "cell": 13,
+        "why": "link"
       },
       {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 68,
-        "elapsed_s": 432
+        "stage": "inline",
+        "cell": 9,
+        "why": "link"
       },
       {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 68,
-        "elapsed_s": 432
+        "stage": "memory",
+        "checks": 80,
+        "mb": 2045
       },
       {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
+        "stage": "inline",
+        "cell": 14,
+        "why": "link"
       },
       {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 68,
-        "elapsed_s": 437
+        "stage": "inline",
+        "cell": 9,
+        "why": "link"
       },
       {
-        "kind": "prefix",
-        "by": "openai/gpt-oss-120b",
-        "lines": 6
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "p + q < m",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "(0 : ℕ) < m - p - q",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 2836
-      },
-      {
-        "kind": "leaf",
-        "goal": "ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\nm : ℕ\nhm : p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2\n⊢ (m - p - q) * (m + p + q) = 5 * p * q",
-        "accepted": false,
-        "tried": 1,
-        "ms": 2262
-      },
-      {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 1127
-      },
-      {
-        "kind": "leaf",
-        "goal": "p\nhq : Nat.Prime q\nm : ℕ\nhm : p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2\nhfac : (m - p - q) * (m + p + q) = 5 * p * q\n⊢ p + q < m",
-        "accepted": false,
-        "tried": 1,
-        "ms": 2508
-      },
-      {
-        "kind": "plan",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 734
-      },
-      {
-        "kind": "plan",
-        "by": "openai/gpt-oss-120b",
-        "chars": 431
-      },
-      {
-        "kind": "skeleton",
-        "by": "openai/gpt-oss-120b"
-      },
-      {
-        "stage": "names",
-        "asked": [
-          "Nat.pow_le_pow_of_le_left"
-        ],
-        "ms": 90605,
-        "found": false
-      },
-      {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "prefix",
-        "by": "openai/gpt-oss-120b",
-        "lines": 5
-      },
-      {
-        "kind": "audit",
-        "by": "evaluation",
-        "goal": "m - p - q = (1 : ℕ) ∨ m - p - q = (5 : ℕ) ∨ m - p - q = p ∨ m - p - q = q ∨ m - p - q = (5 : ℕ) * p ",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "stage": "route",
-        "from": 1,
-        "to": 3,
-        "by": "openai/gpt-oss-120b"
-      },
-      {
-        "stage": "prune",
-        "bid": 0,
-        "goals": 5
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 9619
-      },
-      {
-        "kind": "leaf",
-        "goal": "\n      m - p - q = p ∨ m - p - q = q ∨ m - p - q = 5 * p ∨ m - p - q = 5 * q ∨ m - p - q = p * q ∨ m - p - q = 5 * p * q",
-        "block": "set_option maxHeartbeats 60000 in (prime_facts; divisor_cases h4 <;> (first | (s",
-        "accepted": true,
-        "ms": 17616
-      },
-      {
-        "kind": "prefix",
-        "by": "openai/gpt-oss-120b",
-        "lines": 2
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 5480
-      },
-      {
-        "kind": "leaf",
-        "goal": "- q) * (m + p + q) = 5 * p * q\nh4 : m - p - q ∣ 5 * p * q\nhpos : 0 < m - p - q\n⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3",
-        "accepted": false,
-        "tried": 2,
-        "ms": 21857
-      },
-      {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 159,
-        "elapsed_s": 683
-      },
-      {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 159,
-        "elapsed_s": 683
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 12498
-      },
-      {
-        "kind": "leaf",
-        "goal": " p - q = 5 * p ∨ m - p - q = 5 * q ∨ m - p - q = p * q ∨ m - p - q = 5 * p * q\n⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3",
-        "block": "set_option maxHeartbeats 60000 in (prime_facts; rcases h5 with hc | hc | hc | hc",
-        "accepted": true,
-        "ms": 24898
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 12099
-      },
-      {
-        "kind": "leaf",
-        "goal": "\n      m - p - q = p ∨ m - p - q = q ∨ m - p - q = 5 * p ∨ m - p - q = 5 * q ∨ m - p - q = p * q ∨ m - p - q = 5 * p * q",
-        "block": "set_option maxHeartbeats 60000 in (prime_facts; divisor_cases h4 <;> (first | (s",
-        "accepted": true,
-        "ms": 14064
-      },
-      {
-        "kind": "plan",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 751
-      },
-      {
-        "kind": "plan",
-        "by": "openai/gpt-oss-120b",
-        "chars": 1572
-      },
-      {
-        "kind": "skeleton",
-        "by": "openai/gpt-oss-120b"
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 11845
-      },
-      {
-        "stage": "probe_skipped",
-        "kind": "leaf",
-        "spent_s": 114,
-        "elapsed_s": 761
-      },
-      {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 159,
-        "elapsed_s": 761
-      },
-      {
-        "stage": "probe_skipped",
-        "kind": "scan",
-        "spent_s": 159,
-        "elapsed_s": 761
+        "stage": "memory",
+        "checks": 84,
+        "mb": 2464
       },
       {
         "stage": "slow",
-        "ms": 12619,
-        "was": 0
-      },
-      {
-        "stage": "slow",
-        "ms": 12944,
-        "was": 0
-      },
-      {
-        "stage": "slow",
-        "ms": 12592,
-        "was": 0
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": false
-      },
-      {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
+        "ms": 12420,
+        "was": 156
       },
       {
         "kind": "step",
         "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "prefix",
-        "by": "openai/gpt-oss-120b",
-        "lines": 2
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "stage": "split",
-        "goals": 3
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
         "accepted": false,
-        "ms": 14077
+        "why": "error at {'line': 430, 'column': 8}: linarith failed to find a contradiction\ncase h2\np q : ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\nh : p = q\na✝ : 0 < q\n⊢ False\nfail"
       },
       {
-        "kind": "restated",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "of": [
-          "h5"
-        ]
+        "stage": "memory",
+        "checks": 88,
+        "mb": 3014
       },
       {
-        "kind": "leaf_restart",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "goal": "     m - p - q = p ∨ m - p - q = q ∨ m - p - q = 5 * p ∨ m - p - q = 5 * q ∨ m - p - q = p * q ∨ m - p - q = 5 * p * q\n⊢ p = q ∨ p = 3 ∧ q = 11 ∨ p = 11 ∧ q = 3",
-        "settled": 9
+        "stage": "memory",
+        "checks": 92,
+        "mb": 3589
       },
       {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": false
+        "stage": "memory",
+        "checks": 96,
+        "mb": 4156
       },
       {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 58599
+        "stage": "memory",
+        "checks": 100,
+        "mb": 4708
       },
       {
-        "kind": "search-retry",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": false,
-        "ms": 13138
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "kind": "restated",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "of": [
-          "h5"
-        ]
-      },
-      {
-        "kind": "library",
-        "goal": "p q : ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\nh_eq : p = q\n⊢ ∃ m, p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2",
-        "found": 1,
-        "accepted": false,
-        "ms": 13666
-      },
-      {
-        "kind": "step",
-        "by": "openai/gpt-oss-120b",
-        "accepted": true
-      },
-      {
-        "kind": "plan",
-        "by": "openai/gpt-oss-120b",
-        "chars": 1383
-      },
-      {
-        "kind": "plan",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "chars": 719
-      },
-      {
-        "kind": "skeleton",
-        "by": "qwen/qwen3.5-flash-02-23"
-      },
-      {
-        "kind": "closers",
-        "by": "harness",
-        "accepted": true,
-        "ms": 26481
-      },
-      {
-        "kind": "collapse",
-        "tactic": "ring",
-        "accepted": true
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "m - p - q = (1 : ℕ) → False",
-        "verdict": "holds",
-        "values": {}
-      },
-      {
-        "kind": "audit",
-        "by": "openai/gpt-oss-120b",
-        "goal": "m - p - q = (5 : ℕ) → p = (3 : ℕ) ∧ q = (11 : ℕ) ∨ p = (11 : ℕ) ∧ q = (3 : ℕ)",
-        "verdict": "refuted",
-        "values": {
-          "p": "5",
-          "q": "5",
-          "m": "15"
-        }
-      },
-      {
-        "kind": "step",
-        "by": "qwen/qwen3.5-flash-02-23",
-        "accepted": false
-      },
-      {
-        "kind": "restated",
-        "by": "qwen/qwen3.5-flash-02-23"
+        "stage": "memory",
+        "checks": 104,
+        "mb": 4185
       },
       {
         "stage": "verify",
         "accepted": true,
         "faults": [],
-        "compile_ms": 11012,
+        "compile_ms": 12652,
         "slow": false,
         "techniques": "kept"
       }

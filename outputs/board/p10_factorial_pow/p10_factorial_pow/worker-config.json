@@ -13,7 +13,7 @@
   "numeric_answer_names": [
     "p10_answer"
   ],
-  "out_dir": "/home/sunny/frame/out/p10_factorial_pow/board_agent/20260903T100834Z/p10_factorial_pow",
+  "out_dir": "/home/sunny/frame131/out/p10_factorial_pow/board_agent/20260905T092400Z/p10_factorial_pow",
   "budget_usd": 1.0,
   "time_limit_s": 1800.0,
   "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
@@ -21,5 +21,5 @@
   "comparator_timeout_s": 180,
   "verify_reserve_s": 120,
   "agent": "submission.board_agent:create_agent",
-  "session_id": "2cd2a8c96291450493ba5461194c71f5"
+  "session_id": "3e13d6f5327f4e6a9fd21ec4e149f534"
 }
