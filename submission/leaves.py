@@ -359,9 +359,69 @@ BLOCKS = re.compile(r"∑ \w+ ∈ Finset\.Ico \S+ \((\w+) \+ 1\), ∑ \w+ ∈ Fi
 FACTOR = r"\((?:[^()]|\([^()]*\))+\)|[A-Za-z_][\w']*"
 
 
+SET_FORALL = re.compile(r"^∀ (\w+) ∈ \{(\w+) \| ∃ ([\w ]+?), (.+)\}, (.+)$")
+LOWER_BOUNDS = re.compile(r"^(.+?) ∈ lowerBounds \{(\w+) \| ∃ ([\w ]+?), (.+)\}$")
+
+
+def _conjuncts(prop: str) -> list[str]:
+    """Top-level `∧` parts of a proposition."""
+    depth, parts, cur = 0, [], ""
+    i = 0
+    while i < len(prop):
+        ch = prop[i]
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        if depth == 0 and prop.startswith(" ∧ ", i):
+            parts.append(cur.strip())
+            cur, i = "", i + 3
+            continue
+        cur += ch
+        i += 1
+    parts.append(cur.strip())
+    return parts
+
+
+def _destructured(goal_text: str) -> list[tuple[str, str]]:
+    """(prefix, inner goal): `∀ n ∈ {n | ∃ a b, P ∧ …}, T` (or `c ∈ lowerBounds {…}`)
+    introduced and destructured, a hypothesis `P ∧ Q` split. Measured on rmo_2000_6
+    (frame129): the inner leaf was accepted 4 times, then failed 4 times on these."""
+    hyps, target = _hyps(goal_text), _target(goal_text)
+    head = goal_text.split("⊢", 1)[0] if "⊢" in goal_text else ""
+    out: list[tuple[str, str]] = []
+    m = SET_FORALL.match(target) or LOWER_BOUNDS.match(target)
+    if m:
+        if m.re is SET_FORALL:
+            n, bound, exist, body, inner = m.groups()
+        else:
+            c, bound, exist, body = m.groups()
+            n, inner = "n", f"{c} ≤ n"
+        body = re.sub(rf"(?<![\w'.]){re.escape(bound)}(?![\w'])", n, body) if bound != n else body
+        parts = _conjuncts(body)
+        names = [f"vm_c{i}" for i in range(len(parts))]
+        binders = " ".join([n] + exist.split())
+        text = (head + f"{binders} : ℕ\n" + "".join(f"{h} : {t}\n" for h, t in zip(names, parts))
+                + f"⊢ {inner}")
+        out.append((f"intro {n} vm_hn\nobtain ⟨{', '.join(exist.split() + names)}⟩ := vm_hn", text))
+    for h, t in hyps:
+        parts = _conjuncts(t)
+        if len(parts) > 1 and not t.startswith(("∀", "∃")):
+            names = [f"vm_{h}{i}" for i in range(len(parts))]
+            rest = [l for l in head.split("\n") if not l.startswith(f"{h} :")]
+            text = "\n".join(rest).rstrip("\n") + "\n" + "".join(f"{a} : {b}\n" for a, b in zip(names, parts)) + f"⊢ {target}"
+            out.append((f"obtain ⟨{', '.join(names)}⟩ := {h}", text))
+            break
+    return out
+
+
 def leaf_candidates(goal_text: str) -> list[str]:
     hyps = _hyps(goal_text)
     target = _target(goal_text)
+    for prefix, inner in _destructured(goal_text):
+        got = [f"{prefix}\n{c[len(BUDGET) + 2:-1].replace('; ', chr(10))}" for c in leaf_candidates(inner)]
+        if got:
+            return _finalised(got)
     bounds = _bounds(hyps)
     powers = _powers(hyps)
     primes = _prime_facts(hyps)
@@ -630,6 +690,10 @@ def leaf_candidates(goal_text: str) -> list[str]:
             root = int(round(int(rhs) ** (1 / int(n)))) + 1
             if root <= CASES_MAX:
                 out.append(f"bounded_cases {v} {root}")
+    return _finalised(out)
+
+
+def _finalised(out: list[str]) -> list[str]:
     seen, uniq = set(), []
     for c in out:
         if c not in seen:

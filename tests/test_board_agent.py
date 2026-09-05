@@ -2815,3 +2815,21 @@ def test_a_goal_a_model_has_repeated_on_is_not_offered_to_it_again_until_the_boa
     assert len(repeats) <= 1, f"{len(repeats)} repeats"
     assert sum(1 for m, _ in llm.calls if m == "model-a") <= 3
 
+
+
+def test_leaf_reads_past_a_set_forall_and_a_conjunction_hypothesis():
+    # rmo_2000_6 (frame129, 12bf666): the radical leaf was accepted 4 times on
+    # `⊢ 10 ≤ a * b` and the run still failed on these two outer shapes.
+    from submission.leaves import leaf_candidates
+    outer = "⊢ ∀ n ∈ {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b}, 10 ≤ n"
+    got = leaf_candidates(outer)
+    assert got and got[0].startswith("set_option maxHeartbeats 400000 in (intro n vm_hn; obtain ⟨a, b, vm_c0, vm_c1, vm_c2, vm_c3⟩ := vm_hn; subst vm_c3; ")
+    assert "prime_to_bases 2 vm_c2" in got[0] and "Nat.le_of_dvd" in got[0]
+    lower = "⊢ 10 ∈ lowerBounds {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 3 * b ^ 4 ∧ n = a * b}"
+    assert any("prime_to_bases 5" in c for c in leaf_candidates(lower))
+    conj = "n a b : ℕ\nha : 0 < a\nhb : 0 < b\nhdiv : 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b\n⊢ 10 ≤ n"
+    got = leaf_candidates(conj)
+    assert got[0].startswith("set_option maxHeartbeats 400000 in (obtain ⟨vm_hdiv0, vm_hdiv1⟩ := hdiv; subst vm_hdiv1; ")
+    # A bound variable named differently from the set's own is renamed.
+    assert leaf_candidates(outer.replace("∀ n ∈", "∀ m ∈").replace(", 10 ≤ n", ", 10 ≤ m"))[0].startswith(
+        "set_option maxHeartbeats 400000 in (intro m vm_hn;")
