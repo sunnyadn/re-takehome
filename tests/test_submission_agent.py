@@ -114,15 +114,6 @@ _TWO_DECL_LINES = ["import Mathlib", "", "lemma helper : True := by",
 _TWO_DECLS = "\n".join(_TWO_DECL_LINES) + "\n"
 
 
-def test_suggestions_picks_only_try_this_info():
-    messages = [
-        {"severity": "info", "data": "Try this:\n  exact Nat.sqrt_le k"},
-        {"severity": "info", "data": "some other note"},
-        {"severity": "error", "data": "Try this: not an info"},
-    ]
-    assert contract.suggestions(messages) == ["Try this:\n  exact Nat.sqrt_le k"]
-
-
 class _SearchLean:
     """Fails the candidate with a missing name, answers the search with a hit."""
 
@@ -273,20 +264,6 @@ class _FixableLean(_SearchLean):
             container_restarted=False,
             messages=[{"severity": "error", "pos": {"line": 3},
                        "data": "Unknown constant `Nat.made_up`"}])
-
-
-def test_both_shapes_of_lean_suggestion_yield_a_tactic():
-    """Captured from real runs: a lemma term and a tactic-advice block.
-
-    The advice block is mostly prose, so only Lean's own marker is reliable."""
-
-    lemma = "Try this:\n  [apply] exact lt_of_pow_lt_pow_left' 3 h2"
-    advice = ("Try this:\n  [apply] ring_nf\n  \n  The `ring` tactic failed to "
-              "close the goal. Use `ring_nf` to obtain a normal form.\n    \n  "
-              "Note that `ring` works primarily in *commutative* rings.")
-    assert contract.suggested_tactics([lemma]) == ["exact lt_of_pow_lt_pow_left' 3 h2"]
-    assert contract.suggested_tactics([advice]) == ["ring_nf"]
-    assert len(contract.suggested_tactics([lemma, advice])) == 2
 
 
 class _CountingLLM:

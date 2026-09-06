@@ -9,7 +9,7 @@ from re_harness import Services
 from submission.techniques import PREAMBLE_END
 from submission.framework import (alternatives, axiom_probe, classify, collapse, cursor_goal,
                                   drop_lines, first_blocks, have_spans, is_done, placeholders, render)
-from submission.contract import grade, scoring_faults, suggested_tactics, suggestions
+from submission.contract import grade, scoring_faults
 from submission.replies import lighter_forms
 from submission.state import State
 from submission.cells import modular, strip_markers
@@ -152,9 +152,8 @@ async def look(text: str, services: Services, focus: int = 0) -> State:
 
 
 async def finish(state: State, services: Services, time_left) -> State:
-    """Take the search out of a finished file: the comparator allows 180s."""
+    """Shrink a finished file: the comparator recompiles it cold in 180s."""
 
-    state = await substitute_search(state, services)
     # Measured on p08: both passes turned a file the comparator accepted
     # into one it timed out on, because deleting a fact a closer was using
     # makes that closer redo the work in a term the kernel then re-checks.
@@ -214,14 +213,3 @@ async def prune(state: State, services: Services, time_left) -> State:
     return state
 
 
-async def substitute_search(state: State, services: Services) -> State:
-    """Replace each `exact?` with the term it printed, keeping the search
-    call when the term does not re-elaborate."""
-
-    if "exact?" not in state.text and "apply?" not in state.text:
-        return state
-    for term in suggested_tactics(suggestions(state.messages))[:4]:
-        probe = await look(state.text.replace("exact?", term, 1), services)
-        if probe.accepted:
-            return probe
-    return state

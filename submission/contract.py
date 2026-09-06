@@ -238,31 +238,6 @@ def in_file_coordinates(services: Any) -> Any:
     return services
 
 
-TRY_THIS = "Try this"
-
-
-TRY_LINE = re.compile(r"^\s*\[[a-z]+\]\s*(\S.*?)\s*$")
-
-
-def suggested_tactics(hits: Sequence[str]) -> list[str]:
-    """The tactic Lean marked in each `Try this:` block.
-
-    Blocks mix lemma terms with tactic advice; the marker picks out both."""
-
-    out = []
-    for hit in hits:
-        for line in hit.splitlines():
-            found = TRY_LINE.match(line)
-            if found and found.group(1) not in out:
-                out.append(found.group(1).strip())
-    return out
-
-
-def suggestions(messages: Sequence[dict[str, Any]]) -> list[str]:
-    return [str(m.get("data", "")).strip() for m in messages
-            if m.get("severity") == "info" and TRY_THIS in str(m.get("data", ""))]
-
-
 HTTP_STATUS = re.compile(r"OpenRouter returned HTTP (\d{3})")
 
 
