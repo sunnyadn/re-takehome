@@ -14,72 +14,12 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
-from re_harness import AgentResult, LLMCallError, Problem, Services
-from re_harness.budget import BudgetAccountingError, BudgetExceeded
-from re_harness.lean import LeanRuntimeError
+from re_harness import LLMCallError, Problem, Services
 
-from submission.techniques import PREAMBLE_END, without_techniques
-from submission.agent import (
-    in_file_coordinates,
-    BUDGET_HEADROOM,
-    declared_names,
-    FEEDBACK_CHARS,
-    RETRY_BACKOFF_S,
-    Config,
-    Ledger,
-    answer_names,
-    format_messages,
-    grade,
-    normalise_imports,
-    refused_before_generation,
-    scoring_faults,
-    split_files,
-    strip_fences,
-    suggested_tactics,
-    suggestions,
-    sweep_files,
-    usable_cocktail,
-)
-from submission.framework import (
-    UNKNOWN_NAME,
-    statement_probes,
-    alternatives,
-    hand_to_search,
-    declaration_name,
-    graded_theorems,
-    definition_slots,
-    fill_definition,
-    answer_slots,
-    axiom_probe,
-    collapse,
-    first_blocks,
-    have_spans,
-    in_span,
-    classify,
-    cursor,
-    cursor_goal,
-    drop_lines,
-    fill_answer,
-    insert_preamble,
-    is_done,
-    message_line,
-    unreachable,
-    normalise_steps,
-    as_goal,
-    drop_own,
-    enclosing_name,
-    root_names,
-    split_cursor,
-    unwrap_own,
-    placeholders,
-    prefixes,
-    render,
-    replace_cursor,
-    sweep_body,
-    open_names,
-    restate,
-    proof_body,
-)
+from submission.techniques import PREAMBLE_END
+from submission.config import Config, FEEDBACK_CHARS, Ledger, RETRY_BACKOFF_S
+from submission.contract import (declared_names, format_messages, refused_before_generation, strip_fences, suggested_tactics, suggestions)
+from submission.framework import (UNKNOWN_NAME, statement_probes, alternatives, hand_to_search, declaration_name, graded_theorems, definition_slots, fill_definition, answer_slots, axiom_probe, collapse, first_blocks, have_spans, in_span, classify, cursor, cursor_goal, drop_lines, fill_answer, insert_preamble, is_done, message_line, unreachable, normalise_steps, as_goal, drop_own, enclosing_name, root_names, split_cursor, unwrap_own, placeholders, prefixes, render, replace_cursor)
 
 # A step is a few lines; the file it goes into is the context. Wide replies are
 # the failure mode here, not narrow ones.

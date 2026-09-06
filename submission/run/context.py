@@ -8,8 +8,8 @@ from __future__ import annotations
 from typing import Any
 
 from re_harness import Problem, Services
-from submission.agent import (Ledger, answer_names, declared_names,
-                              normalise_imports, with_preamble)
+from submission.config import Ledger
+from submission.contract import answer_names, declared_names, normalise_imports, with_preamble
 from submission.cells import Cells
 from submission.framework import root_names
 from submission.board.types import Notes

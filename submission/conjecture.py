@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import re
-from itertools import product
 from math import comb as _comb
 from typing import Any, Sequence
 

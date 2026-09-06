@@ -117,7 +117,8 @@ async def main() -> int:
     args = ap.parse_args()
 
     from re_harness import Problem
-    from submission.agent import Config, SubmissionAgent
+    from submission.agent import SubmissionAgent
+    from submission.config import Config
 
     run = Path(args.run_dir)
     cache = Cache.from_events([run / "events.jsonl"])

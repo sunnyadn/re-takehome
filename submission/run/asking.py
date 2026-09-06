@@ -11,7 +11,8 @@ import re
 import time
 from typing import Any, Sequence
 
-from submission.agent import FEEDBACK_CHARS, format_messages
+from submission.config import FEEDBACK_CHARS
+from submission.contract import format_messages
 from submission.cells import enclosing, remap, render_check, reopen_past_cell
 from submission.framework import (classify, hand_to_search, in_span, insert_preamble,
                                   message_line, prefixes, proof_span, root_names, unreachable)

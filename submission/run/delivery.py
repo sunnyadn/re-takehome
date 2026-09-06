@@ -6,7 +6,7 @@ import re
 from typing import Any
 
 from re_harness import AgentResult
-from submission.agent import grade, scoring_faults
+from submission.contract import grade, scoring_faults
 from submission.cells import modular, strip_markers
 from submission.framework import axiom_probe, classify, is_done
 from submission.framework_agent import SLOW_COMPILE_MS, State

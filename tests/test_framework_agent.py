@@ -70,7 +70,7 @@ def test_the_calls_the_loop_makes_satisfy_the_harness_policy():
 
     from re_harness.llm import LLMClient, MAX_OUTPUT_TOKENS
     from re_harness.models import ALLOWED_MODELS, PRICE_CEILINGS
-    from submission.agent import Config
+    from submission.config import Config
 
     for model in Config().lines:
         assert model in ALLOWED_MODELS and model in PRICE_CEILINGS

@@ -10,7 +10,7 @@ import asyncio
 import re
 import time
 
-from submission.agent import format_messages
+from submission.contract import format_messages
 from submission.cells import CELL_PROBE, dissolve, remap, render_check, strip_markers
 from submission.framework import (DECL_HEAD, classify, drop_lines, message_line,
                                   message_span, proof_span, split_cursor)

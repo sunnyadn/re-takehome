@@ -4,7 +4,7 @@ share of the clock. The first part of a run: it depends only on `context`."""
 from __future__ import annotations
 import time
 
-from submission.agent import BUDGET_HEADROOM
+from submission.config import BUDGET_HEADROOM
 from submission.run.context import Run
 
 # What the harness's own Lean probes may take of the wall clock so far: the

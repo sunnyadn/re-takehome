@@ -10,7 +10,8 @@ from __future__ import annotations
 import re
 import time
 
-from submission.agent import FEEDBACK_CHARS, format_messages
+from submission.config import FEEDBACK_CHARS
+from submission.contract import format_messages
 from submission.cells import enclosing, reset_cell
 from submission.conjecture import (families, fits, lemma_text, read_table, table_file,
                                    verified, verify_file)

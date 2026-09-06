@@ -4,7 +4,8 @@ import time
 
 from re_harness import Problem
 from re_harness.lean import LeanCheck
-from submission.agent import COCKTAIL, Config
+from submission.config import Config
+from submission.sweep import COCKTAIL
 from submission.cells import CELL_PROBE
 from submission.board_agent import BoardAgent
 from submission.board.probes import PROBE, read_board, render_all
@@ -208,7 +209,7 @@ def test_every_placeholder_is_rendered_as_skip_at_once():
 def test_the_board_reads_one_goal_per_placeholder_with_its_own_context():
     text = ("import Mathlib\n\ntheorem demo : True := by\n  have k : True := by\n"
             "    sorry\n  sorry\n\ntheorem demo_b : True := by\n  sorry\n")
-    from submission.agent import FileCoordinates
+    from submission.contract import FileCoordinates
     check = asyncio.run(FileCoordinates(BoardLean()).check_file(render_all(text)))
     board = read_board(text, check.messages, check.accepted)
     assert [g.decl for g in board.goals] == ["demo", "demo", "demo_b"]
@@ -1559,7 +1560,7 @@ def test_the_challenge_imports_are_kept_and_numeral_exponents_typed_when_they_ar
     # `a ^ 2` elaborates through Monoid.npow, under the challenge's own imports
     # through instPowNat. Verified with the real comparator: original imports +
     # import Mathlib + `attribute [instance 2000] instPowNat` + `^ (2 : ℕ)` passes.
-    from submission.agent import normalise_imports, type_exponents
+    from submission.contract import normalise_imports, type_exponents
     narrow = ("import Mathlib.Data.Nat.Basic\nimport Mathlib.Order.Bounds.Basic\n\n"
               "theorem t (a b : ℕ) : 2000 ∣ a ^ 2 * b ^ 5 → 10 ≤ a * b := by\n  sorry\n")
     out = normalise_imports(narrow, narrow)
@@ -1567,7 +1568,7 @@ def test_the_challenge_imports_are_kept_and_numeral_exponents_typed_when_they_ar
                           "attribute [instance 2000] instPowNat\n\n")
     assert "2000 ∣ a ^ (2 : ℕ) * b ^ (5 : ℕ) → 10 ≤ a * b := by" in out
     assert normalise_imports(out, out) == out  # idempotent
-    from submission.agent import statement_drift
+    from submission.contract import statement_drift
     assert statement_drift(narrow, out) == []   # the agent's own grader accepts its header
     assert statement_drift(narrow, out.replace("10 ≤ a * b", "9 ≤ a * b"))
     full = "import Mathlib\n\ntheorem t (a : ℕ) : a ^ 2 = a * a := by\n  sorry\n"
@@ -1872,7 +1873,7 @@ def test_a_claim_the_walk_covers_is_settled_without_an_auditor_call():
 def test_the_technique_preamble_sits_after_the_header_and_the_models_are_told_about_it():
     # Techniques are Lean tactics defined once in the file, not prose recipes:
     # checked once in the image, callable by either model anywhere in the file.
-    from submission.agent import normalise_imports, with_preamble
+    from submission.contract import normalise_imports, with_preamble
     from submission.techniques import PREAMBLE_MARK
     narrow = ("import Mathlib.Data.Nat.Basic\n\ntheorem demo (d : ℕ) (h : d ∣ 2000) : 5 ≤ d := by\n  sorry\n")
     text = with_preamble(normalise_imports(narrow, narrow))
@@ -2771,7 +2772,7 @@ def test_a_step_that_closes_its_goal_is_not_refused_for_its_own_check_time():
                                      FakeServices(lean, llm)))
     assert result.metadata["solved_by"] == "board_loop"
     assert not any(e.get("stage") == "slow" for e in result.metadata["events"])
-    from submission.agent import COCKTAIL
+    from submission.sweep import COCKTAIL
     assert "subst_vars <;> ring" in COCKTAIL and "subst_vars <;> nlinarith" in COCKTAIL
 
 
@@ -2835,7 +2836,7 @@ def test_an_inaccessible_hypothesis_becomes_a_named_binder_of_the_cell():
 
 
 def test_vm_leaves_off_disables_the_leaf_sweep(monkeypatch):
-    from submission.agent import Config
+    from submission.config import Config
     monkeypatch.setenv("VM_LEAVES", "off")
     assert Config.from_env().leaves is False
     monkeypatch.delenv("VM_LEAVES")

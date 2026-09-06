@@ -20,7 +20,9 @@ from re_harness.lean import LeanRuntimeError
 
 from submission.sampling import read_sample_hit, sample_file, sampled_search
 from submission.techniques import without_techniques
-from submission.agent import (FEEDBACK_CHARS, Ledger, in_file_coordinates, format_messages, scoring_faults, split_files, sweep_files, usable_cocktail)
+from submission.config import FEEDBACK_CHARS, Ledger
+from submission.contract import format_messages, in_file_coordinates, scoring_faults
+from submission.sweep import split_files, sweep_files, usable_cocktail
 from submission.framework import (classify, definition_slots, fill_definition, graded_theorems, line_of, placeholders, proof_span, root_names)
 from submission.framework_agent import FILE_CHARS, ANSWER_TOKENS, strip_fences, LOOSE_DRAIN_S, FrameworkAgent
 from submission.board.types import Board, Goal, binder_names, narrates, owner, signature

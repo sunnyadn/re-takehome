@@ -13,7 +13,9 @@ from typing import Any
 from re_harness import LLMCallError
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
-from submission.agent import FEEDBACK_CHARS, format_messages, technique_card
+from submission.config import FEEDBACK_CHARS
+from submission.contract import format_messages
+from submission.techniques import technique_card
 from submission.framework import classify, insert_above, render, restate
 from submission.framework_agent import (FILE_CHARS, FRAMEWORK_SYSTEM, Feedback, GOAL_CHARS,
                                         State, sheet_for)

@@ -12,7 +12,8 @@ from typing import Any, Sequence
 # `first` takes the first alternative that does not fail, and `norm_num` can
 # succeed by rewriting without closing; `done` turns that into a failure so the
 # block keeps searching. Never emit an alternative without it.
-from submission.agent import DECL_START, COCKTAIL, NAT_POW_LINE, PROOF_DECL, wrap_tactic
+from submission.contract import NAT_POW_LINE
+from submission.sweep import COCKTAIL, DECL_START, PROOF_DECL, wrap_tactic
 from submission.techniques import PREAMBLE_END
 
 # A placeholder is a whole line. A term-position `:= sorry` (an answer slot) is

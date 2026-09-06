@@ -7,7 +7,7 @@ import time
 
 from re_harness import LLMCallError, Problem
 from re_harness.lean import LeanCheck
-from submission.agent import Config
+from submission.config import Config
 from submission.framework_agent import FrameworkAgent
 
 CHALLENGE = "import Mathlib\n\ntheorem demo : True := by\n  sorry\n"

@@ -6,10 +6,12 @@ from types import SimpleNamespace
 import pytest
 
 import submission.agent as agent_mod
+import submission.config as config
+import submission.contract as contract
+import submission.sweep as sweep
 from re_harness import LLMCallError
-from submission.agent import (
-    COCKTAIL, Ledger, sweep_files, wrap_tactic,
-)
+from submission.config import Ledger
+from submission.sweep import COCKTAIL, sweep_files, wrap_tactic
 
 
 def test_every_cocktail_alternative_is_parenthesised():
@@ -59,7 +61,7 @@ class _Services:
 
 def test_the_stop_margin_never_eats_a_quarter_of_a_short_run():
     # The 8-hour floor used to swallow 47% of a 30-minute run.
-    from submission.agent import Config
+    from submission.config import Config
     short, graded = Config(time_limit_s=1800.0), Config(time_limit_s=28800.0)
     assert short.stop_margin_s <= 0.25 * 1800.0
     assert short.last_turn_start_s / 1800.0 > 0.6
@@ -79,7 +81,7 @@ def test_file_coordinates_moves_lean_positions_down_by_the_import_lines():
         async def check_file(self, source, timeout_s=None):
             return LeanCheck(False, [{"severity": "error", "pos": {"line": 4}, "endPos": {"line": 5},
                                       "data": "unsolved goals\n⊢ True"}], True, False, 1)
-    lean = agent_mod.FileCoordinates(Raw())
+    lean = contract.FileCoordinates(Raw())
     three = "import A\nimport B\nimport Mathlib\n\ntheorem t : True := by\n  sorry\n"
     one = "import Mathlib\n\ntheorem t : True := by\n  sorry\n"
     assert asyncio.run(lean.check_file(three)).messages[0]["pos"]["line"] == 7
@@ -87,8 +89,8 @@ def test_file_coordinates_moves_lean_positions_down_by_the_import_lines():
     assert asyncio.run(lean.check_file(one)).messages[0]["pos"]["line"] == 5
     # idempotent wrapping
     services = type("S", (), {})(); services.lean = Raw()
-    agent_mod.in_file_coordinates(services); inner = services.lean
-    assert agent_mod.in_file_coordinates(services).lean is inner
+    contract.in_file_coordinates(services); inner = services.lean
+    assert contract.in_file_coordinates(services).lean is inner
 
 
 class _StuckLLM:
@@ -119,7 +121,7 @@ def test_suggestions_picks_only_try_this_info():
         {"severity": "info", "data": "some other note"},
         {"severity": "error", "data": "Try this: not an info"},
     ]
-    assert agent_mod.suggestions(messages) == ["Try this:\n  exact Nat.sqrt_le k"]
+    assert contract.suggestions(messages) == ["Try this:\n  exact Nat.sqrt_le k"]
 
 
 class _SearchLean:
@@ -215,9 +217,9 @@ class _MixedErrorLean(_SearchLean):
 def test_the_retry_pool_scales_with_the_clock():
     # Eight was sized for a 30-minute run of ~8 calls; a graded run makes ~35x
     # that, and exhausting the pool ends the run hours early.
-    assert agent_mod.Config(time_limit_s=1800.0).max_retries == 8
-    assert agent_mod.Config(time_limit_s=28800.0).max_retries == 128
-    assert agent_mod.Config(time_limit_s=60.0).max_retries == 8
+    assert config.Config(time_limit_s=1800.0).max_retries == 8
+    assert config.Config(time_limit_s=28800.0).max_retries == 128
+    assert config.Config(time_limit_s=60.0).max_retries == 8
 
 
 def test_refused_before_generation_reads_the_harness_message():
@@ -227,9 +229,9 @@ def test_refused_before_generation_reads_the_harness_message():
                            "and reported no cost: body")
     other = LLMCallError("OpenRouter returned HTTP 502; spend is uncertain: body")
     plain = LLMCallError("connection reset")
-    assert agent_mod.refused_before_generation(refused)
-    assert not agent_mod.refused_before_generation(other)
-    assert not agent_mod.refused_before_generation(plain)
+    assert contract.refused_before_generation(refused)
+    assert not contract.refused_before_generation(other)
+    assert not contract.refused_before_generation(plain)
 
 
 _SURRENDER = (
@@ -291,9 +293,9 @@ def test_both_shapes_of_lean_suggestion_yield_a_tactic():
     advice = ("Try this:\n  [apply] ring_nf\n  \n  The `ring` tactic failed to "
               "close the goal. Use `ring_nf` to obtain a normal form.\n    \n  "
               "Note that `ring` works primarily in *commutative* rings.")
-    assert agent_mod.suggested_tactics([lemma]) == ["exact lt_of_pow_lt_pow_left' 3 h2"]
-    assert agent_mod.suggested_tactics([advice]) == ["ring_nf"]
-    assert len(agent_mod.suggested_tactics([lemma, advice])) == 2
+    assert contract.suggested_tactics([lemma]) == ["exact lt_of_pow_lt_pow_left' 3 h2"]
+    assert contract.suggested_tactics([advice]) == ["ring_nf"]
+    assert len(contract.suggested_tactics([lemma, advice])) == 2
 
 
 class _CountingLLM:
@@ -401,7 +403,7 @@ def test_a_mend_that_cuts_a_graded_declaration_is_refused():
     """surplus_lines can point at the statement itself; scoring_faults is the
     only thing standing between that and a file the grader scores zero."""
 
-    from submission.agent import scoring_faults
+    from submission.contract import scoring_faults
     from submission.framework import drop_lines
     cut = drop_lines(_TWO_DECLS, [6])
     assert scoring_faults(cut, (), _TWO_DECLS), "dropping the statement raised no fault"
@@ -412,6 +414,6 @@ def test_split_candidates_are_only_built_for_a_decomposable_goal():
 
     iff = "theorem t : True ↔ True := by\n  sorry\n"
     flat = "theorem t (x : ℝ) : x = x := by\n  sorry\n"
-    assert len(agent_mod.split_files(iff, ("rfl",))) == len(agent_mod.SPLITTERS)
-    assert agent_mod.split_files(flat, ("rfl",)) == []
+    assert len(sweep.split_files(iff, ("rfl",))) == len(sweep.SPLITTERS)
+    assert sweep.split_files(flat, ("rfl",)) == []
 
