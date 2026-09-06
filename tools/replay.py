@@ -117,7 +117,7 @@ async def main() -> int:
     args = ap.parse_args()
 
     from re_harness import Problem
-    from submission.agent import SubmissionAgent
+    from submission.board_agent import BoardAgent
     from submission.config import Config
 
     run = Path(args.run_dir)
@@ -131,7 +131,7 @@ async def main() -> int:
         challenge=(problems / "challenge.lean").read_text(),
     )
     limit = args.time_limit if args.time_limit else 10**9
-    agent = SubmissionAgent(Config(time_limit_s=limit))
+    agent = BoardAgent(Config(time_limit_s=limit))
     llm, lean = ReplayLLM(cache), ReplayLean(cache)
     seen: list[tuple[str, dict]] = []
     services = SimpleNamespace(
@@ -158,7 +158,7 @@ async def main() -> int:
     if out is not None:
         meta = out.metadata
         print(f"replayed outcome: accepted={meta.get('accepted_by_repl')} "
-              f"winner={meta.get('winner_line')} spend=${meta.get('spend_usd')}")
+              f"solved_by={meta.get('solved_by')} spend=${meta.get('spend_usd')}")
         print(f"recorded outcome: passed={result['passed']} "
               f"spend=${result['budget']['spent_usd']:.4f}")
     return 0

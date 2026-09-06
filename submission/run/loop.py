@@ -30,7 +30,7 @@ from submission.run.delivery import Delivery
 from submission.run.ladder import Ladder
 
 
-# The cursor loop's prompt, less "give every have a body": on the board a
+# `FRAMEWORK_SYSTEM`, less "give every have a body": on the board a
 # `have` may end in `sorry` and becomes a goal of its own.
 BOARD_SYSTEM = FRAMEWORK_SYSTEM.replace(
     "  obtain, subst, left, right, exfalso, interval_cases, by_contra, show, rw.\n"

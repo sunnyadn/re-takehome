@@ -1,7 +1,6 @@
-"""One file, one cursor, two models taking turns; Lean adjudicates every step.
-
-The loop is FRAMEWORK.md: check, read the goal at `skip`, try the free closers,
-otherwise ask a model for one step. A step that compiles is permanent.
+"""What `BoardAgent` inherits. One model call with its pacing and reasoning
+settings, the plan and probe asks, and `_finish`, which takes the search back
+out of a proved file. No loop lives here; the board's loop is in `run/loop.py`.
 """
 
 from __future__ import annotations

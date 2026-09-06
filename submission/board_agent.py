@@ -1,10 +1,6 @@
-"""A board of open goals, each known by its content, two models working two
-of them at once; Lean judges every edit against the whole file. The file is
-still the proof; a reply is read once, as a proof of whatever it names.
-
-`solve` below is the spine: it wires the seven parts listed in
-`submission/run/__init__.py` and calls four things it inherits from
-`FrameworkAgent` (`_share`, `_define`, `_resolve_answers`, `_finish`)."""
+"""A board of open goals, two models working two of them at once, Lean judging
+every edit against the whole file. `solve` below is the spine: it wires the
+seven parts of `submission/run/`, and what it borrows sits in the class below."""
 
 
 from __future__ import annotations
@@ -125,7 +121,9 @@ TUPLE_IN = re.compile(r"[⟨(]\s*([A-Za-z_][\w']*(?:\s*,\s*[A-Za-z_][\w']*)+)\s*
 
 
 class BoardAgent(FrameworkAgent):
-    """The cursor loop's primitives, driven by a board instead of a cursor."""
+    """The board program. It overrides `_share` and `_call`, adds `_define` and
+    `solve`, and borrows `_ask_plan`, `_probe`, `_resolve_answers` and `_finish`
+    from `FrameworkAgent` unchanged."""
 
     async def _define(self, problem: Problem, text: str, services: Services,
                       ledger: Ledger, events: list[dict[str, Any]]) -> str:

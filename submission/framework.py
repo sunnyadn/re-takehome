@@ -1,7 +1,6 @@
-"""FRAMEWORK.md as code: one file, one cursor, Lean adjudicates.
-
-The cursor is the topmost lone `sorry` line, rendered as `skip` so Lean prints
-its goal. Everything here is a text transform; the model supplies the steps.
+"""Reading and rewriting Lean text, with no state and no I/O: what a check's
+messages mean, where a proof begins and ends, what a file declares and what it
+still leaves open. The two agent classes above both build on this.
 """
 
 from __future__ import annotations
