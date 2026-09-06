@@ -67,6 +67,53 @@ AUDIT_SYSTEM = ("You audit one goal inside a Lean 4 proof. You answer with one "
 INFLATION = 3.0
 
 
+def _claimed_haves(base: Board, nxt: Board, lines: list[str]) -> list[dict[str, Any]]:
+    """Every `have` in the file whose claim its declaration did not already
+    state. Measured on putnam_2020_a2: a false `have` with a proof body had
+    only its residue audited. The claim is audited whatever the body says."""
+
+    known: dict[str, dict[str, str]] = {}
+    subjects: list[dict[str, Any]] = []
+    for i, ln in enumerate(lines):
+        head = HAVE_HEAD.match(ln)
+        decl = owner(nxt.text, i + 1) if head else ""
+        claim = " ".join(claim_of(head.group(2).strip()).split()) if head else ""
+        if not decl or not claim:
+            continue
+        if decl not in known:
+            known[decl] = stated_facts(base.text, decl)
+        if claim in known[decl]:
+            continue
+        subjects.append({"key": (decl, "have " + claim), "decl": decl, "at": i,
+                         "what": head.group(2).strip(), "claim": claim})
+    return subjects
+
+
+def _suspect_goals(nxt: Board, had: set[Any], lines: list[str],
+                   covered: set[int]) -> list[dict[str, Any]]:
+    """Goals the step left that a witness can decide on its own, minus the
+    ones the board already had and the ones a `have` above already covers."""
+
+    subjects: list[dict[str, Any]] = []
+    for g in nxt.goals:
+        # `⊢ False` is provable only in an inconsistent context, so a witness
+        # for the context alone proves the branch dead. Measured on p09: a
+        # satisfiable `⊢ False` held both models for the rest of the run.
+        # A goal with nothing in scope is a closed proposition: a wrong
+        # witness or rewrite leaves one that is false, and its negation
+        # decides it in one check. Measured on rmo_2000_6: `use 10; use 1`
+        # left `⊢ 0 < 1 ∧ 2000 ∣ 10 ^ 3 * 1 ^ 4 ∧ ...` and the branch died.
+        dead_end = target_of(g.text) == "False"
+        closed = is_closed(g.text)
+        if (g.key in had or not g.text or META.search(target_of(g.text))
+                or not (dead_end or closed or is_stated(lines, g))
+                or enclosing_have(lines, g)[0] in covered):
+            continue
+        subjects.append({"key": g.key, "decl": g.decl, "goal": g, "what": "",
+                         "claim": ""})
+    return subjects
+
+
 def _unchanged(goal: Goal, left: list[Goal]) -> str:
     if left and all(g.text == goal.text for g in left):
         return "that step left the goal exactly as it was"
@@ -324,41 +371,10 @@ class Asking:
         other = next((m for m in self.run.cfg.lines if m != author and not narrates(m)),
                      next((m for m in self.run.cfg.lines if not narrates(m)),
                           next((m for m in self.run.cfg.lines if m != author), author)))
-        had = {g.key for g in base.goals}
         lines = nxt.text.split("\n")
-        # Measured on putnam_2020_a2: a false `have` with a proof body had only
-        # its residue audited. The claim is audited whatever the body says.
-        known: dict[str, dict[str, str]] = {}
-        subjects: list[dict[str, Any]] = []
-        for i, ln in enumerate(lines):
-            head = HAVE_HEAD.match(ln)
-            decl = owner(nxt.text, i + 1) if head else ""
-            claim = " ".join(claim_of(head.group(2).strip()).split()) if head else ""
-            if not decl or not claim:
-                continue
-            if decl not in known:
-                known[decl] = stated_facts(base.text, decl)
-            if claim in known[decl]:
-                continue
-            subjects.append({"key": (decl, "have " + claim), "decl": decl, "at": i,
-                             "what": head.group(2).strip(), "claim": claim})
-        covered = {s["at"] for s in subjects}
-        for g in nxt.goals:
-            # `⊢ False` is provable only in an inconsistent context, so a witness
-            # for the context alone proves the branch dead. Measured on p09: a
-            # satisfiable `⊢ False` held both models for the rest of the run.
-            # A goal with nothing in scope is a closed proposition: a wrong
-            # witness or rewrite leaves one that is false, and its negation
-            # decides it in one check. Measured on rmo_2000_6: `use 10; use 1`
-            # left `⊢ 0 < 1 ∧ 2000 ∣ 10 ^ 3 * 1 ^ 4 ∧ ...` and the branch died.
-            dead_end = target_of(g.text) == "False"
-            closed = is_closed(g.text)
-            if (g.key in had or not g.text or META.search(target_of(g.text))
-                    or not (dead_end or closed or is_stated(lines, g))
-                    or enclosing_have(lines, g)[0] in covered):
-                continue
-            subjects.append({"key": g.key, "decl": g.decl, "goal": g, "what": "",
-                             "claim": ""})
+        subjects = _claimed_haves(base, nxt, lines)
+        subjects += _suspect_goals(nxt, {g.key for g in base.goals}, lines,
+                                   {s["at"] for s in subjects})
         for sub in subjects:
             if self.audited.get(sub["key"]):
                 return self.audited[sub["key"]]
@@ -411,28 +427,8 @@ class Asking:
         replies = [t.result() if t.done() else ("", "") for t in pending_calls]
         for sub in subjects:
             self.audited[sub["key"]] = ""
-            verdict, values = "unstated", {}
-            target = sub["claim"] or target_of(sub["goal"].text)
-            if sub["parsed"]:
-                groups, target = sub["parsed"]
-                reply, stopped = replies[asked.index(sub)] if sub in asked else ("", "")
-                names = {n for grp in groups for n in binder_names(grp)}
-                given = sub["found"] if sub["found"] else read_witness(reply)
-                values = {n: v for n, v in (given or {}).items() if n in names}
-                verdict = "unverified"
-                if given is None and stopped != "length" and "holds" in reply:
-                    verdict = "holds"
-                if sub["searched"] and not sub["found"]:
-                    verdict = "holds"
-                if sub["found"] and "sequence" in sub["found"]:
-                    # Lean evaluated the sampled sequence itself: the hit is the verdict.
-                    verdict, values = "refuted", dict(sub["found"])
-                elif values or not names:
-                    check = await self.run.services.lean.check_file(
-                        witness_file(prefix, groups, values, target),
-                        timeout_s=CHECK_TIMEOUT_FLOOR_S)
-                    if check.accepted:
-                        verdict = "refuted"
+            reply, stopped = replies[asked.index(sub)] if sub in asked else ("", "")
+            verdict, target, values = await self.decide(sub, reply, stopped, prefix)
             self.run.events.append({"kind": "audit",
                            "by": "evaluation" if sub.get("searched") else other,
                            "goal": target[:100], "verdict": verdict, "values": values})
@@ -450,6 +446,35 @@ class Asking:
                     "it): the witness, rewrite or case was wrong. Undo it and choose again")
                 return self.audited[sub["key"]]
         return ""
+
+    async def decide(self, sub: dict[str, Any], reply: str, stopped: str,
+                     prefix: str) -> tuple[str, str, dict[str, str]]:
+        """What the evaluation walk, the auditor's reply and Lean together say
+        about one claim: refuted with the values that break it, holds, or
+        unverified. A claim Lean would not restate stays unstated."""
+
+        verdict, values = "unstated", {}
+        target = sub["claim"] or target_of(sub["goal"].text)
+        if sub["parsed"]:
+            groups, target = sub["parsed"]
+            names = {n for grp in groups for n in binder_names(grp)}
+            given = sub["found"] if sub["found"] else read_witness(reply)
+            values = {n: v for n, v in (given or {}).items() if n in names}
+            verdict = "unverified"
+            if given is None and stopped != "length" and "holds" in reply:
+                verdict = "holds"
+            if sub["searched"] and not sub["found"]:
+                verdict = "holds"
+            if sub["found"] and "sequence" in sub["found"]:
+                # Lean evaluated the sampled sequence itself: the hit is the verdict.
+                verdict, values = "refuted", dict(sub["found"])
+            elif values or not names:
+                check = await self.run.services.lean.check_file(
+                    witness_file(prefix, groups, values, target),
+                    timeout_s=CHECK_TIMEOUT_FLOOR_S)
+                if check.accepted:
+                    verdict = "refuted"
+        return verdict, target, values
 
     async def mine(self, base: Board, goal: Goal, block: str, author: str,
                    why: str) -> tuple[Board | None, str]:
