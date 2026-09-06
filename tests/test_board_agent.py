@@ -3003,3 +3003,19 @@ def test_a_report_inside_the_region_survives_when_it_covers_a_stub():
                           probed=set(), old=(400, 420), delta=0, cut=10000,
                           nested_old={7})
     assert kept == [_REAL_UNSOLVED]
+
+
+def test_a_worker_cannot_release_the_other_workers_claim():
+    from submission.board.types import Notes
+
+    notes = Notes()
+    key = ("thm", "goal text")
+    notes.claim(key, "B")
+    # `pick` hands A a goal B holds when nothing is unclaimed, so A reaches
+    # the release with a claim that is not its own.
+    notes.claim(key, "A")
+    assert notes[key].claimed_by == "B"
+    notes.release(key, "A")
+    assert notes[key].claimed_by == "B", "A released a claim still in flight"
+    notes.release(key, "B")
+    assert notes[key].claimed_by is None

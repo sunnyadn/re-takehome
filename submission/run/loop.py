@@ -307,7 +307,7 @@ class Loop:
                         self.bb.focus(main)
             if not prompt:
                 async with self.lock:
-                    self.run.notes[goal.key].claimed_by = None
+                    self.run.notes.release(goal.key, model)
                 return True
         if goal is None:
             return False
@@ -319,8 +319,7 @@ class Loop:
         finally:
             self.run.loose.remove(task)
         async with self.lock:
-            if self.run.notes[goal.key].claimed_by == model:
-                self.run.notes[goal.key].claimed_by = None
+            self.run.notes.release(goal.key, model)
             if why == "length":
                 reply = salvage(reply)
                 kept = reply.count("\n") + 1 if reply else 0

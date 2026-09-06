@@ -226,6 +226,12 @@ class Notes(dict):
         if self[key].claimed_by is None:
             self[key].claimed_by = model
 
+    def release(self, key: tuple[str, str], model: str) -> None:
+        """Only what this model holds. `pick` offers a goal the other model
+        has claimed, so an unguarded release drops a claim still in flight."""
+        if self[key].claimed_by == model:
+            self[key].claimed_by = None
+
     def forget(self, key: tuple[str, str]) -> None:
         self[key].forget()
 
