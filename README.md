@@ -23,11 +23,23 @@ flowchart LR
 ```
 
 **All 16 sample problems proved, every proof accepted by the kit's Comparator.
-Median 31 s per problem, 13 of the 16 under a minute, the slowest 7 minutes against
-the 8-hour budget.**
+Median 22 s per problem, 13 of the 16 under a minute, the slowest 7 minutes against
+the 8-hour budget, 1.3 cents for the set.**
 
-[How it works](docs/ARCHITECTURE.md) · [What the two models each contributed](docs/PART2.md) ·
-[Design notes](docs/APPROACH.md) · runs under [`outputs/board/`](outputs/board)
+One run per problem, sequential on an idle 28-core host, under
+[`outputs/board-2026-09-06/`](outputs/board-2026-09-06).
+`python tools/overlap.py outputs/board-2026-09-06` prints those numbers back out
+of the run directories. Three problems finish within 15 s of the minute mark, so
+the count under a minute is the softest of the three.
+
+There are two board run sets here and they are not interchangeable.
+[`outputs/board/`](outputs/board) is the set the Part 2 note counts steps and
+audits from, recorded on 5 September, and it is kept exactly as it was for that
+reason. `outputs/board-2026-09-06/` is the same sixteen problems on the code in
+this repository now, and the timings above are from it.
+
+[How it works](docs/ARCHITECTURE.md) · [Where the code is](docs/ARCHITECTURE.md#where-each-of-these-lives) ·
+[What the two models each contributed](docs/PART2.md) · [Design notes](docs/APPROACH.md)
 
 ---
 
