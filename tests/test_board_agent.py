@@ -2912,3 +2912,94 @@ def test_a_pair_of_reciprocals_against_a_listed_solution_set_is_a_leaf():
     assert got.count("⟨rfl, rfl⟩") == 6
     # Every `have` hands its proof a parenthesised `by`, or the block is swallowed.
     assert ":= by " not in got
+
+
+# --- what Blackboard.look guarantees when only one cell was checked ---------
+#
+# A focused check shows Lean one cell and stubs the rest, so Lean reports no
+# goal for anything outside it. These three functions are how the unchecked
+# part of the board is carried across. Measured on the six deterministic
+# problems: `carry` runs 25 times and the reparent once, while the count
+# mismatch and the nested-cell message exception never run at all, so for
+# those two these are the only tests there are.
+
+def _goal(line, text, stmt="", cell=0):
+    from submission.board.types import Goal
+    return Goal(line, "  ", "thm", text, stmt, cell)
+
+
+# Verbatim from a real focused check of p06_pow_mod (out/.../events.jsonl).
+_REAL_UNSOLVED = {
+    "severity": "error",
+    "pos": {"line": 410, "column": 53},
+    "endPos": {"line": 411, "column": 65},
+    "data": "unsolved goals\n⊢ 7 ^ 2026 % 100 = p06_answer",
+}
+
+
+def test_a_goal_outside_the_checked_cell_keeps_the_text_lean_last_gave_it():
+    from submission.board.types import carry_goals
+
+    # Two placeholders. Line 20 is the one this check probed, line 40 is not.
+    base = [_goal(20, "OLD INSIDE"), _goal(40, "OLD OUTSIDE", stmt="S")]
+    found = [_goal(22, "FRESH FROM LEAN"), _goal(42, "")]
+    out = carry_goals(base, found, probed={22}, old=(10, 30), nested_old=set())
+
+    assert [g.text for g in out] == ["FRESH FROM LEAN", "OLD OUTSIDE"]
+    # The carried goal takes the new line number and the old statement.
+    assert (out[1].line, out[1].stmt) == (42, "S")
+
+
+def test_a_changed_count_of_untouched_goals_refuses_to_guess():
+    from submission.board.types import carry_goals
+
+    base = [_goal(40, "A"), _goal(50, "B")]
+    found = [_goal(42, "")]   # one placeholder outside, where there were two
+    assert carry_goals(base, found, probed=set(), old=(10, 30), nested_old=set()) is None
+
+
+def test_a_goal_inside_a_stubbed_nested_cell_is_carried_not_dropped():
+    from submission.board.types import carry_goals
+
+    # Line 20 is inside the checked region but belongs to nested cell 7, which
+    # this check rendered as a stub, so Lean said nothing about it.
+    base = [_goal(20, "IN NESTED CELL", cell=7)]
+    found = [_goal(21, "")]
+    out = carry_goals(base, found, probed=set(), old=(10, 30), nested_old={7})
+    assert [g.text for g in out] == ["IN NESTED CELL"]
+
+
+def test_a_message_below_the_edit_moves_by_however_much_the_region_grew():
+    from submission.board.types import carry_messages
+
+    below = dict(_REAL_UNSOLVED, pos={"line": 500, "column": 0},
+                 endPos={"line": 500, "column": 9})
+    # The placeholder this report is about moved down with it.
+    goals = [_goal(503, "still open")]
+    kept = carry_messages([below], base_goals=[], goals=goals, probed=set(),
+                          old=(10, 30), delta=3, cut=100, nested_old=set())
+    assert [m["pos"]["line"] for m in kept] == [503]
+
+
+def test_a_goal_report_with_no_placeholder_under_it_is_about_a_closed_goal():
+    from submission.board.types import carry_messages
+
+    # The report spans 410-411 and no placeholder is left there, so it is the
+    # header report of the goal this edit just closed and must not be kept.
+    kept = carry_messages([_REAL_UNSOLVED], base_goals=[], goals=[_goal(900, "elsewhere")],
+                          probed=set(), old=(10, 30), delta=0, cut=10000,
+                          nested_old=set())
+    assert kept == []
+
+
+def test_a_report_inside_the_region_survives_when_it_covers_a_stub():
+    from submission.board.types import carry_messages
+
+    # Inside the checked region, but its span covers line 411, where a goal of
+    # a stubbed nested cell sits. Dropping it loses that goal's only report.
+    base_goals = [_goal(411, "in the stub", cell=7)]
+    goals = [_goal(411, "in the stub", cell=7)]
+    kept = carry_messages([_REAL_UNSOLVED], base_goals=base_goals, goals=goals,
+                          probed=set(), old=(400, 420), delta=0, cut=10000,
+                          nested_old={7})
+    assert kept == [_REAL_UNSOLVED]

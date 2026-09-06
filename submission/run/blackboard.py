@@ -13,14 +13,15 @@ import time
 from submission.contract import format_messages
 from submission.cells import CELL_PROBE, dissolve, remap, render_check, strip_markers
 from submission.framework import (DECL_HEAD, classify, drop_lines, message_line,
-                                  message_span, proof_span, split_cursor)
+                                  proof_span, split_cursor)
 from submission.framework_agent import Feedback
 from submission.techniques import blank_techniques
 from submission.board.probes import (CHECK_TIMEOUT_CAP_S, check_timeout_s, dump_check,
                                      read_board)
 from submission.board.text import (base_region, drop_declaration, withdraw, withdraw_only)
-from submission.board.types import (Board, Goal, all_cell_spans, author_free, inherit,
-                                    owner, shift_message)
+from submission.board.types import (Board, Goal, all_cell_spans, author_free,
+                                    carry_goals, carry_messages, inherit,
+                                    reparent_target)
 from submission.run.budget import Budget
 from submission.run.context import Run
 from submission.run.delivery import Delivery
@@ -136,60 +137,21 @@ class Blackboard:
         found.ms = check.duration_ms
         if rendered.region is not None and base is not None and old is not None:
             new = rendered.region
-            if isinstance(focus, int) and not any(new[0] <= g.line <= new[1] for g in found.goals) \
-                    and not errors:
-                # The cell closed: what encloses it is checked next, so a goal
-                # of the parent that has no placeholder (Lean reports it on
-                # the parent's header) is seen again. Measured on rmo_2000_6:
-                # the stale-report filter alone let `case refine_1.refine_2`
-                # vanish and the board was delivered with a sorry.
-                above = [sp for sp in all_cell_spans(candidate) if sp.holds(new[0]) and sp.id != focus]
-                parent: int | str = max(above, key=lambda sp: sp.start).id if above else owner(candidate, new[0])
-                if parent and parent != focus:
-                    return await self.look(candidate, base, parent, edited)
-            # Fresh goals are the placeholders this check rendered as probes;
-            # every other placeholder (outside the unit, or inside a nested
-            # cell that was a stub here) keeps its goal from the base, by order.
+            # Measured on rmo_2000_6: without the reparent the stale-report
+            # filter let `case refine_1.refine_2` vanish and the board was
+            # delivered with a sorry.
+            parent = reparent_target(candidate, new, focus, found.goals, errors)
+            if parent is not None:
+                return await self.look(candidate, base, parent, edited)
             shown = rendered.text.split("\n")
             probed = {rendered.lines[i] for i, l in enumerate(shown) if CELL_PROBE in l}
             nested_old = {sp.id for sp in all_cell_spans(base.text)} - ({focus} if isinstance(focus, int) else set())
-            outside_old = [g for g in base.goals
-                           if not old[0] <= g.line <= old[1]
-                           or (g.cell in nested_old and g.cell != 0)]
-            outside_new = [g for g in found.goals if g.line not in probed]
-            if len(outside_old) != len(outside_new):
+            goals = carry_goals(base.goals, found.goals, probed, old, nested_old)
+            if goals is None:
                 return await self.look(candidate, base)
-            delta = (new[1] - new[0]) - (old[1] - old[0])
-            goals = []
-            carried = iter(outside_old)
-            for g in found.goals:
-                if g.line in probed:
-                    goals.append(g)
-                    continue
-                was = next(carried)
-                goals.append(Goal(g.line, g.indent, g.decl, was.text, was.stmt, g.cell))
-            kept = []
-            holes = [g.line for g in goals if g.line not in probed]
-            inner_old = {g.line for g in base.goals if old[0] <= g.line <= old[1]
-                         and g.cell in nested_old and g.cell != 0}
-            for m in base.messages:
-                at = message_line(m)
-                if at is None or (old[0] <= at <= old[1] and not (
-                        m in classify([m])[0] and any(
-                            (message_span(m) or (at, at))[0] <= h <= (message_span(m) or (at, at))[1]
-                            for h in inner_old))):
-                    continue
-                cut = edited.line if edited is not None else old[0]
-                m = shift_message(m, delta) if at > cut else m
-                span = message_span(m)
-                if m in classify([m])[0] and span and not any(span[0] <= h <= span[1] for h in holes):
-                    # A goal report from before the edit that no placeholder
-                    # outside the checked unit sits under is about the goal
-                    # just closed (measured: `exact Nat.sum_range_choose_halfway k`
-                    # closed the theorem and its old header report made
-                    # `unreachable` refuse the step).
-                    continue
-                kept.append(m)
+            kept = carry_messages(base.messages, base.goals, goals, probed, old,
+                                  (new[1] - new[0]) - (old[1] - old[0]),
+                                  edited.line if edited is not None else old[0], nested_old)
             found = Board(candidate, goals, kept + messages, accepted, base.bid, check.duration_ms)
         for g in found.goals:
             if g.stmt:

@@ -4,7 +4,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from typing import Any, Sequence
-from submission.framework import DECL_HEAD, line_of, proof_span, root_names
+from submission.framework import (DECL_HEAD, classify, line_of, message_line,
+                                  message_span, proof_span, root_names)
 from submission.framework_agent import NARRATES, STEP_TOKENS, Feedback
 
 # One definition. board_agent.py had two, and the second silently won.
@@ -265,6 +266,68 @@ def inherit(old: Sequence[Goal], new: Sequence[Goal], notes: Notes) -> None:
             now.said = was.said
         if was.plan is not None and now.plan is None:
             now.plan = was.plan
+
+
+def reparent_target(text: str, region: tuple[int, int], focus: Any,
+                    goals: Sequence[Goal], errors: Sequence[Any]) -> Any:
+    """The cell closed with no goal of its own, so Lean reports the parent's
+    goal on the parent's header: the id to check next, or None."""
+
+    if not isinstance(focus, int) or errors:
+        return None
+    if any(region[0] <= g.line <= region[1] for g in goals):
+        return None
+    above = [sp for sp in all_cell_spans(text) if sp.holds(region[0]) and sp.id != focus]
+    parent = max(above, key=lambda sp: sp.start).id if above else owner(text, region[0])
+    return parent if parent and parent != focus else None
+
+
+def carry_goals(base_goals: Sequence[Goal], found: Sequence[Goal], probed: set[int],
+                old: tuple[int, int], nested_old: set[Any]) -> list[Goal] | None:
+    """A goal on a probed line was checked; every other goal keeps the text
+    and statement it had on the base board, matched by file order. None when
+    that count changed, which is the caller's signal to check the whole file."""
+
+    outside_old = [g for g in base_goals
+                   if not old[0] <= g.line <= old[1]
+                   or (g.cell in nested_old and g.cell != 0)]
+    if len(outside_old) != len([g for g in found if g.line not in probed]):
+        return None
+    goals, carried = [], iter(outside_old)
+    for g in found:
+        if g.line in probed:
+            goals.append(g)
+            continue
+        was = next(carried)
+        goals.append(Goal(g.line, g.indent, g.decl, was.text, was.stmt, g.cell))
+    return goals
+
+
+def carry_messages(base_messages: Sequence[Any], base_goals: Sequence[Goal],
+                   goals: Sequence[Goal], probed: set[int], old: tuple[int, int],
+                   delta: int, cut: int, nested_old: set[Any]) -> list[Any]:
+    """The base's messages about everything this check did not look at, moved
+    by however much the checked region grew."""
+
+    holes = [g.line for g in goals if g.line not in probed]
+    inner_old = {g.line for g in base_goals if old[0] <= g.line <= old[1]
+                 and g.cell in nested_old and g.cell != 0}
+    kept = []
+    for m in base_messages:
+        at = message_line(m)
+        if at is None or (old[0] <= at <= old[1] and not (
+                m in classify([m])[0] and any(
+                    (message_span(m) or (at, at))[0] <= h <= (message_span(m) or (at, at))[1]
+                    for h in inner_old))):
+            continue
+        m = shift_message(m, delta) if at > cut else m
+        span = message_span(m)
+        if m in classify([m])[0] and span and not any(span[0] <= h <= span[1] for h in holes):
+            # A goal report from before the edit that no placeholder outside
+            # the checked unit sits under is about the goal just closed.
+            continue
+        kept.append(m)
+    return kept
 
 
 def target_of(goal_text: str) -> str:
