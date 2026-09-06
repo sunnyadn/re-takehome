@@ -6,10 +6,10 @@ from re_harness import Problem
 from re_harness.lean import LeanCheck
 from submission.agent import COCKTAIL, Config
 from submission.cells import CELL_PROBE
-from submission.board_agent import (
-    PROBE,
-    Board, BoardAgent, Goal, interpret, read_board, render_all,
-)
+from submission.board_agent import BoardAgent
+from submission.board.probes import PROBE, read_board, render_all
+from submission.board.reply import interpret
+from submission.board.types import Board, Goal
 from tests.test_framework_loop import FakeServices, said
 
 ONE = "import Mathlib\n\ntheorem demo : True := by\n  sorry\n"
@@ -408,7 +408,7 @@ def test_a_byte_identical_step_is_not_sent_to_lean_twice():
 def test_the_model_sees_every_statement_and_only_its_own_body():
     # Measured on p09: the last 8000 chars of the file cut the shared lemma's
     # statement off the top, and the model cited a lemma it could not see.
-    from submission.board_agent import view
+    from submission.board.text import view
     from submission.framework import render
     text = ("import Mathlib\n\ntheorem lemma_a (n : ℕ) :\n    n + 0 = n := by\n  simp\n  omega\n\n"
             "theorem lemma_b : True := by\n  sorry\n\n"
@@ -992,7 +992,7 @@ def test_a_withdrawn_claim_blocks_only_a_have_that_states_it_again():
     # Measured on p09 (gate26 run 4): after `have h_case : n % 3 = 0` was
     # withdrawn, every step containing the text `n % 3 = 0` was refused before
     # Lean saw it, and the goal itself was `⊢ n % 3 = 0`: 330 refusals in 19 min.
-    from submission.board_agent import restates
+    from submission.board.text import restates
     assert restates("have h2 : n % 3 = 0 := by\n  omega", ["n % 3 = 0"])
     assert restates("have h2 :  n % 3 = 0  := by omega", ["n % 3 = 0"])
     assert not restates("rcases h with h | h\nomega", ["n % 3 = 0"])
@@ -1120,7 +1120,8 @@ def test_a_fact_already_proved_in_scope_is_not_proved_again():
 def test_the_same_shared_lemma_under_two_names_is_kept_once():
     # Measured on p09 (gate33 run 1): both models proposed `2 ^ n % 7 = 2 ^ (n % 3) % 7`
     # under different names, and the board proved both.
-    from submission.board_agent import signature, drop_declaration
+    from submission.board.text import drop_declaration
+    from submission.board.types import signature
     text = ("import Mathlib\ntheorem a_cycle (n : ℕ) : 2 ^ n % 7 = 2 ^ (n % 3) % 7 := by\n  sorry\n\n"
             "theorem b_cycle (n : ℕ) :  2 ^ n % 7 = 2 ^ (n % 3) % 7 := by\n  sorry\n\n"
             "theorem other (n : ℕ) : 2 ^ n % 7 < 7 := by\n  sorry\n")
@@ -1134,7 +1135,7 @@ def test_a_rewrite_that_unfolds_a_variable_everywhere_is_measured_as_inflation()
     # Measured on rmo_2001_2 (v7.32), p09 (gate29 run 1, gate26 run 4) and
     # rmo_2000_2: `rw [← Nat.mod_add_div p 9] at *` turned every `p` in every
     # hypothesis into `p % 9 + 9 * (p / 9)` and the run never recovered.
-    from submission.board_agent import inflated
+    from submission.board.text import inflated
     before = ("p q : ℕ\nhp : Nat.Prime p\nhq : Nat.Prime q\nm : ℕ\n"
               "hm : p ^ 2 + 7 * p * q + q ^ 2 = m ^ 2\n⊢ p = q ∨ p = 3 ∧ q = 11")
     after = ("p q : ℕ\nhp : Nat.Prime (p % 9 + 9 * (p / 9))\nhq : Nat.Prime (q % 9 + 9 * (q / 9))\nm : ℕ\n"
@@ -1159,7 +1160,7 @@ def test_a_big_operator_written_with_in_is_spelled_the_way_this_mathlib_reads_it
     # (14 rejections): both models write `∑ j in Finset.Icc 0 k`, the spelling
     # Mathlib replaced by `∑ j ∈ s`, and Lean's "unexpected token 'in'" never
     # tells them so. The rename is lexical; the term means the same.
-    from submission.board_agent import dialect
+    from submission.board.reply import dialect
     assert dialect("have h : ∑ j in Finset.Icc 0 k, f j = ∏ (i : ℕ) in s, g i := by\n"
                    "  simp") == ("have h : ∑ j ∈ Finset.Icc 0 k, f j = ∏ (i : ℕ) ∈ s, g i := by\n"
                                  "  simp")
@@ -1182,7 +1183,7 @@ def test_a_proved_fact_re_derived_inside_a_new_claims_body_is_not_a_restatement(
     # Measured on rmo_2000_6 (one35a): `have h_v5 : 5 ∣ a * b := by\n  have : 5 ∣ a ^ 2
     # * b ^ 5 := h5_pow ...` was refused twice as "already on the board as h5";
     # the new claim was new, only a local alias inside its body repeated h5.
-    from submission.board_agent import restates
+    from submission.board.text import restates
     block = ("have h_v5 : 5 ∣ a * b := by\n"
              "  have : (5 : ℕ) ∣ a ^ 2 * b ^ 5 := h5_pow\n"
              "  exact Nat.Prime.dvd_of_dvd_pow Nat.prime_five this")
@@ -1210,7 +1211,7 @@ def test_a_lean_3_comma_at_the_end_of_a_tactic_line_is_dropped():
     # Measured on r3's archive: 38 of 868 step replies had a tactic line ending
     # in a comma, every one rejected with "expected command", and qwen wrote
     # the next one the same way after being told (rmo_2000_6 one40a, twice).
-    from submission.board_agent import dialect
+    from submission.board.reply import dialect
     assert dialect("intro n hn,\nsimp [p10_answer] at hn ⊢,\nexact h") == \
         "intro n hn\nsimp [p10_answer] at hn ⊢\nexact h"
     # a comma that continues a list on the next line, or sits inside an open
@@ -1235,7 +1236,7 @@ def test_a_misspelt_library_name_comes_back_with_the_nearest_real_ones():
     asked = [e for e in result.metadata["events"] if e.get("stage") == "names"]
     assert len(asked) == 1 and asked[0]["asked"] == ["Nat.mod_pow_self"]
     # the local `x` and hypothesis-style names never go to Lean
-    from submission.board_agent import library_names
+    from submission.board.probes import library_names
     assert library_names([{"data": "Unknown identifier `x`"}, {"data": "Unknown identifier `h_k`"},
                           {"data": "Unknown identifier `k.succ`"}], "k x : ℕ\n⊢ True") == []
     # a field access that does not resolve names the constant Lean looked for
@@ -1397,7 +1398,7 @@ def test_a_reply_that_rewrites_the_enclosing_case_and_have_is_unwrapped():
     # the body of `have h₁ : ... := by` under `case left =>`, qwen answered
     # `case left =>\n  have h₁ : ... := by\n    refine ⟨1, 10, ...⟩`, and Lean
     # said "Case tag `left` not found". The context it copied is stripped.
-    from submission.board_agent import unwrap
+    from submission.board.reply import unwrap
     text = ("theorem t : True := by\n  constructor\n  case left =>\n"
             "    have h₁ : ∃ a b : ℕ, 10 = a * b := by\n      sorry\n    exact h₁\n"
             "  case right =>\n    sorry\n")
@@ -1432,7 +1433,7 @@ def test_a_closed_goal_is_one_whose_target_names_no_hypothesis():
     # Measured on rmo_2000_6 (one51a 07:13): `use 2; use 5` left `⊢ 0 < 5 ∧ 2000 ∣
     # 8 * 5 ^ 4 ∧ 10 = 2 * 5` (false) under `h_a : 0 < 5`, `h_div : ...`; with
     # "no hypotheses" as the test it was not audited and the branch died.
-    from submission.board_agent import is_closed
+    from submission.board.probes import is_closed
     assert is_closed("h_a : 0 < 5\nh_div : 2000 ∣ 5 ^ 3 * 2 ^ 4\n⊢ 0 < 5 ∧ 2000 ∣ 8 * 5 ^ 4 ∧ 10 = 2 * 5")
     assert is_closed("⊢ 2000 ∣ 4 ^ 2 * 1 ^ 5")
     assert not is_closed("a b : ℕ\nha : 0 < a\n⊢ 10 ≤ a * b")
@@ -1444,7 +1445,7 @@ def test_a_goal_keeps_its_history_when_a_fact_is_added_above_it():
     # Measured on rmo_2000_6 (one52b): every lifted fact changed the hypothesis
     # list, hence the key, of every goal below it; tries reset, and with all
     # goals at 0 the line order decided: `case inl` got 2 prompts in 28 minutes.
-    from submission.board_agent import Notes, inherit
+    from submission.board.types import Notes, inherit
     old = [Goal(5, "  ", "t", "a : ℕ\n⊢ P a"), Goal(9, "  ", "t", "a : ℕ\n⊢ Q a")]
     new = [Goal(5, "  ", "t", "a : ℕ\n⊢ R a"),            # the fact just posted
            Goal(7, "  ", "t", "a : ℕ\nx : R a\n⊢ P a"),   # the same goals, one hypothesis richer
@@ -1469,7 +1470,7 @@ def test_an_existential_goal_with_a_decidable_body_gets_its_witness_from_evaluat
     # for `10 ∈ {n | ∃ a b, … ∧ n = a * b}` (`use 10, 1`, `use 2, 4`) and each
     # wrong guess cost a model call and an audit; the only small witness is
     # a = 1, b = 10. Lean finds it by evaluating the body over 0..39 in one check.
-    from submission.board_agent import existential, witness_search_file, read_witnesses
+    from submission.board.probes import existential, read_witnesses, witness_search_file
     member = "⊢ 10 ∈ {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b}"
     assert existential(member) == (["a", "b"], "0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ 10 = a * b")
     assert existential("⊢ ∃ x : ℕ, x * x = 49") == (["x"], "x * x = 49")
@@ -1507,7 +1508,8 @@ def test_a_stuck_leaf_inside_a_mostly_proved_have_is_restarted_before_the_have_i
     # failed 4 times and the whole have went, proved work included. The board
     # then filled with `4 ≤ a + b`. A leaf whose have already holds proved facts
     # is restarted once (tries, feedback and plan cleared) before withdrawal.
-    from submission.board_agent import settled_inside, Goal
+    from submission.board.text import settled_inside
+    from submission.board.types import Goal
     text = ("import Mathlib\n\ntheorem demo : True := by\n"
             "  have big : Q := by\n"
             "    have p1 : P := by\n      trivial\n"
@@ -1531,7 +1533,8 @@ def test_a_declaration_with_proved_facts_does_not_restart_while_its_last_goal_ca
     # Measured on rmo_2000_6 (one55a): at 08:46 one goal was left under
     # `case inr.inr` inside `have h_min` (h2, h5, h2a, h5a proved above it);
     # it reached 6 tries and the whole declaration went back to its statement.
-    from submission.board_agent import settled_inside, Goal
+    from submission.board.text import settled_inside
+    from submission.board.types import Goal
     text = ("import Mathlib\n\ntheorem demo : True := by\n"
             "  have big : Q := by\n"
             "    have p1 : P := by\n      trivial\n"
@@ -1596,7 +1599,7 @@ def test_a_board_that_accepts_nothing_for_a_share_of_the_window_restarts_before_
 
 
 def test_goal_tokens_are_the_goal_s_identifiers_then_its_notation_with_the_weak_words_last():
-    from submission.board_agent import goal_tokens
+    from submission.board.probes import goal_tokens
     assert goal_tokens("hp : Nat.Prime p\n⊢ (2 ^ 2 * 1009 ^ 2).divisors.card = 9") == [
         "divisors", "pow", "nat", "prime"]
     assert goal_tokens("a b : ℕ\nhdiv : 2000 ∣ a ^ 2 * b ^ 5\n⊢ 10 ≤ a * b")[:2] == ["dvd", "pow"]
@@ -1606,7 +1609,7 @@ def test_goal_tokens_are_the_goal_s_identifiers_then_its_notation_with_the_weak_
 def test_the_environment_s_answer_for_a_goal_s_words_reaches_the_step_prompt():
     # The curated sheets cover 13 vocabularies; a holdout goal outside them got
     # nothing. Lean scans its own constants for the goal's tokens instead.
-    from submission.board_agent import goal_tokens
+    from submission.board.probes import goal_tokens
     challenge = ("import Mathlib\n\ntheorem demo (m n : ℕ) (h : m.Coprime n) : "
                  "(m * n).divisors.card = 1 := by\n  sorry\n")
     asked = []
@@ -1785,7 +1788,7 @@ def test_a_rejected_reply_is_read_for_the_statements_it_makes():
     # Measured on putnam_2018_a1 (v7.74): 30 replies called the divisor technique
     # and none reached Lean, each call below the first error of a long reply.
     # The statements of a rejected block go on the board as facts to prove.
-    from submission.board_agent import mine_statements
+    from submission.board.reply import mine_statements
     block = ("linarith\nhave a : True := by\n  trivial\nhave b : 1 = 1 := by rfl\n"
              "have a : 2 = 2 := by rfl\nintro loc\nhave c : True := by trivial\n")
     assert mine_statements(block, {}, []) == ["have a : True := by", "have b : 1 = 1 := by"]
@@ -2634,7 +2637,7 @@ def test_a_leaf_is_checked_at_the_cap_timeout_and_its_own_cost_is_not_a_slow_ste
     # on board): the leaf takes 12 s in an idle image and 50 s on a loaded host;
     # judged as a model step it hit the 30 s check timeout (one candidate tried,
     # then break) and the 10 s slow-step delta. A leaf is one cell, paid once.
-    from submission.board_agent import CHECK_TIMEOUT_CAP_S
+    from submission.board.probes import CHECK_TIMEOUT_CAP_S
 
     class SlowLeafLean(BoardLean):
         """The theorem's goal carries `hb : x ≤ 3`; every check with the leaf
@@ -2811,7 +2814,7 @@ def test_leaf_reads_past_a_set_forall_and_a_conjunction_hypothesis():
 def test_an_inaccessible_hypothesis_becomes_a_named_binder_of_the_cell():
     # rmo_2000_6 (frame130): `a✝ : 10 ∈ S` came back as `10 ∈ S → ∀ n ∈ S, 10 ≤ n`,
     # the link passed no argument and a leaf's `intro n` took the premise.
-    from submission.board_agent import read_board
+    from submission.board.probes import read_board
     from submission.cells import link
     S = "{n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b}"
     St = "{n | ∃ a b, (0 : ℕ) < a ∧ (0 : ℕ) < b ∧ (2000 : ℕ) ∣ a ^ (2 : ℕ) * b ^ (5 : ℕ) ∧ n = a * b}"

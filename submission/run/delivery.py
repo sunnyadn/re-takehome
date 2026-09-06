@@ -6,7 +6,7 @@ import re
 from typing import Any
 
 from re_harness import AgentResult
-from submission.agent import declared_names, grade, scoring_faults
+from submission.agent import grade, scoring_faults
 from submission.cells import modular, strip_markers
 from submission.framework import axiom_probe, classify, is_done
 from submission.framework_agent import SLOW_COMPILE_MS, State
@@ -81,12 +81,12 @@ class Delivery:
             # calls a technique does not carry the block that defines them.
             final = strip_techniques(final)
         check = await self.run.services.lean.check_file(
-            axiom_probe(final, declared_names(self.run.problem.challenge)))
+            axiom_probe(final, self.run.graded))
         faults, _ = grade(final, check, self.run.names, self.run.problem.challenge)
         if (not check.accepted or faults) and final != state.text:
             final = state.text
             check = await self.run.services.lean.check_file(
-                axiom_probe(final, declared_names(self.run.problem.challenge)))
+                axiom_probe(final, self.run.graded))
             faults, _ = grade(final, check, self.run.names, self.run.problem.challenge)
         self.run.events.append({"stage": "verify", "accepted": check.accepted,
                        "faults": faults[:5], "compile_ms": check.duration_ms,

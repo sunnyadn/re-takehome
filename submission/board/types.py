@@ -4,11 +4,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from typing import Any, Sequence
+from submission.framework import DECL_HEAD, line_of, proof_span, root_names
+from submission.framework_agent import NARRATES, STEP_TOKENS, Feedback
 
 # One definition. board_agent.py had two, and the second silently won.
 OPENERS, CLOSERS = "([{⟨", ")]}⟩"
-from submission.framework import DECL_HEAD, line_of, proof_span, root_names
-from submission.framework_agent import NARRATES, STEP_TOKENS, Feedback
 
 
 
@@ -202,6 +202,12 @@ class GoalRecord:
         tried, what Lean said, the plan. What the harness learned about the
         goal's shape survives, because the shape did not change."""
         self.tries, self.said, self.plan = 0, None, None
+
+    def reject(self, author: str, why: str, kind: str = "rejected") -> None:
+        """What the next model is told, and one more try against this goal.
+        The two always move together; nothing sets one without the other."""
+        self.said = Feedback(author, why, kind)
+        self.tries += 1
 
 
 class Notes(dict):

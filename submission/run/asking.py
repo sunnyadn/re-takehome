@@ -78,7 +78,6 @@ class Asking:
         self.shelf: dict[tuple[str, ...], str] = {}
         self.tried_statements: set[str] = set()
         self.audited: dict[tuple[str, str], str] = {}
-        self.loose: list[asyncio.Task[Any]] = []
 
     async def probe(self, text: str, line: int, timeout_s: int) -> tuple[list[dict[str, Any]], int]:
         """One check of the file with a probe line in it, focused on the cell
@@ -94,7 +93,7 @@ class Asking:
         names = library_names(messages, goal.text)
         fresh = [n for n in names if n not in self.known_names]
         if fresh and self.budget.affordable("scan"):
-            imports = "\n".join(l for l in self.run.text.split("\n") if l.startswith("import "))
+            imports = self.run.imports
             check = await self.run.services.lean.check_file(name_probe_file(imports, fresh), timeout_s=90)
             self.budget.spent("scan", check.duration_ms / 1000)
             found = read_name_probe(check.messages)
@@ -113,7 +112,7 @@ class Asking:
         if tokens not in self.shelf:
             if not self.budget.affordable("scan"):
                 return
-            imports = "\n".join(l for l in self.run.text.split("\n") if l.startswith("import "))
+            imports = self.run.imports
             check = await self.run.services.lean.check_file(library_file(imports, tokens), timeout_s=90)
             self.budget.spent("scan", check.duration_ms / 1000)
             self.shelf[tokens] = read_library(check.messages)
@@ -278,9 +277,9 @@ class Asking:
 
         # Measured over 12 audits: a narrating model names values that violate
         # a hypothesis every time, at ~9 s; the other answers in ~1.4 s.
-        other = next((m for m in self.run.models if m != author and not narrates(m)),
-                     next((m for m in self.run.models if not narrates(m)),
-                          next((m for m in self.run.models if m != author), author)))
+        other = next((m for m in self.run.cfg.lines if m != author and not narrates(m)),
+                     next((m for m in self.run.cfg.lines if not narrates(m)),
+                          next((m for m in self.run.cfg.lines if m != author), author)))
         had = {g.key for g in base.goals}
         lines = nxt.text.split("\n")
         # Measured on putnam_2020_a2: a false `have` with a proof body had only
@@ -358,8 +357,8 @@ class Asking:
             other, audit_prompt(sub["stmt"], shown_prefix),
             AUDIT_TOKENS, self.run.services, self.run.ledger, system=AUDIT_SYSTEM)) for sub in asked]
         for t in pending_calls:
-            self.loose.append(t)
-            t.add_done_callback(lambda t: self.loose.remove(t) if t in self.loose else None)
+            self.run.loose.append(t)
+            t.add_done_callback(lambda t: self.run.loose.remove(t) if t in self.run.loose else None)
         if pending_calls:
             done_calls, late = await asyncio.wait(pending_calls, timeout=AUDIT_WAIT_S)
             if late:

@@ -3,7 +3,6 @@ share of the clock. The first part of a run: it depends only on `context`."""
 
 from __future__ import annotations
 import time
-from typing import Any
 
 from submission.agent import BUDGET_HEADROOM
 from submission.run.context import Run
@@ -20,7 +19,7 @@ PROBE_GRACE_S = 60.0
 
 class Budget:
     def __init__(self, run: Run) -> None:
-        self.cfg, self.ledger, self.events = run.cfg, run.ledger, run.events
+        self.run = run
         self.started = time.monotonic()
         self.deadline = self.started + run.cfg.last_turn_start_s
         self.probe_spent = {"scan": 0.0, "leaf": 0.0, "retry": 0.0}
@@ -35,7 +34,7 @@ class Budget:
         return self.deadline - time.monotonic()
 
     def can_ask(self) -> bool:
-        return self.ledger.spent_usd < BUDGET_HEADROOM * self.cfg.budget_usd
+        return self.run.ledger.spent_usd < BUDGET_HEADROOM * self.run.cfg.budget_usd
 
     def spent(self, kind: str, seconds: float) -> None:
         self.probe_spent[kind] += seconds
@@ -46,6 +45,6 @@ class Budget:
         share = RETRY_SHARE if kind == "retry" else PROBE_SHARE
         if self.probe_spent[kind] <= PROBE_GRACE_S or self.probe_spent[kind] <= share * elapsed:
             return True
-        self.events.append({"stage": "probe_skipped", "kind": kind,
-                            "spent_s": round(self.probe_spent[kind]), "elapsed_s": round(elapsed)})
+        self.run.events.append({"stage": "probe_skipped", "kind": kind,
+                                "spent_s": round(self.probe_spent[kind]), "elapsed_s": round(elapsed)})
         return False

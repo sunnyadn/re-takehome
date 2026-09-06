@@ -19,7 +19,7 @@ from submission.framework_agent import (FILE_CHARS, FRAMEWORK_SYSTEM, Feedback, 
                                         State, sheet_for)
 from submission.board.reply import interpret, salvage
 from submission.board.text import proved_facts, restates, settled_inside, view
-from submission.board.types import Board, Edit, Goal, step_tokens
+from submission.board.types import Edit, Goal, step_tokens
 from submission.run.asking import Asking
 from submission.run.blackboard import BEAM, WITHDRAW_AFTER, Blackboard
 from submission.run.budget import Budget
@@ -48,9 +48,6 @@ assert "goal on the board" in BOARD_SYSTEM
 PLAN_AFTER = 2
 # Library probes (`apply?`, the name scan) wait for one rejected step.
 SEARCH_AFTER = 1
-# When every goal is last in line, the declaration holding the worst of them
-# goes back to its statement, with its goals' history cleared. Time and money
-# bound how often; a count did not, and the branch was unreachable until v7.40.
 # A worker with no goal to take waits this long for the board to change.
 IDLE_WAIT_S = 2.0
 
@@ -79,10 +76,9 @@ class Loop:
                 continue
             if edit.kind == "drop":
                 self.run.events.append({"kind": "drop", "by": author, "name": edit.name})
-                self.run.notes[goal.key].said = Feedback(
+                self.run.notes[goal.key].reject(
                     author, f"`{edit.name}` is already declared; work the goal "
-                    "you were shown, do not restate it", "rejected")
-                self.run.notes[goal.key].tries += 1
+                    "you were shown, do not restate it")
                 continue
             if edit.kind == "step":
                 if here is None:
@@ -92,31 +88,28 @@ class Loop:
                     # Measured on p10: five byte-identical replies in a row.
                     self.run.events.append({"kind": "repeat", "by": author})
                     self.run.notes[here.key].repeated.add(author)
-                    self.run.notes[goal.key].said = Feedback(
+                    self.run.notes[goal.key].reject(
                         author, "that is byte for byte the step already rejected "
                         "on this goal; Lean will say the same thing. Try a "
                         "different route: " + self.run.notes[goal.key].said.text[:600]
                         if self.run.notes[goal.key].said else "that step was already rejected here")
-                    self.run.notes[goal.key].tries += 1
                     continue
                 # Measured on p09: a substring match locked a worker out for 19
                 # min once `n % 3 = 0` was withdrawn and the goal read `⊢ n % 3 = 0`.
                 # Only a `have` stating the claim again is a restatement.
                 if restates(edit.body, self.bb.withdrawn.get(here.decl, ())):
                     self.run.events.append({"kind": "restated", "by": author})
-                    self.run.notes[goal.key].said = Feedback(author, "that step restates a fact "
-                                              "already withdrawn from this declaration")
-                    self.run.notes[goal.key].tries += 1
+                    self.run.notes[goal.key].reject(author, "that step restates a fact "
+                                                    "already withdrawn from this declaration")
                     continue
                 present = proved_facts(self.bb.board.text, here)
                 if restates(edit.body, present):
                     # Measured on p09: the same claim proved twice in one declaration.
                     names = [present[c] for c in present if restates(edit.body, [c])]
                     self.run.events.append({"kind": "restated", "by": author, "of": names[:3]})
-                    self.run.notes[goal.key].said = Feedback(author, "that step states a fact already "
-                                              "on the board as " + ", ".join(f"`{n}`" for n in names[:3])
-                                              + "; use it, do not prove it again")
-                    self.run.notes[goal.key].tries += 1
+                    self.run.notes[goal.key].reject(author, "that step states a fact already "
+                                                    "on the board as " + ", ".join(f"`{n}`" for n in names[:3])
+                                                    + "; use it, do not prove it again")
                     continue
                 nxt, why = await self.ladder.lift_and_advance(self.bb.board, here, edit.body, author)
                 if nxt is None:
@@ -124,8 +117,7 @@ class Loop:
                 self.run.events.append({"kind": "step", "by": author, "accepted": nxt is not None,
                                **({} if nxt is not None else {"why": str(why)[:160]})})
                 if nxt is None:
-                    self.run.notes[goal.key].said = Feedback(author, why)
-                    self.run.notes[goal.key].tries += 1
+                    self.run.notes[goal.key].reject(author, why)
                     continue
                 await self.bb.commit(nxt)
                 took = True
@@ -140,9 +132,8 @@ class Loop:
                 self.run.events.append({"kind": "lemma", "by": author, "name": edit.name,
                                "accepted": kept})
                 if not kept:
-                    self.run.notes[goal.key].said = Feedback(
+                    self.run.notes[goal.key].reject(
                         author, bad or format_messages(lifted.messages)[:FEEDBACK_CHARS])
-                    self.run.notes[goal.key].tries += 1
                     continue
                 await self.bb.commit(lifted)
                 took = True
@@ -175,8 +166,7 @@ class Loop:
                 self.run.events.append({"kind": "step", "by": author, "accepted": nxt is not None,
                                **({} if nxt is not None else {"why": str(why)[:160]})})
                 if nxt is None:
-                    self.run.notes[goal.key].said = Feedback(author, why)
-                    self.run.notes[goal.key].tries += 1
+                    self.run.notes[goal.key].reject(author, why)
                     continue
                 await self.bb.commit(nxt)
                 took = True
@@ -266,7 +256,7 @@ class Loop:
             # The crux is where routes diverge, so it gets two: one plan
             # from each model, the second written as a skeleton onto a
             # sibling branch. Lean's progress on each decides between them.
-            other = next((m for m in self.run.models if m != model), model)
+            other = next((m for m in self.run.cfg.lines if m != model), model)
             state = State(text=self.bb.board.text, goal=goal.text)
             avoid = list(self.routes.get(goal.decl, []))
             plan, second = await asyncio.gather(
@@ -308,8 +298,8 @@ class Loop:
                         self.run.events.append({"stage": "route", "from": base.bid,
                                        "to": fork.bid, "by": model})
                         self.bb.prune()
-                    elif self.bb.live(fork.bid):
-                        self.bb.branches.remove(self.bb.live(fork.bid))
+                    else:
+                        self.bb.discard(fork.bid)
                     main = self.bb.live(base.bid)
                     if main:
                         self.bb.focus(main)
@@ -321,11 +311,11 @@ class Loop:
             return False
         task = asyncio.ensure_future(
             self.agent._call(model, prompt, step_tokens(model), self.run.services, self.run.ledger, system=BOARD_SYSTEM))
-        self.asking.loose.append(task)
+        self.run.loose.append(task)
         try:
             reply, why = await task
         finally:
-            self.asking.loose.remove(task)
+            self.run.loose.remove(task)
         async with self.lock:
             if self.run.notes[goal.key].claimed_by == model:
                 self.run.notes[goal.key].claimed_by = None
@@ -334,20 +324,19 @@ class Loop:
                 kept = reply.count("\n") + 1 if reply else 0
                 self.run.events.append({"kind": "cut", "by": model, "kept": kept})
                 if not kept:
-                    self.run.notes[goal.key].said = Feedback(model, self.run.notes[goal.key].said.text
+                    self.run.notes[goal.key].reject(model, self.run.notes[goal.key].said.text
                                                     if self.run.notes[goal.key].said else "nothing yet", "cut")
-                    self.run.notes[goal.key].tries += 1
                     return True
             now = self.bb.live(base.bid)
             here = now.find(goal.key) if now else None
             if here is not None:
                 self.bb.focus(now)
-            elif base.find(goal.key) is not None:
-                # The goal moved on under this reply. Judged against the
-                # file it was asked about, an accepted answer is a second
-                # way forward, and a second way is a branch, not waste.
-                fork = self.bb.fork(base)
-                here = fork.find(goal.key) if fork is not None else None
+            # The goal moved on under this reply. Judged against the file it
+            # was asked about, an accepted answer is a second way forward, and
+            # a second way is a branch, not waste. With the beam full there is
+            # no room for one, and the reply is stale.
+            elif base.find(goal.key) is not None and (fork := self.bb.fork(base)) is not None:
+                here = fork.find(goal.key)
                 edits = interpret(reply, self.bb.board, here, self.run.graded)
                 took = await self.apply(model, here, edits) if edits else False
                 if took and self.bb.live(fork.bid):
@@ -355,8 +344,7 @@ class Loop:
                                    "goal": goal.text[:60]})
                     self.bb.prune()
                 else:
-                    if self.bb.live(fork.bid):
-                        self.bb.branches.remove(self.bb.live(fork.bid))
+                    self.bb.discard(fork.bid)
                     self.run.events.append({"kind": "stale", "by": model})
                 return True
             if here is None:
@@ -365,9 +353,8 @@ class Loop:
             edits = interpret(reply, self.bb.board, here, self.run.graded)
             if not edits:
                 self.run.events.append({"kind": "empty", "by": model})
-                self.run.notes[goal.key].said = Feedback(model, self.run.notes[goal.key].said.text
+                self.run.notes[goal.key].reject(model, self.run.notes[goal.key].said.text
                                                 if self.run.notes[goal.key].said else "nothing yet", "empty")
-                self.run.notes[goal.key].tries += 1
                 return True
             await self.apply(model, here, edits)
             still = self.bb.board.find(goal.key)

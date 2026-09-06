@@ -6,7 +6,6 @@ deterministic sweep files, all used by `submission/board_agent.py`."""
 
 from __future__ import annotations
 
-import asyncio
 import os
 import copy
 import dataclasses
@@ -15,11 +14,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
-from re_harness import AgentResult, LLMCallError, Problem, Services
-from re_harness.budget import BudgetAccountingError, BudgetExceeded
+from re_harness import LLMCallError, Services
 from re_harness.llm import REFUSED_BEFORE_GENERATION
 from re_harness.config import HarnessSettings
-from re_harness.lean import LeanRuntimeError, numeric_answers_are_literals
+from re_harness.lean import numeric_answers_are_literals
 from re_harness.models import ALLOWED_MODELS, MODEL_A, MODEL_B
 from submission.techniques import PREAMBLE_MARK, preamble, technique_card
 
@@ -441,8 +439,6 @@ def in_file_coordinates(services: Any) -> Any:
 TRY_THIS = "Try this"
 
 
-
-
 TRY_LINE = re.compile(r"^\s*\[[a-z]+\]\s*(\S.*?)\s*$")
 
 
@@ -494,8 +490,6 @@ def format_messages(messages: Sequence[dict[str, Any]]) -> str:
         if m.get("severity") in ("error", "warning")
     ]
     return "\n\n".join(chunks)[:FEEDBACK_CHARS] if chunks else ""
-
-
 
 
 def create_agent():

@@ -23,8 +23,8 @@ from submission.techniques import without_techniques
 from submission.agent import (FEEDBACK_CHARS, Ledger, in_file_coordinates, format_messages, scoring_faults, split_files, sweep_files, usable_cocktail)
 from submission.framework import (classify, definition_slots, fill_definition, graded_theorems, line_of, placeholders, proof_span, root_names)
 from submission.framework_agent import FILE_CHARS, ANSWER_TOKENS, strip_fences, LOOSE_DRAIN_S, FrameworkAgent
-from submission.board.types import Board, Goal, Notes, binder_names, inherit, narrates, owner, signature
-from submission.board.reply import (ascribe_literals, dialect, interpret, mine_statements, set_elements, unwrap)
+from submission.board.types import Board, Goal, binder_names, narrates, owner, signature
+from submission.board.reply import dialect, set_elements
 from submission.run.budget import Budget
 from submission.run.context import Run
 from submission.run.delivery import Delivery
@@ -32,8 +32,8 @@ from submission.run.blackboard import Blackboard
 from submission.run.asking import AUDIT_SYSTEM, AUDIT_TOKENS, Asking
 from submission.run.ladder import Ladder
 from submission.run.loop import Loop
-from submission.board.text import (drop_declaration, inflated, restates, settled_inside, split_statement, view)
-from submission.board.probes import (CHECK_TIMEOUT_CAP_S, CHECK_TIMEOUT_FLOOR_S, PROBE, audit_prompt, container_memory_bytes, counterexample_search, existential, extract_file, goal_tokens, is_closed, library_names, read_board, read_witness, read_witnesses, render_all, searched_clean, statements, witness_file, witness_search_file)
+from submission.board.text import drop_declaration, split_statement
+from submission.board.probes import (CHECK_TIMEOUT_FLOOR_S, audit_prompt, container_memory_bytes, counterexample_search, extract_file, read_witness, read_witnesses, searched_clean, statements, witness_file, witness_search_file)
 
 
 # The REPL keeps every command's state. Measured in the harness image: a real
@@ -291,12 +291,12 @@ class BoardAgent(FrameworkAgent):
         if not isinstance(services.lean, RenewingLean):
             services.lean = RenewingLean(services.lean, events)
         run = Run(problem, services, cfg, events)
-        ledger, names, text = run.ledger, run.names, run.text
+        ledger, names = run.ledger, run.names
         budget = Budget(run)
         delivery = Delivery(self, run, budget)
         bb = Blackboard(run, budget, delivery)
         asking = Asking(self, run, budget, bb)
-        ladder = Ladder(self, run, budget, bb, asking)
+        ladder = Ladder(run, budget, bb, asking)
         loop = Loop(self, run, budget, bb, asking, ladder, delivery)
 
         try:
@@ -314,17 +314,19 @@ class BoardAgent(FrameworkAgent):
                     delivery.offer(candidate, True)
                     return delivery.result(candidate, "deterministic_sweep", True)
 
+            # The three rewrites settle `run.text`, which every part reads
+            # afterwards for its import prefix and its repair fallback.
             if graded_theorems(problem.challenge) > 1 and budget.can_ask():
-                text = await self._share(problem, text, services, ledger, events)
-            if definition_slots(text) and budget.can_ask():
-                text = await self._define(problem, text, services, ledger, events)
+                run.text = await self._share(problem, run.text, services, ledger, events)
+            if definition_slots(run.text) and budget.can_ask():
+                run.text = await self._define(problem, run.text, services, ledger, events)
             if names and budget.can_ask():
-                text = await self._resolve_answers(
-                    problem, text, names, services, ledger, events)
+                run.text = await self._resolve_answers(
+                    problem, run.text, names, services, ledger, events)
 
-            bb.board = Board(text, bid=0)
-            await bb.commit(await bb.look(text))
-            tasks = [asyncio.ensure_future(loop.worker(m)) for m in run.models]
+            bb.board = Board(run.text, bid=0)
+            await bb.commit(await bb.look(run.text))
+            tasks = [asyncio.ensure_future(loop.worker(m)) for m in run.cfg.lines]
             try:
                 await asyncio.gather(*tasks)
             finally:
@@ -346,8 +348,8 @@ class BoardAgent(FrameworkAgent):
         finally:
             # Every call the agent started must settle before it returns: the
             # harness fails a problem whose ledger still holds a reservation.
-            if asking.loose:
-                await asyncio.wait(list(asking.loose))
+            if run.loose:
+                await asyncio.wait(list(run.loose))
 
 
 def create_agent() -> BoardAgent:

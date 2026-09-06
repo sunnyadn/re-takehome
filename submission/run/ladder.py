@@ -7,10 +7,8 @@ them rather than one round per rung. `unstick` is the rung of last resort:
 it takes an edit back and reopens what it closed."""
 
 from __future__ import annotations
-import asyncio
 import re
 import time
-from typing import Any
 
 from submission.agent import FEEDBACK_CHARS, format_messages
 from submission.cells import enclosing, reset_cell
@@ -30,17 +28,14 @@ from submission.board.text import (context_grows, enclosing_chain, put, settled_
 from submission.board.types import (Board, Goal, HAVE_HEAD, hypotheses, is_root_goal,
                                     split_top, target_of)
 from submission.run.asking import TIMED_OUT, Asking
-from submission.run.blackboard import BEAM, Blackboard
+from submission.run.blackboard import Blackboard
 from submission.run.budget import Budget
 from submission.run.context import Run
 
 
 class Ladder:
-    def __init__(self, agent: Any, run: Run, budget: Budget, bb: Blackboard,
-                 asking: Asking) -> None:
-        self.agent, self.run, self.budget = agent, run, budget
-        self.bb, self.asking = bb, asking
-        self.restated: dict[str, int] = {}
+    def __init__(self, run: Run, budget: Budget, bb: Blackboard, asking: Asking) -> None:
+        self.run, self.budget, self.bb, self.asking = run, budget, bb, asking
         self.conjectured: dict[tuple[str, str], str] = {}
         self.cocktail: tuple[str, ...] = ()
 
@@ -79,7 +74,7 @@ class Ladder:
         if not parsed:
             return False
         names, body = parsed
-        imports = "\n".join(l for l in self.run.text.split("\n") if l.startswith("import "))
+        imports = self.run.imports
         check = await self.run.services.lean.check_file(witness_search_file(imports, names, body), timeout_s=60)
         found = read_witnesses(check.messages)
         accepted = False
@@ -303,7 +298,9 @@ class Ladder:
     async def unstick(self) -> None:
         """Every goal last in line, or nothing accepted for a while: the
         innermost open have comes off on a fork, else the worst goal's
-        declaration starts over and what was said and planned for it goes."""
+        declaration starts over and what was said and planned for it goes.
+        Time and money bound how often; a count did not, and this was
+        unreachable until v7.40."""
 
 
         worst = max(self.bb.board.goals, key=lambda g: self.run.notes[g.key].tries, default=None)
@@ -354,7 +351,6 @@ class Ladder:
             await self.bb.commit(await self.bb.look(reset_cell(self.bb.board.text, held)), progress=False)
             self.bb.prune()
             return
-        self.restated[worst.decl] = self.restated.get(worst.decl, 0) + 1
         fresh_text, _ = restate(self.bb.board.text, worst.decl)
         self.run.events.append({"stage": "restate", "decl": worst.decl,
                        "tries": self.run.notes[worst.key].tries})

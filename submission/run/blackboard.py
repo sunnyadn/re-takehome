@@ -82,6 +82,13 @@ class Blackboard:
         self.focus(fresh)
         return fresh
 
+    def discard(self, bid: int) -> None:
+        """Drop a branch that went nowhere. The counterpart to `fork`, so
+        branches are only ever added and removed here."""
+        gone = self.live(bid)
+        if gone is not None:
+            self.branches.remove(gone)
+
     def prune(self) -> None:
         while len(self.branches) > BEAM:
             worst = max(self.branches, key=lambda b: b.score)
