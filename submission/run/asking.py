@@ -29,6 +29,7 @@ from submission.board.text import (enclosing_have, inflated, is_stated, put, spl
                                    stated_facts)
 from submission.board.types import (Board, Goal, HAVE_HEAD, binder_names, hyp_count,
                                     is_root_goal, narrates, owner, target_of)
+from submission.sampling import enumerated
 from submission.run.blackboard import Blackboard
 from submission.run.budget import Budget
 from submission.run.context import Run
@@ -417,7 +418,7 @@ class Asking:
         for sub in subjects:
             sub["searched"], sub["found"] = False, None
             if sub["parsed"] and sub["parsed"][0]:
-                sub["searched"], sub["found"] = await self.agent._enumerated(prefix, *sub["parsed"], self.run.services)
+                sub["searched"], sub["found"] = await enumerated(prefix, *sub["parsed"], self.run.services)
         # No binders, no question: the witness file alone decides a closed claim.
         # A claim the walk covered is settled: the auditor is asked about the rest.
         asked = [sub for sub in subjects

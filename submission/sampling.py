@@ -6,6 +6,10 @@ from __future__ import annotations
 import re
 from typing import Any, Sequence
 
+from re_harness import Services
+from submission.board.probes import (counterexample_search, read_witnesses, searched_clean,
+                                     witness_search_file)
+
 FORALL_BOUND = 12       # ∀ (N : ℕ), P  is checked as  ∀ N < 12, P
 VALUE_BOUND = 8         # every ℕ binder ranges over 0..7
 SEQ_TYPES = ("ℕ → ℝ", "ℕ → ℚ")
@@ -112,3 +116,31 @@ def read_sample_hit(messages: Sequence[dict[str, Any]],
             hit = {"sequence": SAMPLES[row[0]] if 0 <= row[0] < len(SAMPLES) else str(row[0])}
             hit.update({n: str(v) for n, v in zip(names, row[1:])})
     return met or hit is not None, hit
+
+
+async def enumerated(prefix: str, groups: Sequence[str], target: str,
+             services: Services) -> tuple[bool, dict[str, str] | None]:
+    """(the walk ran, values that satisfy every hypothesis and break the
+    claim) over 0..WITNESS_BOUND-1. A claim the walk covers is settled here
+    and no model is asked about it: measured over 7 runs, every refutation
+    with ℕ binders came from the walk and the auditor's came from closed
+    claims and ℤ, while audit calls were half of all calls (108 of 285 on
+    putnam_2020_a2, 1990 s of latency, one reply 482 s under the board lock)."""
+    search = counterexample_search(groups, target)
+    if not search:
+        # A statement over a sequence (x : ℕ → ℝ) with ∀-hypotheses: sampled
+        # sequences over ℚ, the ∀s bounded (measured on rmo_2000_3: every
+        # claim carries hpos/hmono/hsq and the walk cannot bind a function).
+        sampled = sampled_search(groups, target)
+        if not sampled:
+            return False, None
+        names, seq, body = sampled
+        check = await services.lean.check_file(sample_file(prefix, names, seq, body), timeout_s=60)
+        met, hit = read_sample_hit(check.messages, names)
+        return met, hit
+    names, body = search
+    check = await services.lean.check_file(witness_search_file(prefix, names, body), timeout_s=60)
+    rows = read_witnesses(check.messages)
+    if rows and len(rows[0]) == len(names):
+        return True, dict(zip(names, rows[0]))
+    return searched_clean(check.messages), None

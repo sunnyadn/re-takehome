@@ -8,13 +8,12 @@ from __future__ import annotations
 import asyncio
 import re
 import time
-from typing import Any, Sequence
+from typing import Any
 
 from re_harness import AgentResult, LLMCallError, Problem, Services
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
-from submission.sampling import read_sample_hit, sample_file, sampled_search
 from submission.techniques import without_techniques
 from submission.contract import format_messages, in_file_coordinates, scoring_faults
 from submission.sweep import split_files, sweep_files, usable_cocktail
@@ -32,7 +31,8 @@ from submission.run.asking import AUDIT_SYSTEM, AUDIT_TOKENS, Asking
 from submission.run.ladder import Ladder
 from submission.run.loop import Loop
 from submission.board.text import drop_declaration, split_statement
-from submission.board.probes import (CHECK_TIMEOUT_FLOOR_S, audit_prompt, container_memory_bytes, counterexample_search, extract_file, read_witness, read_witnesses, searched_clean, statements, witness_file, witness_search_file)
+from submission.sampling import enumerated
+from submission.board.probes import CHECK_TIMEOUT_FLOOR_S, audit_prompt, container_memory_bytes, extract_file, read_witness, statements, witness_file
 
 LOOSE_DRAIN_S = 30.0
 
@@ -204,33 +204,6 @@ class BoardAgent(FrameworkAgent):
                 text = drop_declaration(text, name)
         return text
 
-    async def _enumerated(self, prefix: str, groups: Sequence[str], target: str,
-                          services: Services) -> tuple[bool, dict[str, str] | None]:
-        """(the walk ran, values that satisfy every hypothesis and break the
-        claim) over 0..WITNESS_BOUND-1. A claim the walk covers is settled here
-        and no model is asked about it: measured over 7 runs, every refutation
-        with ℕ binders came from the walk and the auditor's came from closed
-        claims and ℤ, while audit calls were half of all calls (108 of 285 on
-        putnam_2020_a2, 1990 s of latency, one reply 482 s under the board lock)."""
-        search = counterexample_search(groups, target)
-        if not search:
-            # A statement over a sequence (x : ℕ → ℝ) with ∀-hypotheses: sampled
-            # sequences over ℚ, the ∀s bounded (measured on rmo_2000_3: every
-            # claim carries hpos/hmono/hsq and the walk cannot bind a function).
-            sampled = sampled_search(groups, target)
-            if not sampled:
-                return False, None
-            names, seq, body = sampled
-            check = await services.lean.check_file(sample_file(prefix, names, seq, body), timeout_s=60)
-            met, hit = read_sample_hit(check.messages, names)
-            return met, hit
-        names, body = search
-        check = await services.lean.check_file(witness_search_file(prefix, names, body), timeout_s=60)
-        rows = read_witnesses(check.messages)
-        if rows and len(rows[0]) == len(names):
-            return True, dict(zip(names, rows[0]))
-        return searched_clean(check.messages), None
-
     async def _audit_root(self, text: str, decl: str, services: Services,
                           ledger: Ledger, term: str = "") -> tuple[str, dict[str, str]]:
         """A declaration's statement tried against a witness: Lean states its
@@ -266,7 +239,7 @@ class BoardAgent(FrameworkAgent):
         for values in tries:
             if await breaks(values):
                 return "refuted", values
-        searched, found = await self._enumerated(prefix, groups, target, services)
+        searched, found = await enumerated(prefix, groups, target, services)
         if found and await breaks(found):
             return "refuted", found
         if searched:
