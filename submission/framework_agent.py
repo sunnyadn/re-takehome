@@ -6,41 +6,24 @@ out of a proved file. No loop lives here; the board's loop is in `run/loop.py`.
 from __future__ import annotations
 
 import asyncio
-import time
 from typing import Any, Sequence
 
-from re_harness import LLMCallError, Problem, Services
+from re_harness import Problem, Services
 
 from submission.techniques import PREAMBLE_END
-from submission.config import ANSWER_TOKENS, Config, FEEDBACK_CHARS, FILE_CHARS, GOAL_CHARS, Ledger, RETRY_BACKOFF_S
-from submission.contract import (declared_names, format_messages, refused_before_generation, strip_fences, suggested_tactics, suggestions)
+from submission.config import ANSWER_TOKENS, Config, FEEDBACK_CHARS, FILE_CHARS, GOAL_CHARS, Ledger
+from submission.contract import declared_names, format_messages, strip_fences, suggested_tactics, suggestions
 from submission.framework import (statement_probes, alternatives, declaration_name,
                                   graded_theorems, answer_slots, collapse, first_blocks,
                                   have_spans, classify, cursor_goal, drop_lines, fill_answer,
                                   insert_preamble, is_done, as_goal,
                                   placeholders, render)
-from submission.prompts import FRAMEWORK_SYSTEM, PLANNER_SYSTEM, sheet_for
-from submission.replies import lighter_forms, printed_numbers, spoken, tool_lines
+from submission.prompts import PLANNER_SYSTEM, sheet_for
+from submission.replies import lighter_forms, printed_numbers
+from submission.calls import Caller
 from submission.state import State
 from submission.board.types import NARRATES, STEP_TOKENS
 
-# Measured on p09: qwen3.5-flash narrates its reasoning as ordinary content and
-# the code block after it is what the token limit cuts. Over three samples each,
-# reasoning off halves the reply and every one of them begins with the block.
-# gpt-oss-120b answers HTTP 400 rather than turn it off, and that 400 is fatal:
-# the ledger marks accounting incomplete and never clears it, so the next call
-# aborts the problem. The setting is therefore decided by name, never probed.
-REASONING = {"effort": "low"}
-# The harness reads a reply for at most 180 s and a ReadTimeout leaves the
-# ledger unknown, which scores the problem 0 whatever the file says. Measured
-# on p10 (v7.79): a 4000-token step call at 19 tokens/s ran 206 s and zeroed a
-# proof that had been accepted 38 s earlier. So a call may ask for no more
-# tokens than the slowest recent reply rate produces in LATENCY_BUDGET_S.
-LATENCY_BUDGET_S = 120.0
-PACE_WINDOW = 6
-PACE_MIN_TOKENS = 400
-PACE_FLOOR = 1200
-NO_REASONING = {"enabled": False}
 PLAN_TOKENS = 1500
 
 # The finish pass is free of tokens but not of clock, so it is bounded.
@@ -64,13 +47,13 @@ FINISH_RESERVE_S = 300.0
 class FrameworkAgent:
     def __init__(self, config: Config | None = None):
         self.config = config or Config.from_env()
-        # Per model: (completion tokens, seconds) of each reply, for _paced.
-        self._pace: dict[str, list[tuple[int, float]]] = {}
+        self.caller = Caller()
 
-    def _reasoning(self, model: str) -> dict[str, Any]:
-        """Reasoning a model narrates in its content crowds out the step."""
-
-        return NO_REASONING if any(n in model for n in NARRATES) else REASONING
+    async def _call(self, model: str, prompt: str, max_tokens: int, services: Services,
+                    ledger: Ledger, system: str = "", think: bool = False,
+                    tools: Sequence[Any] = ()) -> tuple[str, str]:
+        return await self.caller.call(model, prompt, max_tokens, services, ledger,
+                                      system=system, think=think, tools=tools)
 
     async def _look(self, text: str, services: Services, focus: int = 0) -> State:
         """One check does both jobs: it adjudicates, and it prints the next goal."""
@@ -287,51 +270,3 @@ class FrameworkAgent:
             if left and check.messages:
                 note += "\nLean said:\n" + format_messages(check.messages)[:600]
         return text
-
-    async def _call(self, model: str, prompt: str, max_tokens: int, services: Services,
-                    ledger: Ledger, system: str = "", think: bool = False,
-                    tools: Sequence[Any] = ()) -> tuple[str, str]:
-        """The reply and why the provider stopped, which is not always `stop`.
-
-        Reasoning is off for steps because it crowds the block out of the reply.
-        It stays on where thinking is the answer: the plan, and the arithmetic
-        behind a numeric slot."""
-
-        max_tokens = self._paced(model, max_tokens)
-        for wait in (0.0,) + RETRY_BACKOFF_S:
-            if wait:
-                await asyncio.sleep(wait)
-            started = time.monotonic()
-            try:
-                reply = await services.llm.complete(
-                    model=model,
-                    messages=[{"role": "system", "content": system or FRAMEWORK_SYSTEM},
-                              {"role": "user", "content": prompt}],
-                    max_tokens=max_tokens,
-                    temperature=0.4,
-                    reasoning=REASONING if think else self._reasoning(model),
-                    **({"tools": list(tools),
-                        "tool_choice": {"type": "function",
-                                        "function": {"name": "answer"}}} if tools else {}),
-                )
-            except LLMCallError as exc:
-                if refused_before_generation(exc):
-                    continue
-                raise
-            ledger.record(reply.usage)
-            self._pace.setdefault(model, []).append(
-                (int((reply.usage or {}).get("completion_tokens") or 0), time.monotonic() - started))
-            said = tool_lines(reply.tool_calls) or spoken(reply.content or "")
-            return said, reply.finish_reason or ""
-        return "", ""
-
-    def _paced(self, model: str, want: int) -> int:
-        """`want` tokens, or what the slowest of the model's recent replies
-        would produce inside LATENCY_BUDGET_S, whichever is less."""
-
-        rates = [t / s for t, s in self._pace.get(model, [])[-PACE_WINDOW:]
-                 if t >= PACE_MIN_TOKENS and s > 0]
-        if len(rates) < 2:
-            return want
-        return max(PACE_FLOOR, min(want, int(min(rates) * LATENCY_BUDGET_S)))
-

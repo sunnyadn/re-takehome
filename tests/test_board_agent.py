@@ -8,6 +8,7 @@ from submission.config import Config
 from submission.sweep import COCKTAIL
 from submission.cells import CELL_PROBE
 from submission.board_agent import BoardAgent
+import submission.calls as cl
 from submission.board.probes import PROBE, read_board, render_all
 from submission.board.reply import interpret
 from submission.board.types import Board, Goal
@@ -1582,7 +1583,6 @@ def test_a_board_that_accepts_nothing_for_a_share_of_the_window_restarts_before_
     # Measured on p09 (reg61b, 2026-09-03 10:14Z): 7 of 30 steps accepted, both
     # withdrawals on one route, and the clock ran out before every goal reached
     # LAST_IN_LINE. Time without an accepted step is a reason to start over.
-    import submission.board_agent as ba
     from submission.run import blackboard
     clock = {"now": 0.0}
 
@@ -1590,7 +1590,7 @@ def test_a_board_that_accepts_nothing_for_a_share_of_the_window_restarts_before_
         clock["now"] += 5.0
         return clock["now"]
 
-    monkeypatch.setattr(ba.time, "monotonic", ticking)
+    monkeypatch.setattr(cl.time, "monotonic", ticking)
     challenge = "import Mathlib\n\ntheorem demo (n : ℕ) : True := by\n  sorry\n"
     result, _, _, _ = run(challenge, {"model-b": ["linarith [h%d]" % i for i in range(40)]
                                       + ["have key : True := by trivial\nexact key"] * 3},
@@ -1610,7 +1610,6 @@ def test_goal_tokens_are_the_goal_s_identifiers_then_its_notation_with_the_weak_
 def test_the_environment_s_answer_for_a_goal_s_words_reaches_the_step_prompt():
     # The curated sheets cover 13 vocabularies; a holdout goal outside them got
     # nothing. Lean scans its own constants for the goal's tokens instead.
-    from submission.board.probes import goal_tokens
     challenge = ("import Mathlib\n\ntheorem demo (m n : ℕ) (h : m.Coprime n) : "
                  "(m * n).divisors.card = 1 := by\n  sorry\n")
     asked = []
@@ -1645,14 +1644,13 @@ def test_a_stalled_board_takes_back_the_innermost_open_have_before_it_restarts_t
     # Undo at the goal, not the declaration: the facts beside the stuck `have`
     # stay on the board, and only when no open goal sits inside a `have` does
     # the declaration go back to its statement.
-    import submission.board_agent as ba
     clock = {"now": 0.0}
 
     def ticking():
         clock["now"] += 12.0
         return clock["now"]
 
-    monkeypatch.setattr(ba.time, "monotonic", ticking)
+    monkeypatch.setattr(cl.time, "monotonic", ticking)
     challenge = "import Mathlib\n\ntheorem demo (n : ℕ) : True := by\n  sorry\n"
     result, _, _, _ = run(challenge, {"model-b": ["have inner : True := by\n  sorry\nexact inner"]
                                       + ["linarith [h%d]" % i for i in range(40)]
@@ -1667,14 +1665,13 @@ def test_a_stalled_board_takes_back_the_innermost_open_have_before_it_restarts_t
 def test_the_stall_take_back_happens_on_a_fork_so_the_stuck_subtree_stays_a_branch(monkeypatch):
     # OR below the root: the board with the stuck have and the board without it
     # race as two branches, the way two plans do.
-    import submission.board_agent as ba
     clock = {"now": 0.0}
 
     def ticking():
         clock["now"] += 12.0
         return clock["now"]
 
-    monkeypatch.setattr(ba.time, "monotonic", ticking)
+    monkeypatch.setattr(cl.time, "monotonic", ticking)
     challenge = "import Mathlib\n\ntheorem demo (n : ℕ) : True := by\n  sorry\n"
     result, _, _, _ = run(challenge, {"model-b": ["have inner : True := by\n  sorry\nexact inner"]
                                       + ["linarith [h%d]" % i for i in range(40)]
@@ -1757,7 +1754,6 @@ def test_an_auditor_that_does_not_answer_in_time_lets_the_step_through_unverifie
     # Measured on putnam_2020_a2 (v7.63): one audit reply took 482 s under the
     # board lock, the run's only gap over 90 s. The call is not cancelled (an
     # open reservation fails the problem); it is drained before the agent returns.
-    import submission.board_agent as ba
     challenge = "import Mathlib\n\ntheorem demo (x : ℕ) (hx : x < 2) : True := by\n  sorry\n"
     lean, llm = WitnessLean(), ScriptLLM({
         "model-a": ["have fine : x < 3 := by\n  sorry\nhave key : True := by trivial\nexact key",
@@ -2122,7 +2118,6 @@ def test_an_old_lean_container_is_renewed_while_a_model_is_being_waited_on(monke
     # after 55–90 checks; 28 kills in three hours across the lanes, each costing
     # the check in flight plus a cold import. The renewal happens on our terms,
     # under a model wait, before the kernel does it mid-check.
-    import submission.board_agent as ba
 
     class AgedLean(BoardLean):
         def __init__(self):
@@ -2136,8 +2131,8 @@ def test_an_old_lean_container_is_renewed_while_a_model_is_being_waited_on(monke
         def start(self):
             self.starts += 1
 
-    monkeypatch.setattr(ba, "RENEW_AFTER_CHECKS", 3)
-    monkeypatch.setattr(ba, "container_memory_bytes", lambda name: None)
+    monkeypatch.setattr(cl, "RENEW_AFTER_CHECKS", 3)
+    monkeypatch.setattr(cl, "container_memory_bytes", lambda name: None)
     lean, llm = AgedLean(), ScriptLLM({
         "model-a": ["no", "have key : True := by trivial", "exact key"],
         "model-b": ["no", "have key : True := by trivial", "exact key"]})
@@ -2204,7 +2199,6 @@ def test_a_check_issued_during_a_renewal_waits_for_the_new_container():
     # to the kernel, so that check ran on a REPL without Mathlib (unknown
     # tactic, ℕ unbound) or raised LeanRuntimeError and the run aborted.
     from types import SimpleNamespace
-    import submission.board_agent as ba
 
     class SwappingLean:
         def __init__(self):
@@ -2227,7 +2221,7 @@ def test_a_check_issued_during_a_renewal_waits_for_the_new_container():
 
     async def scenario():
         inner = SwappingLean()
-        lean = ba.RenewingLean(inner, [])
+        lean = cl.RenewingLean(inner, [])
         lean.renew()
         check = await lean.check_file("theorem t : True := trivial")
         return inner, check
@@ -2667,7 +2661,6 @@ def test_a_leaf_is_checked_at_the_cap_timeout_and_its_own_cost_is_not_a_slow_ste
     # The same 15 s from a model step is still refused as slow.
     lean2, llm2 = SlowLeafLean(), ScriptLLM({"model-a": ["omega"] * 3})
     lean2.no_leaf = True
-    from submission import board_agent as ba
     from submission.run import ladder
     saved = ladder.leaf_candidates
     ladder.leaf_candidates = lambda text: []

@@ -10,6 +10,7 @@ from submission.config import Config, Ledger
 from submission import framework_agent as fa
 from submission import prompts as pr
 from submission import replies as rp
+from submission import calls as cl
 
 FENCED = "Here you go:\n```lean\nhave h : True := by trivial\n```\n"
 
@@ -135,11 +136,11 @@ def test_the_provider_is_asked_with_the_settings_the_recorded_runs_show():
     # temperature 0.4, max_tokens 6000, reasoning {"enabled": False}, no tools.
     asked = _called()
     assert asked["temperature"] == 0.4 and asked["max_tokens"] == 6000
-    assert asked["reasoning"] == fa.NO_REASONING and "tools" not in asked
+    assert asked["reasoning"] == cl.NO_REASONING and "tools" not in asked
     # The line that does not narrate gets its reasoning back.
-    assert _called(model="openai/gpt-oss-120b")["reasoning"] == fa.REASONING
+    assert _called(model="openai/gpt-oss-120b")["reasoning"] == cl.REASONING
     # `think` turns it on whoever is asked, because there the thinking is the answer.
-    assert _called(think=True)["reasoning"] == fa.REASONING
+    assert _called(think=True)["reasoning"] == cl.REASONING
 
 
 def test_a_call_with_tools_names_the_one_function_it_will_accept():

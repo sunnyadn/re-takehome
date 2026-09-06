@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import re
-import time
 from typing import Any
 
 from re_harness import AgentResult, LLMCallError, Problem, Services
@@ -31,87 +30,11 @@ from submission.run.asking import AUDIT_SYSTEM, AUDIT_TOKENS, Asking
 from submission.run.ladder import Ladder
 from submission.run.loop import Loop
 from submission.board.text import drop_declaration, split_statement
+from submission.calls import RenewingLean
 from submission.sampling import enumerated
-from submission.board.probes import CHECK_TIMEOUT_FLOOR_S, audit_prompt, container_memory_bytes, extract_file, read_witness, statements, witness_file
+from submission.board.probes import CHECK_TIMEOUT_FLOOR_S, audit_prompt, extract_file, read_witness, statements, witness_file
 
 LOOSE_DRAIN_S = 30.0
-
-# The REPL keeps every command's state. Measured in the harness image: a real
-# board leaves 46–77 MB behind per check (a trivial file leaves nothing), the
-# container's cap is 5 GiB, so the kernel killed the REPL every 55–90 checks,
-# mid-check, and the next check paid a cold Mathlib import (28 kills in three
-# hours across the lanes on one machine). Renewed on our terms instead: when
-# its memory is up (sampled) or, without a reading, after this many checks,
-# while a model reply is awaited so the import overlaps that wait. Measured on
-# p10 (win): 787 MB at check 9, 2980 MB at check 16 on one theorem; with
-# cells a check retains almost nothing (682 MB after import, +2 MB per small
-# check), and one `exact?` takes the container to 2.7 GB for good (its index),
-# which a renew only makes it load again (27 s). So the threshold sits near
-# the 5 GB limit and the count is a backstop.
-# Measured again with cells (p10, win): at 3.1-3.4 GB a check of three bare
-# probes took 118 s and `intro n hn` 108 s (the container thrashing), so the
-# threshold sits below that and above one search's residue (2.7 GB).
-RENEW_AT_BYTES = int(3.0 * 2 ** 30)
-RENEW_AFTER_CHECKS = 200
-MEMORY_SAMPLE_EVERY = 4
-
-
-class RenewingLean:
-    """Counts the checks on the current Lean container, samples its memory,
-    and renews it on request; check results pass through unchanged."""
-
-    def __init__(self, inner: Any, events: list[dict[str, Any]]) -> None:
-        self._inner = inner
-        self._events = events
-        self.checks = 0
-        self.memory: int | None = None
-        self.task: asyncio.Task[Any] | None = None
-        self._sampling: asyncio.Task[Any] | None = None
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._inner, name)
-
-    async def check_file(self, source: str, timeout_s: Any = None) -> Any:
-        if self.task is not None and not self.task.done():
-            await asyncio.gather(self.task, return_exceptions=True)
-        check = await self._inner.check_file(source, timeout_s=timeout_s)
-        self.checks = 1 if getattr(check, "container_restarted", False) else self.checks + 1
-        name = getattr(self._inner, "_container_name", None)
-        if name and self.checks % MEMORY_SAMPLE_EVERY == 0 and (self._sampling is None or self._sampling.done()):
-            self._sampling = asyncio.ensure_future(self._sample(name))
-        return check
-
-    async def _sample(self, name: str) -> None:
-        self.memory = await asyncio.to_thread(container_memory_bytes, name)
-        self._events.append({"stage": "memory", "checks": self.checks,
-                             "mb": None if self.memory is None else self.memory // 2 ** 20})
-
-    def due(self) -> bool:
-        if self.task is not None and not self.task.done():
-            return False
-        if self.memory is not None:
-            return self.memory >= RENEW_AT_BYTES
-        return self.checks >= RENEW_AFTER_CHECKS
-
-    def renew(self) -> None:
-        """Start the renewal in the background; every check waits for it."""
-        if not (hasattr(self._inner, "close") and hasattr(self._inner, "start")):
-            return
-        checks, memory = self.checks, self.memory
-        self.checks, self.memory = 0, None
-
-        def swap() -> None:
-            self._inner.close()
-            self._inner.start()
-
-        async def run() -> None:
-            t0 = time.monotonic()
-            await asyncio.to_thread(swap)
-            self._events.append({"stage": "renew", "checks": checks,
-                                 "mem_mb": (memory or 0) // 2 ** 20 or None,
-                                 "ms": int((time.monotonic() - t0) * 1000)})
-        self.task = asyncio.ensure_future(run())
-
 
 # There is no refutation probe. Proving `¬ target` from the context by
 # decide/omega only refutes the goal when the context is consistent, and a
@@ -251,13 +174,6 @@ class BoardAgent(FrameworkAgent):
         if (given or not names) and await breaks(given):
             return "refuted", given
         return ("holds" if tries or given or "holds" in reply else "unverified"), {}
-
-    async def _call(self, model: str, prompt: str, max_tokens: int, services: Services,
-                    ledger: Ledger, *args: Any, **kwargs: Any) -> tuple[str, str]:
-        lean = getattr(services, "lean", None)
-        if isinstance(lean, RenewingLean) and lean.due():
-            lean.renew()
-        return await super()._call(model, prompt, max_tokens, services, ledger, *args, **kwargs)
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
         services = in_file_coordinates(services)
