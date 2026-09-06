@@ -9,7 +9,8 @@ from re_harness import AgentResult
 from submission.contract import grade, scoring_faults
 from submission.cells import modular, strip_markers
 from submission.framework import axiom_probe, classify, is_done
-from submission.framework_agent import SLOW_COMPILE_MS, State
+from submission.framework_agent import SLOW_COMPILE_MS
+from submission.state import State
 from submission.techniques import PREAMBLE_MARK, strip_techniques, uses_techniques
 from submission.board.types import Board
 from submission.board.text import shed_unreferenced

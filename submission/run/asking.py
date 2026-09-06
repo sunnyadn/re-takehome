@@ -16,7 +16,10 @@ from submission.contract import format_messages
 from submission.cells import enclosing, remap, render_check, reopen_past_cell
 from submission.framework import (classify, hand_to_search, in_span, insert_preamble,
                                   message_line, prefixes, proof_span, root_names, unreachable)
-from submission.framework_agent import BUDGET_RETRY, RAISED_BUDGETS, VACUOUS, notes_for
+from submission.framework_agent import RAISED_BUDGETS
+from submission.prompts import notes_for
+from submission.replies import BUDGET_RETRY
+from submission.state import VACUOUS
 from submission.techniques import blank_techniques, without_techniques
 from submission.board.probes import (CHECK_TIMEOUT_FLOOR_S, audit_prompt, check_timeout_s,
                                      extract_file, goal_tokens, have_extract_file, is_closed,

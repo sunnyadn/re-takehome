@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from typing import Any, Sequence
 from submission.framework import (DECL_HEAD, classify, line_of, message_line,
                                   message_span, proof_span, root_names)
-from submission.framework_agent import NARRATES, STEP_TOKENS, Feedback
+from submission.framework_agent import NARRATES, STEP_TOKENS
+from submission.state import Feedback
 
 # One definition. board_agent.py had two, and the second silently won.
 OPENERS, CLOSERS = "([{⟨", ")]}⟩"

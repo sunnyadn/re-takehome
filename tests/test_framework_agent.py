@@ -3,35 +3,37 @@
 from __future__ import annotations
 
 from submission import framework_agent as fa
+from submission import prompts as pr
+from submission import replies as rp
 
 FENCED = "Here you go:\n```lean\nhave h : True := by trivial\n```\n"
 
 
 def test_a_fenced_step_survives_screening():
-    assert fa.screen_step(FENCED) == "have h : True := by trivial"
+    assert rp.screen_step(FENCED) == "have h : True := by trivial"
 
 
 def test_a_step_that_rewrites_the_file_is_refused():
     # A declaration is not refused here: the loop routes it above the theorem,
     # and refuses it there if it names something the problem already declares.
-    assert fa.screen_step("theorem x : True := by trivial") != ""
+    assert rp.screen_step("theorem x : True := by trivial") != ""
     # An import line is not Lean tactic text: it is dropped, and the step it
     # came wrapped in survives rather than costing the whole call.
-    assert fa.screen_step("import Mathlib\nintro x") == "intro x"
-    assert fa.screen_step("decide using native_decide") == ""
-    assert fa.screen_step("") == ""
+    assert rp.screen_step("import Mathlib\nintro x") == "intro x"
+    assert rp.screen_step("decide using native_decide") == ""
+    assert rp.screen_step("") == ""
 
 
 def test_a_bare_placeholder_is_refused_but_branches_keep_theirs():
-    assert fa.screen_step("have h : True := by sorry") == ""
-    branch = fa.screen_step("induction n with\n| zero => sorry\n| succ k ih => sorry")
+    assert rp.screen_step("have h : True := by sorry") == ""
+    branch = rp.screen_step("induction n with\n| zero => sorry\n| succ k ih => sorry")
     assert branch.count("sorry") == 2
 
 
 def test_only_the_triggered_notes_are_sent():
-    assert fa.notes_for("linarith failed to find a contradiction").startswith("- Every")
-    assert fa.notes_for("unsolved goals") == ""
-    assert fa.notes_for("omega could not prove the goal").count("\n- ") == 0
+    assert pr.notes_for("linarith failed to find a contradiction").startswith("- Every")
+    assert pr.notes_for("unsolved goals") == ""
+    assert pr.notes_for("omega could not prove the goal").count("\n- ") == 0
 
 
 def test_a_parse_error_from_an_older_dialect_is_named_as_such():
@@ -39,13 +41,13 @@ def test_a_parse_error_from_an_older_dialect_is_named_as_such():
     # were Lean 3 spellings (`intro n hn,`, `cases h with a b`) and ~90
     # "unexpected token '!'" were `7!` with no `open Nat`; Lean's message
     # names neither and the models wrote the same line again.
-    lean3 = fa.notes_for("error at {'line': 10, 'column': 12}: unexpected token ','; expected command")
+    lean3 = pr.notes_for("error at {'line': 10, 'column': 12}: unexpected token ','; expected command")
     assert "Lean 3" in lean3 and "comma" in lean3
-    assert "Lean 3" in fa.notes_for("unexpected token 'have'; expected command")
-    assert "Lean 3" in fa.notes_for("unexpected token 'with'; expected command")
-    bang = fa.notes_for("unexpected token '!'; expected command")
+    assert "Lean 3" in pr.notes_for("unexpected token 'have'; expected command")
+    assert "Lean 3" in pr.notes_for("unexpected token 'with'; expected command")
+    bang = pr.notes_for("unexpected token '!'; expected command")
     assert "Nat.factorial" in bang and "open Nat" in bang
-    assert "Lean 3" not in fa.notes_for("unexpected token ')'; expected command")
+    assert "Lean 3" not in pr.notes_for("unexpected token ')'; expected command")
 
 
 def test_probe_output_keeps_numerals_only():
@@ -54,13 +56,13 @@ def test_probe_output_keeps_numerals_only():
         {"severity": "info", "data": "Try this: exact foo"},
         {"severity": "error", "data": "7"},
     ]
-    assert fa.printed_numbers(msgs) == ["19"]
+    assert rp.printed_numbers(msgs) == ["19"]
 
 
 def test_a_step_that_does_nothing_is_refused():
-    assert fa.screen_step("skip") == ""
-    assert fa.screen_step("skip\n\nskip") == ""
-    assert fa.screen_step("intro n\nskip") != ""
+    assert rp.screen_step("skip") == ""
+    assert rp.screen_step("skip\n\nskip") == ""
+    assert rp.screen_step("intro n\nskip") != ""
 
 
 def test_the_calls_the_loop_makes_satisfy_the_harness_policy():
@@ -74,7 +76,7 @@ def test_the_calls_the_loop_makes_satisfy_the_harness_policy():
 
     for model in Config().lines:
         assert model in ALLOWED_MODELS and model in PRICE_CEILINGS
-    messages = [{"role": "system", "content": fa.FRAMEWORK_SYSTEM},
+    messages = [{"role": "system", "content": pr.FRAMEWORK_SYSTEM},
                 {"role": "user", "content": "Write the next step."}]
     LLMClient._validate_messages(messages)
     for tokens in (fa.STEP_TOKENS, fa.ANSWER_TOKENS):
@@ -92,8 +94,8 @@ That should close the goal."""
 
 def test_prose_around_an_unfenced_step_is_dropped():
     # Measured on p08: qwen answers in prose as often as in Lean.
-    assert fa.screen_step(PROSE) == "intro n hn\nhave key : 0 < n := hn"
+    assert rp.screen_step(PROSE) == "intro n hn\nhave key : 0 < n := hn"
 
 
 def test_a_reply_that_is_only_prose_leaves_nothing():
-    assert fa.screen_step("I think this goal needs a clever substitution.") == ""
+    assert rp.screen_step("I think this goal needs a clever substitution.") == ""

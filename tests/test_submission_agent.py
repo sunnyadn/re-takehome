@@ -3,7 +3,6 @@
 import asyncio
 from types import SimpleNamespace
 
-import pytest
 
 import submission.agent as agent_mod
 import submission.config as config

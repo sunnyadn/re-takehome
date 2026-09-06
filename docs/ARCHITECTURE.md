@@ -203,9 +203,16 @@ about money, and every part that touches it is to `Blackboard`'s right.
 
 `BoardAgent` inherits from `FrameworkAgent` (`submission/framework_agent.py`),
 which is a base class and nothing else: it is never instantiated. The board
-overrides `_share` and `_call`, adds `_define` and `solve`, and borrows
-`_ask_plan`, `_probe`, `_resolve_answers` and `_finish` unchanged. Below both
-sits `submission/framework.py`, pure transforms over Lean text.
+overrides `_share` and `_call`, adds `_define` and `solve`, and calls
+`_resolve_answers` itself; `_ask_plan`, `_probe` and `_finish` are inherited
+but reached from `run/loop.py` and `run/delivery.py` through the `agent`
+parameter those parts are handed, not from `board_agent.py`.
+
+Three things that used to sit in that file with it now have their own:
+`submission/prompts.py` is the text the models are sent, `submission/replies.py`
+reads one reply back, and `submission/state.py` holds the two records the rest
+of the agent passes around. Below all of them sits `submission/framework.py`,
+pure transforms over Lean text.
 
 The hardest part of this is `Blackboard.look`, and it is worth stating on its
 own. A check with a focus shows Lean one cell and stubs the rest, so Lean

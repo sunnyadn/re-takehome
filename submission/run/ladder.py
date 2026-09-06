@@ -17,7 +17,7 @@ from submission.conjecture import (families, fits, lemma_text, read_table, table
                                    verified, verify_file)
 from submission.framework import (classify, insert_preamble, proof_span, reindent,
                                   restate, root_names)
-from submission.framework_agent import Feedback
+from submission.state import Feedback
 from submission.leaves import _hyps as leaf_hyps, _sum_variables, leaf_candidates
 from submission.techniques import blank_techniques
 from submission.board.probes import (UNKNOWN_NAME_QUOTED, WITNESS_BOUND, apply_file, check_timeout_s,

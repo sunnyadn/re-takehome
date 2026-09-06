@@ -179,9 +179,9 @@ def test_a_have_whose_body_names_nothing_known_is_handed_to_search():
 
 
 def test_the_cheapest_spellings_trim_the_hints_before_the_tactic():
-    import submission.framework_agent as fa
+    import submission.replies as rp
     text = "  nlinarith [h1, h2]\n  decide\n"
-    forms = fa.lighter_forms(text)
+    forms = rp.lighter_forms(text)
     assert "  nlinarith [h1]\n  decide\n" in forms
     assert "  nlinarith\n  decide\n" in forms
     # A hint list is tried before the tactic is traded down.
@@ -271,12 +271,12 @@ def test_a_goal_no_placeholder_can_reach_is_given_one_inside_its_branch():
 
 
 def test_a_search_that_prints_an_option_is_still_an_answer():
-    import submission.framework_agent as fa
+    import submission.replies as rp
     # Measured: `#eval (List.range 100).find? p` prints `some 19`, and the same
     # search with `.getD 0` prints `19`.
     said = [{"severity": "info", "data": "some 19"}, {"severity": "info", "data": "19"},
             {"severity": "info", "data": "[1, 2]"}]
-    assert fa.printed_numbers(said) == ["19", "19"]
+    assert rp.printed_numbers(said) == ["19", "19"]
 
 
 def test_a_lemma_whose_proof_fails_keeps_its_statement():
@@ -303,23 +303,23 @@ def test_a_block_is_cut_back_one_top_level_step_at_a_time():
 
 
 def test_a_models_thinking_is_not_its_answer():
-    import submission.framework_agent as fa
+    import submission.replies as rp
     # Measured on p10: the draft holds ten `#eval` lines that are not the answer.
     reply = "<think>\n#eval 1\n#eval 2\n</think>\n\n#eval 6"
-    assert fa.spoken(reply) == "#eval 6"
+    assert rp.spoken(reply) == "#eval 6"
     # An unclosed think block runs to the end of the reply.
-    assert fa.spoken("<think>\nstill going") == ""
-    assert fa.spoken("intro h\nexact h") == "intro h\nexact h"
+    assert rp.spoken("<think>\nstill going") == ""
+    assert rp.spoken("intro h\nexact h") == "intro h\nexact h"
 
 
 def test_a_tool_call_is_read_when_the_model_makes_one():
-    import submission.framework_agent as fa
+    import submission.replies as rp
     calls = [{"function": {"name": "answer",
                            "arguments": '{"evals": ["#eval 6", "#eval 7"]}'}}]
-    assert fa.tool_lines(calls) == "#eval 6\n#eval 7"
+    assert rp.tool_lines(calls) == "#eval 6\n#eval 7"
     # A model that ignores the schema leaves nothing here, and the reply is read.
-    assert fa.tool_lines([]) == "" and fa.tool_lines(None) == ""
-    assert fa.tool_lines([{"function": {"arguments": "not json"}}]) == ""
+    assert rp.tool_lines([]) == "" and rp.tool_lines(None) == ""
+    assert rp.tool_lines([{"function": {"arguments": "not json"}}]) == ""
 
 
 SET_SLOT = """import Mathlib

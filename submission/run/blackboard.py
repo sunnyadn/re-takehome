@@ -15,7 +15,7 @@ from submission.contract import format_messages
 from submission.cells import CELL_PROBE, dissolve, remap, render_check, strip_markers
 from submission.framework import (DECL_HEAD, classify, drop_lines, message_line,
                                   proof_span, split_cursor)
-from submission.framework_agent import Feedback
+from submission.state import Feedback
 from submission.techniques import blank_techniques
 from submission.board.probes import (CHECK_TIMEOUT_CAP_S, check_timeout_s, dump_check,
                                      read_board)

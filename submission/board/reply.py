@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from typing import Sequence
 from submission.framework import (DECLARATION, as_goal, normalise_steps, open_names, prefixes, proof_body, root_names)
-from submission.framework_agent import is_probe, screen_step
+from submission.replies import is_probe, screen_step
 
 from submission.board.types import (OPENERS, CLOSERS, Board, Edit, Goal, HAVE_HEAD, HAVE_NAME, INTRO_LIKE, split_top)
 

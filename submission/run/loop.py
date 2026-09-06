@@ -15,8 +15,9 @@ from submission.config import FEEDBACK_CHARS
 from submission.contract import format_messages
 from submission.techniques import technique_card
 from submission.framework import classify, insert_above, render, restate
-from submission.framework_agent import (FILE_CHARS, FRAMEWORK_SYSTEM, Feedback, GOAL_CHARS,
-                                        State, sheet_for)
+from submission.framework_agent import FILE_CHARS, GOAL_CHARS
+from submission.prompts import FRAMEWORK_SYSTEM, sheet_for
+from submission.state import Feedback, State
 from submission.board.reply import interpret, salvage
 from submission.board.text import proved_facts, restates, settled_inside, view
 from submission.board.types import Board, Edit, Goal, step_tokens
