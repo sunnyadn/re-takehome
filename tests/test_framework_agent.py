@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+from types import SimpleNamespace
+
+from submission.config import Config, Ledger
+
 from submission import framework_agent as fa
 from submission import prompts as pr
 from submission import replies as rp
@@ -99,3 +104,46 @@ def test_prose_around_an_unfenced_step_is_dropped():
 
 def test_a_reply_that_is_only_prose_leaves_nothing():
     assert rp.screen_step("I think this goal needs a clever substitution.") == ""
+
+
+class _Recording:
+    """Records what was asked of the provider. The reply shape is a real one,
+    copied from an `llm_response` in outputs/board-2026-09-06/p08_sum_products."""
+
+    def __init__(self):
+        self.asked = []
+
+    async def complete(self, **kwargs):
+        self.asked.append(kwargs)
+        return SimpleNamespace(content="omega", tool_calls=[], finish_reason="stop",
+                               usage={"cost": 0.0, "completion_tokens": 12})
+
+
+def _called(**extra):
+    """One `_call`, and the keyword arguments the provider saw."""
+
+    llm = _Recording()
+    agent = fa.FrameworkAgent(Config(lines=("qwen/qwen3.5-flash-02-23",)))
+    services = SimpleNamespace(llm=llm, lean=None)
+    asyncio.run(agent._call(extra.pop("model", "qwen/qwen3.5-flash-02-23"),
+                            "prompt", 6000, services, Ledger(), **extra))
+    return llm.asked[0]
+
+
+def test_the_provider_is_asked_with_the_settings_the_recorded_runs_show():
+    # Measured in outputs/board-2026-09-06/p08_sum_products: qwen was called at
+    # temperature 0.4, max_tokens 6000, reasoning {"enabled": False}, no tools.
+    asked = _called()
+    assert asked["temperature"] == 0.4 and asked["max_tokens"] == 6000
+    assert asked["reasoning"] == fa.NO_REASONING and "tools" not in asked
+    # The line that does not narrate gets its reasoning back.
+    assert _called(model="openai/gpt-oss-120b")["reasoning"] == fa.REASONING
+    # `think` turns it on whoever is asked, because there the thinking is the answer.
+    assert _called(think=True)["reasoning"] == fa.REASONING
+
+
+def test_a_call_with_tools_names_the_one_function_it_will_accept():
+    tool = {"type": "function", "function": {"name": "answer"}}
+    asked = _called(tools=(tool,))
+    assert asked["tools"] == [tool]
+    assert asked["tool_choice"] == {"type": "function", "function": {"name": "answer"}}
