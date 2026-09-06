@@ -214,14 +214,6 @@ class _MixedErrorLean(_SearchLean):
         )
 
 
-def test_the_retry_pool_scales_with_the_clock():
-    # Eight was sized for a 30-minute run of ~8 calls; a graded run makes ~35x
-    # that, and exhausting the pool ends the run hours early.
-    assert config.Config(time_limit_s=1800.0).max_retries == 8
-    assert config.Config(time_limit_s=28800.0).max_retries == 128
-    assert config.Config(time_limit_s=60.0).max_retries == 8
-
-
 def test_refused_before_generation_reads_the_harness_message():
     # The harness raises LLMCallError with the status only in the text, so the
     # agent must parse it rather than reach for an attribute that is not there.

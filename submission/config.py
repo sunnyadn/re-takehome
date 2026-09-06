@@ -18,11 +18,6 @@ from re_harness.models import ALLOWED_MODELS, MODEL_A, MODEL_B
 RETRY_BACKOFF_S = (5.0, 20.0, 60.0)
 
 
-# A per-problem pool shared by both lines. Eight suited a 30-minute run of
-# about 8 calls; a graded run makes roughly 35x that, so it scales.
-RETRIES_PER_1800S = 8
-
-
 FEEDBACK_CHARS = 6000
 
 
@@ -72,12 +67,6 @@ class Config:
             time_limit_s=settings.time_limit_s,
             verify_reserve_s=float(settings.verify_reserve_s),
         )
-
-    @property
-    def max_retries(self) -> int:
-        """Scales with the clock, which is what bounds retrying anyway."""
-
-        return max(RETRIES_PER_1800S, round(RETRIES_PER_1800S * self.time_limit_s / 1800.0))
 
     @property
     def agent_deadline_s(self) -> float:

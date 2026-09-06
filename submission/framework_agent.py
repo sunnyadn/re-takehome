@@ -331,14 +331,6 @@ class State:
 VACUOUS = re.compile(r"^\S[^:]*:\s*(?:True|Type)\s*$", re.M)
 
 
-def emptied(before: State, after: State) -> bool:
-    """A hypothesis of type `True` is no fact, so a step that makes one has
-    thrown a fact away. Lean has no complaint about it, and the name it took
-    shadows what was there before."""
-
-    return len(VACUOUS.findall(after.goal)) > len(VACUOUS.findall(before.goal))
-
-
 def stalled(before: State, after: State) -> bool:
     """A step that grew the file and left the proof state exactly as it was."""
 

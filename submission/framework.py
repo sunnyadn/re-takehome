@@ -12,7 +12,7 @@ from typing import Any, Sequence
 # succeed by rewriting without closing; `done` turns that into a failure so the
 # block keeps searching. Never emit an alternative without it.
 from submission.contract import NAT_POW_LINE
-from submission.sweep import COCKTAIL, DECL_START, PROOF_DECL, wrap_tactic
+from submission.sweep import DECL_START, PROOF_DECL
 from submission.techniques import PREAMBLE_END
 
 # A placeholder is a whole line. A term-position `:= sorry` (an answer slot) is
@@ -322,12 +322,6 @@ def drop_lines(text: str, lines: Sequence[int]) -> str:
     return "\n".join(kept)
 
 
-def sweep_body(cocktail: Sequence[str] = COCKTAIL) -> str:
-    """The whole cocktail as one `first`, every alternative forced to close."""
-
-    return "first\n" + "\n".join(f"| {wrap_tactic(t)}" for t in cocktail)
-
-
 FIRST_BLOCK = re.compile(r"^([ \t]*)first[ \t]*\n((?:[ \t]*\|.*(?:\n|$))+)", re.M)
 ALTERNATIVE = re.compile(r"^[ \t]*\|[ \t]*\((.*);[ \t]*done\)[ \t]*$", re.M)
 
@@ -542,33 +536,6 @@ def insert_above(text: str, name: str, block: str) -> str:
             break
         at = prev_start
     return text[:at] + block.rstrip() + "\n\n" + text[at:]
-
-
-def enclosing_name(text: str, index: int = 0) -> str:
-    """The declaration the cursor is inside, which the writer keeps restating.
-
-    Measured on p09: once a shared lemma is in the file, every reply about it
-    comes back as the whole `theorem ... := by ...`, and the name is taken."""
-
-    at = cursor(text, index)
-    if at is None:
-        return ""
-    heads = [m for m in PROOF_HEAD.finditer(text) if m.start() < at.start()]
-    return heads[-1].group(2) if heads else ""
-
-
-def drop_own(block: str, names: Sequence[str]) -> str:
-    """Keep the lemma a reply adds and drop the graded theorem it restates.
-
-    Measured on p09: the writer states `p09_aux_mod` and then rewrites `p09_a`
-    under it. Only the first is new; the second is `already been declared`."""
-
-    lines = block.split("\n")
-    for i, line in enumerate(lines):
-        found = DECLARATION.match(line)
-        if found and found.group(1) in names:
-            return "\n".join(lines[:i]).rstrip()
-    return block
 
 
 HAVE_BODY = re.compile(r"^(\s*have\b.*?:=\s*)(\S.*)$", re.M)

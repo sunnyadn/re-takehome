@@ -279,15 +279,6 @@ def test_a_search_that_prints_an_option_is_still_an_answer():
     assert fa.printed_numbers(said) == ["19", "19"]
 
 
-def test_a_reply_that_adds_a_lemma_and_restates_the_theorem_keeps_the_lemma():
-    block = ("theorem aux (k : ℕ) : 2 ^ k % 7 = 2 ^ (k % 3) % 7 := by\n"
-             "  omega\n\ntheorem demo (n : ℕ) : n + 0 = n := by\n  simp")
-    assert fw.drop_own(block, ("demo",)) == (
-        "theorem aux (k : ℕ) : 2 ^ k % 7 = 2 ^ (k % 3) % 7 := by\n  omega")
-    # A block with no graded name in it is left whole.
-    assert fw.drop_own("intro h\nexact h", ("demo",)) == "intro h\nexact h"
-
-
 def test_a_lemma_whose_proof_fails_keeps_its_statement():
     block = ("theorem aux (k : ℕ) : 2 ^ k % 7 = 2 ^ (k % 3) % 7 := by\n"
              "  simp [Nat.pow_mod]\n  omega")
@@ -297,24 +288,10 @@ def test_a_lemma_whose_proof_fails_keeps_its_statement():
     assert fw.as_goal("theorem aux : True := trivial") == ""
 
 
-HOISTED = """import Mathlib
-
-theorem aux (n : ℕ) : n + 0 = n := by
-  sorry
-
-theorem demo (n : ℕ) : n + 0 = n := by
-  sorry
-"""
-
-
-def test_the_writer_may_restate_the_declaration_the_cursor_is_inside():
-    assert fw.enclosing_name(HOISTED, 0) == "aux"
-    assert fw.enclosing_name(HOISTED, 1) == "demo"
+def test_a_reply_that_restates_its_own_declaration_keeps_only_the_body():
     reply = "theorem aux (n : ℕ) : n + 0 = n := by\n  induction n with\n  | zero => simp"
     body = fw.unwrap_own(reply, ("aux",))
     assert body == "induction n with\n| zero => simp"
-    # Restating a name that is taken and not the one being proved is not a step.
-    assert fw.drop_own(reply, ("aux",)) == ""
 
 
 def test_a_block_is_cut_back_one_top_level_step_at_a_time():
