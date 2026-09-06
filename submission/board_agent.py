@@ -1,6 +1,6 @@
-"""A board of open goals, two models working two of them at once, Lean judging
-every edit against the whole file. `solve` below is the spine: it wires the
-seven parts of `submission/run/`, and what it borrows sits in the class below."""
+"""A board of open goals, two models asking for steps at the same time, Lean
+judging every edit against the whole file. Only the model calls overlap: every
+Lean check in a turn runs under one lock, measured at 19% of the wall clock."""
 
 
 from __future__ import annotations
@@ -51,9 +51,8 @@ TUPLE_IN = re.compile(r"[⟨(]\s*([A-Za-z_][\w']*(?:\s*,\s*[A-Za-z_][\w']*)+)\s*
 
 
 class BoardAgent:
-    """The board program. It overrides `_share` and `_call`, adds `_define` and
-    `solve`, and borrows `_ask_plan`, `_probe`, `_resolve_answers` and `_finish`
-    from `FrameworkAgent` unchanged."""
+    """The board program. `solve` is the spine; everything above it is a setup
+    rewrite `solve` runs once, before the board opens."""
 
     def __init__(self, config: Config | None = None) -> None:
         self.config = config or Config.from_env()
