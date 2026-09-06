@@ -72,13 +72,16 @@ def main() -> int:
         # docs/ARCHITECTURE.md times the agent, not the harness: the comparator
         # is excluded, so the summary below must read the agent's own wall.
         result = events.parent / "result.json"
+        name = events.parent.name
         if result.exists():
-            meta = json.loads(result.read_text()).get("agent_metadata") or {}
+            record = json.loads(result.read_text())
+            meta = record.get("agent_metadata") or {}
             agent_walls.append(meta.get("wall_s", wall))
+            name = record.get("problem_id", name)
         if not spans:
             continue
         busy, second = overlapped(spans)
-        rows.append((events.parts[-3], len(spans), busy, second, wall))
+        rows.append((name, len(spans), busy, second, wall))
     if not rows:
         print(f"no model calls recorded under {root}")
         return 0
