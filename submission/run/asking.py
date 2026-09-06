@@ -67,6 +67,73 @@ AUDIT_SYSTEM = ("You audit one goal inside a Lean 4 proof. You answer with one "
 INFLATION = 3.0
 
 
+def _unchanged(goal: Goal, left: list[Goal]) -> str:
+    if left and all(g.text == goal.text for g in left):
+        return "that step left the goal exactly as it was"
+    return ""
+
+
+def _shadowed_name(goal: Goal, left: list[Goal]) -> str:
+    if any(g.text.count("✝") > goal.text.count("✝") for g in left):
+        # Measured on p10: `have h2 ...` accepted 18 times over, each one
+        # shadowing the last, and the goal text never the same twice.
+        return ("that step re-declared a name the context already "
+                "has (Lean shows the old one as `h✝`); use the "
+                "existing hypothesis instead of stating it again")
+    return ""
+
+
+def _false_from_nothing(goal: Goal, left: list[Goal]) -> str:
+    if any(target_of(g.text) == "False" and target_of(goal.text) != "False"
+           and hyp_count(g.text) <= hyp_count(goal.text) for g in left):
+        # Measured on rmo_2001_2: a wrong witness left `hp : Nat.Prime 3,
+        # hq : Nat.Prime 11 ⊢ False` and 14 turns went into it.
+        return ("that step turned the goal into `False` without adding "
+                "a hypothesis, so the context is still consistent and "
+                "`False` cannot be proved: the witness, rewrite or case "
+                "was wrong. Undo it and choose again")
+    return ""
+
+
+def _inflated_context(goal: Goal, left: list[Goal]) -> str:
+    if left and max(inflated(goal.text, g.text) for g in left) >= INFLATION:
+        # Measured on rmo_2001_2, p09 and rmo_2000_2 (5 runs): a rewrite
+        # `at *` unfolded a variable in every hypothesis and both models
+        # then worked on the unfolded form for the rest of the run.
+        return ("that step made the existing hypotheses more than "
+                f"{INFLATION:g}× larger without closing the goal (a rewrite "
+                "unfolded a variable everywhere). Rewrite only the "
+                "hypothesis you need, or state the fact you want as a `have`")
+    return ""
+
+
+def _uninferred_type(goal: Goal, left: list[Goal]) -> str:
+    if any(META.search(target_of(g.text)) for g in left):
+        # Measured on rmo_2000_2: `apply lt_irrefl _` left `⊢ Type ?u.350`
+        # and `⊢ Preorder ?α`; each got a sorry and 30 turns, six deep.
+        return ("that step left a goal Lean could not infer (`Type ?u`, "
+                "`?α`): an `apply` with `_` for arguments it cannot fill. "
+                "Give the term in full, e.g. `exact absurd h1 (not_lt.mpr h2)`")
+    return ""
+
+
+def _discarded_fact(goal: Goal, left: list[Goal]) -> str:
+    if any(len(VACUOUS.findall(g.text)) > len(VACUOUS.findall(goal.text)) for g in left):
+        # Measured on p09: `simp ... at h ⊢` left `h : True ⊢ False`, Lean
+        # had no complaint, and five turns went into a goal that was dead.
+        return ("that step turned a hypothesis into `True` (or `Type`), "
+                "which throws the fact away; rewrite without `at h`, "
+                "or use the fact instead of simplifying it")
+    return ""
+
+
+# Damage a step can do to the goals it leaves behind, in the order it is looked
+# for. Lean raised no error on any of these: each one is a shape that a run was
+# measured losing turns to.
+COMPLAINTS = (_unchanged, _shadowed_name, _false_from_nothing,
+              _inflated_context, _uninferred_type, _discarded_fact)
+
+
 class Asking:
     def __init__(self, agent: Any, run: Run, budget: Budget, bb: Blackboard) -> None:
         self.agent, self.run, self.budget, self.bb = agent, run, budget, bb
@@ -122,9 +189,10 @@ class Asking:
                            "ms": check.duration_ms})
         self.run.notes[goal.key].shelved = self.shelf[tokens]
 
-    async def judge_once(self, base: Board, goal: Goal, block: str) -> tuple[Board | None, str]:
-        """`failed_at` keeps the block-relative line of the first error, for
-        the prefix cut."""
+    async def place(self, base: Board, goal: Goal, block: str) -> tuple[tuple[int, int], Board, bool]:
+        """The block written at the goal, and the board that came back. A goal
+        with a statement gets its own cell; one Lean will not elaborate on its
+        own falls back to the enclosing cell. True when the step closed it."""
 
         splittable = goal.stmt and not self.run.notes[goal.key].unsplittable and not is_root_goal(base.text, goal)
         cell_id = self.run.cells.new(goal.stmt) if splittable else None
@@ -155,14 +223,21 @@ class Asking:
                     self.run.notes[goal.key].known_stmt = repaired
             return candidate, span, nxt
 
-        candidate, span, nxt = await placed(True)
-        _, surplus, expensive, failures = classify(nxt.messages)
-        closing = False
+        _, span, nxt = await placed(True)
+        _, surplus, _, failures = classify(nxt.messages)
         if not failures and {message_line(m) for m in surplus if in_span(m, span)} == {span[1]}:
             # Only the trailing placeholder has no goal: the step closed it.
-            candidate, span, nxt = await placed(False)
-            _, surplus, expensive, failures = classify(nxt.messages)
-            closing = True
+            _, span, nxt = await placed(False)
+            return span, nxt, True
+        return span, nxt, False
+
+    async def judge_once(self, base: Board, goal: Goal, block: str) -> tuple[Board | None, str]:
+        """The block is placed, then priced, then read for damage it did that
+        Lean raised no error about. `failed_at` keeps the block-relative line
+        of the first error, for the prefix cut."""
+
+        span, nxt, closing = await self.place(base, goal, block)
+        _, surplus, expensive, failures = classify(nxt.messages)
         self.last_span = span
         lines = [l for l in (message_line(m) for m in failures) if l and span[0] <= l <= span[1]]
         self.failed_at = (min(lines) - span[0]) if lines else 0
@@ -216,42 +291,10 @@ class Asking:
             return None, ("there are no goals left where that step was written: "
                           "the goal was already closed above it")
         left = [g for g in nxt.goals if span[0] <= g.line <= span[1]]
-        if left and all(g.text == goal.text for g in left):
-            return None, "that step left the goal exactly as it was"
-        if any(g.text.count("✝") > goal.text.count("✝") for g in left):
-            # Measured on p10: `have h2 ...` accepted 18 times over, each one
-            # shadowing the last, and the goal text never the same twice.
-            return None, ("that step re-declared a name the context already "
-                          "has (Lean shows the old one as `h✝`); use the "
-                          "existing hypothesis instead of stating it again")
-        if any(target_of(g.text) == "False" and target_of(goal.text) != "False"
-               and hyp_count(g.text) <= hyp_count(goal.text) for g in left):
-            # Measured on rmo_2001_2: a wrong witness left `hp : Nat.Prime 3,
-            # hq : Nat.Prime 11 ⊢ False` and 14 turns went into it.
-            return None, ("that step turned the goal into `False` without adding "
-                          "a hypothesis, so the context is still consistent and "
-                          "`False` cannot be proved: the witness, rewrite or case "
-                          "was wrong. Undo it and choose again")
-        if left and max(inflated(goal.text, g.text) for g in left) >= INFLATION:
-            # Measured on rmo_2001_2, p09 and rmo_2000_2 (5 runs): a rewrite
-            # `at *` unfolded a variable in every hypothesis and both models
-            # then worked on the unfolded form for the rest of the run.
-            return None, ("that step made the existing hypotheses more than "
-                          f"{INFLATION:g}× larger without closing the goal (a rewrite "
-                          "unfolded a variable everywhere). Rewrite only the "
-                          "hypothesis you need, or state the fact you want as a `have`")
-        if any(META.search(target_of(g.text)) for g in left):
-            # Measured on rmo_2000_2: `apply lt_irrefl _` left `⊢ Type ?u.350`
-            # and `⊢ Preorder ?α`; each got a sorry and 30 turns, six deep.
-            return None, ("that step left a goal Lean could not infer (`Type ?u`, "
-                          "`?α`): an `apply` with `_` for arguments it cannot fill. "
-                          "Give the term in full, e.g. `exact absurd h1 (not_lt.mpr h2)`")
-        if any(len(VACUOUS.findall(g.text)) > len(VACUOUS.findall(goal.text)) for g in left):
-            # Measured on p09: `simp ... at h ⊢` left `h : True ⊢ False`, Lean
-            # had no complaint, and five turns went into a goal that was dead.
-            return None, ("that step turned a hypothesis into `True` (or `Type`), "
-                          "which throws the fact away; rewrite without `at h`, "
-                          "or use the fact instead of simplifying it")
+        for complaint in COMPLAINTS:
+            why = complaint(goal, left)
+            if why:
+                return None, why
         return nxt, ""
 
     async def judge(self, base: Board, goal: Goal, block: str) -> tuple[Board | None, str]:
