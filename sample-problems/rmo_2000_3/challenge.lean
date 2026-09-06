@@ -1,5 +1,7 @@
 import Mathlib.Data.Real.Basic
 import Mathlib.Data.Finset.Basic
+import Mathlib.Algebra.BigOperators.Group.Finset.Basic
+import Mathlib.Order.Interval.Finset.Nat
 
 open Finset
 
