@@ -153,7 +153,7 @@ class BoardAgent(FrameworkAgent):
                     continue
                 candidate = fill_definition(text, name, term)
                 check = await services.lean.check_file(candidate)
-                if classify(check.messages)[3]:
+                if classify(check.messages).failures:
                     note = ("\n\nThat term did not elaborate. Lean said:\n"
                             + format_messages(check.messages)[:FEEDBACK_CHARS])
                     continue

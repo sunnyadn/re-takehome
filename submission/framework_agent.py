@@ -23,10 +23,10 @@ from submission.prompts import FRAMEWORK_SYSTEM, PLANNER_SYSTEM, sheet_for
 from submission.replies import lighter_forms, printed_numbers, spoken, tool_lines
 from submission.state import State
 
-# A step is a few lines; the file it goes into is the context. Wide replies are
-# the failure mode here, not narrow ones.
-# Measured on p08: gpt-oss-120b spent all 2000 tokens reasoning and returned
-# `content: None` with `finish_reason: length`, so the call bought nothing.
+# The ceiling for a step from the narrating line only; the other line gets
+# `board/types.py::SLOW_STEP_TOKENS`, and `step_tokens` chooses. 2000 was too
+# few either way (measured on p08: gpt-oss-120b spent all 2000 reasoning and
+# returned `content: None` with `finish_reason: length`).
 STEP_TOKENS = 6000
 ANSWER_TOKENS = 4000
 # Measured on p09: qwen3.5-flash narrates its reasoning as ordinary content and
@@ -234,7 +234,7 @@ class FrameworkAgent:
                 continue
             candidate = insert_preamble(text, as_goal(block) or block)
             check = await services.lean.check_file(candidate)
-            kept = not classify(check.messages)[3]
+            kept = not classify(check.messages).failures
             events.append({"stage": "share", "name": named, "kept": kept})
             if kept:
                 text = candidate

@@ -38,7 +38,7 @@ class Delivery:
         nothing graded uses, which is removed. `deliver` checks it again."""
         if b.accepted and is_done(b.text):
             return b.text
-        if classify(b.messages)[3]:
+        if classify(b.messages).failures:
             return None
         text, shed = shed_unreferenced(b.text, self.run.graded)
         if not shed or not is_done(text) or re.search(r"\bsorry\b", text) \

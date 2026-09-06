@@ -252,7 +252,7 @@ class Asking:
             nonlocal cell_id, focus
             candidate, span = put(base.text, goal, block, trailing, cell_id)
             nxt = await self.bb.look(candidate, base, focus, goal)
-            if cell_id is not None and any(message_line(m) == span[0] for m in classify(nxt.messages)[3]):
+            if cell_id is not None and any(message_line(m) == span[0] for m in classify(nxt.messages).failures):
                 # The statement Lean printed does not elaborate on its own
                 # (measured: a set literal loses its `: Set _`). A literal
                 # is ascribed from the binder types once; failing that, the
@@ -263,7 +263,7 @@ class Asking:
                     self.tried_statements.add(repaired)
                     self.run.cells.statements[cell_id] = repaired
                     nxt = await self.bb.look(candidate, base, focus, goal)
-                if any(message_line(m) == span[0] for m in classify(nxt.messages)[3]):
+                if any(message_line(m) == span[0] for m in classify(nxt.messages).failures):
                     self.run.events.append({"stage": "inline", "cell": cell_id, "decl": goal.decl})
                     self.run.notes[goal.key].unsplittable = True
                     cell_id, focus = None, goal.cell or goal.decl
@@ -330,7 +330,7 @@ class Asking:
             # is, and the step stands. Measured on rmo_2000_6: the closing step
             # was refused for a goal it had not touched.
             reopened = await self.bb.look(reopen_past_cell(nxt.text, *lost), base)
-            if not classify(reopened.messages)[3] and not unreachable(reopened.messages, reopened.text, -1):
+            if not classify(reopened.messages).failures and not unreachable(reopened.messages, reopened.text, -1):
                 self.run.events.append({"stage": "reopen", "line": lost[0], "decl": goal.decl})
                 nxt, lost = reopened, None
         if lost:

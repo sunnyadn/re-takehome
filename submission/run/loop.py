@@ -152,7 +152,7 @@ class Loop:
 
         took = False
         lifted = await self.bb.look(insert_above(self.bb.board.text, self.run.first_graded, edit.block))
-        kept = not classify(lifted.messages)[3]
+        kept = not classify(lifted.messages).failures
         # Measured on putnam_2020_a2: a hoisted lemma was false at j = 0;
         # its statement is audited like a `have` before it enters the file.
         bad = await self.asking.audit(author, self.bb.board, lifted) if kept else ""

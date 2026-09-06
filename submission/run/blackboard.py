@@ -97,8 +97,8 @@ class Blackboard:
         return fresh
 
     def discard(self, bid: int) -> None:
-        """Drop a branch that went nowhere. The counterpart to `fork`, so
-        branches are only ever added and removed here."""
+        """Drop a branch that went nowhere. Branches enter in `fork` and in
+        `commit`, and leave here or in `prune`: four sites, not two."""
         gone = self.live(bid)
         if gone is not None:
             self.branches.remove(gone)
@@ -258,7 +258,7 @@ class Blackboard:
             head = DECL_HEAD.match(self.board.text[span[0]:span[1]]) if span else None
             dropped = drop_declaration(self.board.text, goal.decl)
             trimmed = await self.look(dropped)
-            if head and not classify(trimmed.messages)[3]:
+            if head and not classify(trimmed.messages).failures:
                 statement = head.group(1).strip()
                 self.run.events.append({"kind": "withdraw", "by": author, "decl": goal.decl,
                                "have": statement[:120], "tries": self.run.notes[goal.key].tries})
@@ -274,7 +274,7 @@ class Blackboard:
         # withdrawing h_witness took h_min, the whole crux, which never used it.
         trimmed = await self.look(fresh)
         whole = False
-        if classify(trimmed.messages)[3]:
+        if classify(trimmed.messages).failures:
             fresh, statement = withdraw(self.board.text, goal)
             trimmed, whole = await self.look(fresh), True
         self.run.events.append({"kind": "withdraw", "by": author, "have": statement[:120],

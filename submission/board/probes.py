@@ -79,7 +79,7 @@ def render_all(text: str) -> str:
 def read_board(text: str, messages: Sequence[dict[str, Any]], accepted: bool) -> Board:
     """Each placeholder takes the tightest `unsolved goals` span holding it."""
 
-    spans = [(m, message_span(m)) for m in classify(messages)[0]]
+    spans = [(m, message_span(m)) for m in classify(messages).progress]
     stated = statements(messages)
     goals = []
     for match in placeholders(text):

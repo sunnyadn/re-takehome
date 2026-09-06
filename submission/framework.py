@@ -6,7 +6,7 @@ still leaves open. The two agent classes above both build on this.
 from __future__ import annotations
 
 import re
-from typing import Any, Sequence
+from typing import Any, NamedTuple, Sequence
 
 # `first` takes the first alternative that does not fail, and `norm_num` can
 # succeed by rewriting without closing; `done` turns that into a failure so the
@@ -190,8 +190,17 @@ def message_text(message: Any) -> str:
     return data if isinstance(data, str) else str(data)
 
 
-def classify(messages: Sequence[Any]) -> tuple[list[Any], list[Any], list[Any], list[Any]]:
-    """Progress, surplus placeholder, too expensive, real failure."""
+class Verdicts(NamedTuple):
+    """What Lean said about one check, in four piles."""
+
+    progress: list[Any]     # a placeholder still has a goal under it
+    surplus: list[Any]      # a placeholder with no goal left
+    expensive: list[Any]    # Lean ran out of its own budget
+    failures: list[Any]     # anything else Lean called an error
+
+
+def classify(messages: Sequence[Any]) -> Verdicts:
+    """Every error Lean raised, sorted into the four piles above."""
 
     progress, surplus, expensive, failures = [], [], [], []
     for m in messages:
@@ -206,7 +215,7 @@ def classify(messages: Sequence[Any]) -> tuple[list[Any], list[Any], list[Any], 
             expensive.append(m)
         else:
             failures.append(m)
-    return progress, surplus, expensive, failures
+    return Verdicts(progress, surplus, expensive, failures)
 
 
 def _at(message: Any, key: str, field: str) -> int | None:
@@ -250,7 +259,7 @@ def cursor_goal(messages: Sequence[Any], cursor_line: int) -> str:
     cursor to the whole declaration, so the first message is often the wrong
     one and only containment tells them apart."""
 
-    open_goals = classify(messages)[0]
+    open_goals = classify(messages).progress
     holding = [(m, message_span(m)) for m in open_goals]
     fits = [(span[1] - span[0], goal_text(m)) for m, span in holding
             if span and span[0] <= cursor_line <= span[1]]
@@ -280,7 +289,7 @@ def unreachable(messages: Sequence[Any], text: str,
     whose span holds neither is one the cursor can never get back to."""
 
     at = [(line_of(text, m.start()), len(m.group(1))) for m in placeholders(text)]
-    for message in classify(messages)[0]:
+    for message in classify(messages).progress:
         span = message_span(message)
         column = message_column(message)
         if span is None or column is None:

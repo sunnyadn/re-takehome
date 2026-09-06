@@ -1,10 +1,10 @@
 """The cheap things tried before a model is asked.
 
 Each rung answers one shape of goal without spending a token: a cocktail of
-tactics, a leaf block, a witness, a generalisation, a library search. `turn`
-runs them behind three gates, not one gate each, so a goal gets one round of
-them rather than one round per rung. `unstick` is the rung of last resort:
-it takes an edit back and reopens what it closed."""
+tactics, a leaf block, a witness, a generalisation, a library search. What
+decides when a rung runs is not here: the gates are in `loop.py::turn`, three
+of them for the five rungs. `unstick` is the rung of last resort: it takes an
+edit back and reopens what it closed."""
 
 from __future__ import annotations
 import re
@@ -58,8 +58,9 @@ class Ladder:
             cell_id = self.run.cells.new(goal.stmt) if goal.stmt and not is_root_goal(base.text, goal) else None
             flat = await self.bb.look(put(base.text, goal, tactic, trailing=False, cell_id=cell_id)[0],
                               base, cell_id if cell_id is not None else (goal.cell or goal.decl), goal)
-        if flat is not None and flat.find(goal.key) is None and not any(
-                classify(flat.messages)[2:]):
+        said = classify(flat.messages) if flat is not None else None
+        if flat is not None and flat.find(goal.key) is None \
+                and not said.expensive and not said.failures:
             nxt = flat
         self.run.events.append({"kind": "collapse", "tactic": tactic, "accepted": nxt is flat})
         await self.bb.commit(nxt)
@@ -208,7 +209,7 @@ class Ladder:
             text = insert_preamble(text, lemma_text(name, fresh, k, fam, guess))
         staged = await self.bb.look(text) if text != self.bb.board.text else self.bb.board
         moved = staged.find(goal.key)
-        if moved is None or classify(staged.messages)[3]:
+        if moved is None or classify(staged.messages).failures:
             return False
         sub = lambda t: re.sub(rf"(?<![\w'.]){fresh}(?![\w'])", k, t)
         # `k + k` reads as `2 * k` (the form Mathlib's lemmas are stated in).
@@ -274,8 +275,8 @@ class Ladder:
                 nxt, why = await self.asking.advance(staged, moved, rest, author)
             else:
                 nxt, why = await self.bb.look(text, base), ""
-                if classify(nxt.messages)[3]:
-                    nxt, why = None, format_messages(classify(nxt.messages)[3])[:FEEDBACK_CHARS]
+                if classify(nxt.messages).failures:
+                    nxt, why = None, format_messages(classify(nxt.messages).failures)[:FEEDBACK_CHARS]
                 elif nxt is not None:
                     bad = await self.asking.audit(author, base, nxt)
                     if bad:

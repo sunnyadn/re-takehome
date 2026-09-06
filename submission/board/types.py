@@ -174,7 +174,10 @@ def groups(text: str) -> list[str]:
 
 @dataclass
 class GoalRecord:
-    """What the ladder remembers about one goal.
+    """What the run remembers about one goal, written from four parts:
+    `loop`, `ladder`, `blackboard` and `asking` each set fields here. It is
+    shared state, not one part's memory, and the first thing to read when a
+    goal's history looks wrong.
 
     One record per goal in place of a container per thing remembered, so that
     `has this goal been through the leaf sweep` is a field and not a question
@@ -323,13 +326,13 @@ def carry_messages(base_messages: Sequence[Any], base_goals: Sequence[Goal],
     for m in base_messages:
         at = message_line(m)
         if at is None or (old[0] <= at <= old[1] and not (
-                m in classify([m])[0] and any(
+                m in classify([m]).progress and any(
                     (message_span(m) or (at, at))[0] <= h <= (message_span(m) or (at, at))[1]
                     for h in inner_old))):
             continue
         m = shift_message(m, delta) if at > cut else m
         span = message_span(m)
-        if m in classify([m])[0] and span and not any(span[0] <= h <= span[1] for h in holes):
+        if m in classify([m]).progress and span and not any(span[0] <= h <= span[1] for h in holes):
             # A goal report from before the edit that no placeholder outside
             # the checked unit sits under is about the goal just closed.
             continue

@@ -15,6 +15,9 @@ from submission.run.context import Run
 PROBE_SHARE = 0.15
 RETRY_SHARE = 0.05
 PROBE_GRACE_S = 60.0
+# Every probe kind that answers to a share. Adding a rung means adding its
+# name here, not discovering a KeyError in `spent`.
+PROBE_KINDS = ("scan", "leaf", "retry")
 
 
 class Budget:
@@ -22,7 +25,7 @@ class Budget:
         self.run = run
         self.started = time.monotonic()
         self.deadline = self.started + run.cfg.last_turn_start_s
-        self.probe_spent = {"scan": 0.0, "leaf": 0.0, "retry": 0.0}
+        self.probe_spent = {kind: 0.0 for kind in PROBE_KINDS}
 
     def elapsed(self) -> float:
         return time.monotonic() - self.started
@@ -34,6 +37,8 @@ class Budget:
         return self.run.ledger.spent_usd < BUDGET_HEADROOM * self.run.cfg.budget_usd
 
     def spent(self, kind: str, seconds: float) -> None:
+        """Seconds, not dollars. The money is recorded in `config.Ledger.record`
+        and only compared here, by `can_ask`."""
         self.probe_spent[kind] += seconds
 
     def affordable(self, kind: str) -> bool:
