@@ -16,12 +16,12 @@ from re_harness.lean import LeanRuntimeError
 
 from submission.sampling import read_sample_hit, sample_file, sampled_search
 from submission.techniques import without_techniques
-from submission.config import FEEDBACK_CHARS, Ledger
 from submission.contract import format_messages, in_file_coordinates, scoring_faults
 from submission.sweep import split_files, sweep_files, usable_cocktail
 from submission.framework import (classify, definition_slots, fill_definition, graded_theorems, line_of, placeholders, proof_span, root_names)
 from submission.contract import strip_fences
-from submission.framework_agent import ANSWER_TOKENS, FILE_CHARS, FrameworkAgent, LOOSE_DRAIN_S
+from submission.config import ANSWER_TOKENS, FEEDBACK_CHARS, FILE_CHARS, Ledger
+from submission.framework_agent import FrameworkAgent
 from submission.board.types import Board, Goal, binder_names, narrates, owner, signature
 from submission.board.reply import dialect, set_elements
 from submission.run.budget import Budget
@@ -34,6 +34,7 @@ from submission.run.loop import Loop
 from submission.board.text import drop_declaration, split_statement
 from submission.board.probes import (CHECK_TIMEOUT_FLOOR_S, audit_prompt, container_memory_bytes, counterexample_search, extract_file, read_witness, read_witnesses, searched_clean, statements, witness_file, witness_search_file)
 
+LOOSE_DRAIN_S = 30.0
 
 # The REPL keeps every command's state. Measured in the harness image: a real
 # board leaves 46–77 MB behind per check (a trivial file leaves nothing), the

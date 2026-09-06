@@ -12,6 +12,12 @@ from typing import Any, Sequence
 from re_harness.config import HarnessSettings
 from re_harness.models import ALLOWED_MODELS, MODEL_A, MODEL_B
 
+GOAL_CHARS = 4000
+
+ANSWER_TOKENS = 4000
+
+FILE_CHARS = 8000
+
 
 # A refused call releases its reservation, so repeating it is free and the
 # problem stays winnable. Without this a single 429 ends the problem.

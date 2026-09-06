@@ -16,7 +16,6 @@ from submission.contract import format_messages
 from submission.cells import enclosing, remap, render_check, reopen_past_cell
 from submission.framework import (classify, hand_to_search, in_span, insert_preamble,
                                   message_line, prefixes, proof_span, root_names, unreachable)
-from submission.framework_agent import RAISED_BUDGETS
 from submission.prompts import notes_for
 from submission.replies import BUDGET_RETRY
 from submission.state import VACUOUS
@@ -33,6 +32,13 @@ from submission.board.types import (Board, Goal, HAVE_HEAD, binder_names, hyp_co
 from submission.run.blackboard import Blackboard
 from submission.run.budget import Budget
 from submission.run.context import Run
+
+# Lean's budgets are deterministic, so raising them is sound; it buys that
+# determinism with wall clock, which the comparator caps at 180s. Measured on
+# p06_pow_mod: what a large power needs is recursion depth, not heartbeats.
+RAISED_BUDGETS = ("set_option maxHeartbeats 400000\n"
+                     "set_option maxRecDepth 8000\n"
+                     "set_option exponentiation.threshold 4000")
 
 # What the model is told when its step ran the whole check into the timeout.
 # A block that does not parse desynchronises the parser for the rest of the

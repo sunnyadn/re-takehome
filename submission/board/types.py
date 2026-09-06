@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from typing import Any, Sequence
 from submission.framework import (DECL_HEAD, classify, line_of, message_line,
                                   message_span, proof_span, root_names)
-from submission.framework_agent import NARRATES, STEP_TOKENS
 from submission.state import Feedback
 
 # One definition. board_agent.py had two, and the second silently won.
@@ -115,8 +114,18 @@ def split_top(s: str, sep: str) -> tuple[str, str] | None:
     return None
 
 
+NARRATES = ("qwen",)
+
+
 def narrates(model: str) -> bool:
     return any(n in model for n in NARRATES)
+
+
+# The ceiling for a step from the narrating line only; the other line gets
+# `board/types.py::SLOW_STEP_TOKENS`, and `step_tokens` chooses. 2000 was too
+# few either way (measured on p08: gpt-oss-120b spent all 2000 reasoning and
+# returned `content: None` with `finish_reason: length`).
+STEP_TOKENS = 6000
 
 
 # Measured over 808 gpt-oss replies at 6000 tokens: p95 146–182 s and 2

@@ -9,13 +9,16 @@ from re_harness import AgentResult
 from submission.contract import grade, scoring_faults
 from submission.cells import modular, strip_markers
 from submission.framework import axiom_probe, classify, is_done
-from submission.framework_agent import SLOW_COMPILE_MS
 from submission.state import State
 from submission.techniques import PREAMBLE_MARK, strip_techniques, uses_techniques
 from submission.board.types import Board
 from submission.board.text import shed_unreferenced
 from submission.run.budget import Budget
 from submission.run.context import Run
+
+# The comparator allows 180 seconds, so a file that only just compiles here is
+# not safe there. Recorded, never silently accepted.
+SLOW_COMPILE_MS = 150_000
 
 
 class Delivery:

@@ -12,7 +12,7 @@ from typing import Any, Sequence
 from re_harness import LLMCallError, Problem, Services
 
 from submission.techniques import PREAMBLE_END
-from submission.config import Config, FEEDBACK_CHARS, Ledger, RETRY_BACKOFF_S
+from submission.config import ANSWER_TOKENS, Config, FEEDBACK_CHARS, FILE_CHARS, GOAL_CHARS, Ledger, RETRY_BACKOFF_S
 from submission.contract import (declared_names, format_messages, refused_before_generation, strip_fences, suggested_tactics, suggestions)
 from submission.framework import (statement_probes, alternatives, declaration_name,
                                   graded_theorems, answer_slots, collapse, first_blocks,
@@ -22,13 +22,8 @@ from submission.framework import (statement_probes, alternatives, declaration_na
 from submission.prompts import FRAMEWORK_SYSTEM, PLANNER_SYSTEM, sheet_for
 from submission.replies import lighter_forms, printed_numbers, spoken, tool_lines
 from submission.state import State
+from submission.board.types import NARRATES, STEP_TOKENS
 
-# The ceiling for a step from the narrating line only; the other line gets
-# `board/types.py::SLOW_STEP_TOKENS`, and `step_tokens` chooses. 2000 was too
-# few either way (measured on p08: gpt-oss-120b spent all 2000 reasoning and
-# returned `content: None` with `finish_reason: length`).
-STEP_TOKENS = 6000
-ANSWER_TOKENS = 4000
 # Measured on p09: qwen3.5-flash narrates its reasoning as ordinary content and
 # the code block after it is what the token limit cuts. Over three samples each,
 # reasoning off halves the reply and every one of them begins with the block.
@@ -46,9 +41,6 @@ PACE_WINDOW = 6
 PACE_MIN_TOKENS = 400
 PACE_FLOOR = 1200
 NO_REASONING = {"enabled": False}
-NARRATES = ("qwen",)
-GOAL_CHARS = 4000
-FILE_CHARS = 8000
 PLAN_TOKENS = 1500
 
 # The finish pass is free of tokens but not of clock, so it is bounded.
@@ -65,21 +57,10 @@ def below_header(text: str) -> str:
     proof's size, and the block is the same 1.8 KB in every file."""
     i = text.find(PREAMBLE_END)
     return text[i + len(PREAMBLE_END):] if i >= 0 else text
-LOOSE_DRAIN_S = 30.0
 MAX_DELETIONS = 12
 # Each try is one check, and a check is 60ms against a reply's seconds.
 MAX_PREFIXES = 8
 FINISH_RESERVE_S = 300.0
-# Lean's budgets are deterministic, so raising them is sound; it buys that
-# determinism with wall clock, which the comparator caps at 180s. Measured on
-# p06_pow_mod: what a large power needs is recursion depth, not heartbeats.
-RAISED_BUDGETS = ("set_option maxHeartbeats 400000\n"
-                     "set_option maxRecDepth 8000\n"
-                     "set_option exponentiation.threshold 4000")
-# The comparator allows 180 seconds, so a file that only just compiles here is
-# not safe there. Recorded, never silently accepted.
-SLOW_COMPILE_MS = 150_000
-
 class FrameworkAgent:
     def __init__(self, config: Config | None = None):
         self.config = config or Config.from_env()
