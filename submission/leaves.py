@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import math
 import re
+from dataclasses import dataclass
+from typing import Any
 
 NUM = re.compile(r"^\d+$")
 VAR = re.compile(r"^[A-Za-z_][\w']*$")
@@ -567,36 +569,48 @@ def _destructured(goal_text: str) -> list[tuple[str, str]]:
     return out
 
 
-def leaf_candidates(goal_text: str) -> list[str]:
-    hyps = _hyps(goal_text)
-    target = _target(goal_text)
-    for prefix, inner in _destructured(goal_text):
-        got = [f"{prefix}\n{_unwrapped(c)}" for c in leaf_candidates(inner)]
-        if got:
-            return _finalised(got)
-    bounds = _bounds(hyps)
-    powers = _powers(hyps)
-    primes = _prime_facts(hyps)
-    named = _primes(hyps)
-    prime_vars = [t.split()[-1] for n, t in hyps if n in named]
-    finish = _finish(target, prime_vars)
-    # The tightest bounds first; `0 < v` carries nothing a subtraction needs.
-    lowers = sorted(((n, v, c) for n, v, kind, c in bounds if kind == "lower" and c >= 2),
-                    key=lambda b: -b[2])
-    out: list[str] = []
+@dataclass(frozen=True)
+class Facts:
+    """One goal, split up once, for the matchers in LEAVES to read."""
 
+    goal_text: str
+    hyps: list[tuple[str, str]]
+    target: str
+    bounds: list[Any]
+    powers: list[Any]
+    primes: list[Any]
+    named: Any
+    prime_vars: list[str]
+    finish: str
+    lowers: list[Any]
+
+
+def _power_cycle(f: Facts) -> list[str]:
+    goal_text = f.goal_text
+    out: list[str] = []
     # a ^ n under a modulus, a and the modulus numerals: the residue cycles with
     # period k, so n % k decides every claim. Measured on p09 (v7.91–v7.93):
     # `2 ^ n % 7 = 1` was the step withdrawn after four tries in every failing run.
     for a, m, k, n in _cycles(goal_text):
         out.append(f"pow_cycle {a} {m} {k} {n}")
+    return out
 
+
+def _sum_induction(f: Facts) -> list[str]:
+    hyps, target = f.hyps, f.target
+    out: list[str] = []
     # An identity between sums whose ranges end at a variable: induction on it,
     # the step mechanical (peels, rescaling, Pascal, omega). Measured on
     # putnam_2020_a2's generalisation ∑_{j≤m} 2^(m-j) C(n+j,j) = ∑_{i≤m} C(n+m+1,i):
     # both models withdrew the Pascal step; the recipe closes it in 0.5 s.
     for k in _sum_variables(hyps, target):
         out.append(f"sum_induct {k}")
+    return out
+
+
+def _order_bound(f: Facts) -> list[str]:
+    hyps, target = f.hyps, f.target
+    out: list[str] = []
     # `c ≤ E` from `h : c ∣ E` and E > 0. Measured on rmo_2000_6 (frame117):
     # `⊢ 10 ≤ a * b` under `h10 : 10 ∣ a * b` was reported 333 times in one run.
     le = re.match(r"^(.+?) ≤ (.+)$", target)
@@ -626,15 +640,33 @@ def leaf_candidates(goal_text: str) -> list[str]:
                 radical = _radical_bound(hyps, "≤", lo.strip(), m.group(1))
                 if radical:
                     out.append(f"subst {n}\n{radical}")
+    return out
+
+
+def _whole_theorem(f: Facts) -> list[str]:
+    hyps, target = f.hyps, f.target
+    out: list[str] = []
     # Whole-theorem shapes: reciprocals against a listed solution set, a least
     # element of a product set, a sum bounded through its squares.
     out.extend(c for c in (_reciprocal_pair(target), _is_least(target),
                            _square_blocks(hyps, target)) if c)
+    return out
+
+
+def _numeral_divides(f: Facts) -> list[str]:
+    hyps, target = f.hyps, f.target
+    out: list[str] = []
     dv = re.match(r"^(?:\((\d+) : ℕ\)|(\d+)) ∣ (.+)$", target)
     if dv:
         radical = _radical_bound(hyps, "∣", dv.group(1) or dv.group(2), dv.group(3))
         if radical:
             out.append(radical)
+    return out
+
+
+def _antitone_block(f: Facts) -> list[str]:
+    hyps, target = f.hyps, f.target
+    out: list[str] = []
     # ∑_{i ∈ Ico A B} x i / i ≤ R for x positive and antitone: the lemma bounds the
     # block by its length times its first term, the rest is one division
     # inequality. Measured on rmo_2000_3 (cells build, 0/2): the models stated
@@ -665,12 +697,23 @@ def leaf_candidates(goal_text: str) -> list[str]:
                          "| (field_simp; rw [div_le_div_iff₀ (by positivity) (by positivity)]; nlinarith) "
                          "| (field_simp; nlinarith)")
             out.append("\n".join(lines))
+    return out
+
+
+def _block_bound(f: Facts) -> list[str]:
+    hyps, target = f.hyps, f.target
+    out: list[str] = []
     # Blocks [g j, g (j+1)) telescoping over j < m + 1: rmo_2000_3's decomposition
     # of ∑_{i<(m+1)²} into the sums over [j², (j+1)²).
     m = BLOCKS.search(target)
     if m and m.group(1) in {n for name, t in hyps if t.strip() == "ℕ" for n in name.split()}:
         out.append(f"ico_blocks {m.group(1)}")
+    return out
 
+
+def _power_equation(f: Facts) -> list[str]:
+    hyps, target = f.hyps, f.target
+    out: list[str] = []
     # v ^ n bounded by powers in the context (on v ^ n itself, or through
     # `v ^ n = P`), the goal about v: the bounds move to v, then omega. Measured
     # on rmo_2000_2 (v7.79): the route left `h_low : (x+2)^3 ≤ P`, `h_up : P ≤
@@ -679,7 +722,12 @@ def leaf_candidates(goal_text: str) -> list[str]:
         if re.search(rf"\b{re.escape(v)}\b", target) and any(
                 re.search(r"(≤|<)", t) and re.search(r"\^ " + n + r"\b", t) for _, t in hyps):
             out.append(f"pow_bounds {v} {n}")
+    return out
 
+
+def _listed_solution(f: Facts) -> list[str]:
+    target, powers = f.target, f.powers
+    out: list[str] = []
     # `x = c` (and `y = d`) asked outright, with `h : y ^ n = P(x)`: x ≤ c by the
     # squeeze at the large-x shift, c ≤ x by the squeeze one shift lower (the ℕ
     # subtraction in P made exact first), then y from y ^ n = numeral. Measured on
@@ -705,6 +753,12 @@ def leaf_candidates(goal_text: str) -> list[str]:
             else:
                 lines += "omega"
             out.append(lines)
+    return out
+
+
+def _variable_value(f: Facts) -> list[str]:
+    target, powers, lowers = f.target, f.powers, f.lowers
+    out: list[str] = []
     # y = E with y ^ n known: squeeze between consecutive powers.
     m = re.match(r"^([A-Za-z_][\w']*) = (.+)$", target)
     if m and not NUM.match(m.group(2).strip()) and not re.search(r"[∨∧↔→]", m.group(2)):
@@ -714,6 +768,12 @@ def leaf_candidates(goal_text: str) -> list[str]:
                 for hn, _, _ in lowers[:2]:
                     out.append(f"pow_squeeze {y} {n} ({rhs}) with {hn}")
                 out.append(f"pow_squeeze {y} {n} ({rhs})")
+    return out
+
+
+def _small_upper_bound(f: Facts) -> list[str]:
+    target, powers, lowers = f.target, f.powers, f.lowers
+    out: list[str] = []
     # `v ≤ c` / `v < c` / False with y ^ n = P(v): for v large, P sits strictly
     # between consecutive n-th powers of v + k, k read off P's leading terms.
     # Measured on rmo_2000_2 (v7.79): the board was one goal short, `x ≤ 9`,
@@ -727,6 +787,12 @@ def leaf_candidates(goal_text: str) -> list[str]:
                 for hn, _, _ in lowers[:2]:
                     out.append(f"pow_squeeze {y} {n} ({e}) with {hn}")
                 out.append(f"pow_squeeze {y} {n} ({e})")
+    return out
+
+
+def _power_bounds(f: Facts) -> list[str]:
+    target, powers = f.target, f.powers
+    out: list[str] = []
     # A claim about y against E (y ≤ E, E ≤ y, E ^ n ≤ y ^ n, ...) under
     # y ^ n = P(x) that holds only from some x on: below the threshold the
     # equation has no solution (every x, then every y, by cases), above it the
@@ -747,6 +813,12 @@ def leaf_candidates(goal_text: str) -> list[str]:
                        f"(obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le hge; subst hk; "
                        f"first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith))]")
             break
+    return out
+
+
+def _product_factors(f: Facts) -> list[str]:
+    goal_text, hyps, primes, finish = f.goal_text, f.hyps, f.primes, f.finish
+    out: list[str] = []
     # A variable defined by an equation `w = E`: substitute, make ℕ subtraction
     # exact, then arithmetic. Measured on rmo_2000_2: `hyx : y = x + 2 ⊢ x = 9`.
     for hn, t in hyps:
@@ -756,11 +828,23 @@ def leaf_candidates(goal_text: str) -> list[str]:
             out.append(f"{primes}subst {hn}\n{'nat_sub_exact' + chr(10) if '-' in goal_text else ''}"
                        + finish)
             break
+    return out
+
+
+def _solved_subtraction(f: Facts) -> list[str]:
+    hyps, target, primes, finish = f.hyps, f.target, f.primes, f.finish
+    out: list[str] = []
     # A variable defined through ℕ subtraction, `m - p - q = D`: solve for it and
     # substitute. Measured on rmo_2001_2 (v7.79): divisor_cases left eight such
     # cases and every model reply on them failed at the truncated subtraction.
     if _solved_subtractions(hyps) and not re.search(r"[↔→∀∃]", target):
         out.append(f"{primes}solve_sub\n{finish}")
+    return out
+
+
+def _case_split_hypothesis(f: Facts) -> list[str]:
+    hyps, target, primes, finish = f.hyps, f.target, f.primes, f.finish
+    out: list[str] = []
     # A disjunction of such equations (what divisor_cases leaves as a fact):
     # every case at once, the same block in each. Measured on rmo_2001_2
     # (v7.87): the eight-way fact was on the board four times and the models
@@ -782,12 +866,30 @@ def leaf_candidates(goal_text: str) -> list[str]:
         alts = " | ".join(["hc"] * len(cases))
         out.append(f"{primes}rcases {hn} with {alts} <;> (solve_sub; {finish})")
         break
+    return out
+
+
+def _truncated_subtraction(f: Facts) -> list[str]:
+    goal_text, target, primes, finish = f.goal_text, f.target, f.primes, f.finish
+    out: list[str] = []
     if "-" in goal_text and not re.search(r"[↔→∀∃∣]", target):
         out.append(f"{primes}nat_sub_exact\n{finish}")
+    return out
+
+
+def _exact_subtraction(f: Facts) -> list[str]:
+    hyps, primes, finish = f.hyps, f.primes, f.finish
+    out: list[str] = []
     # d ∣ N: one goal per divisor, each finished mechanically.
     for n, t in hyps:
         if re.match(r"^.+ ∣ .+$", t) and re.search(r"\d", t):
             out.append(f"{primes}divisor_cases {n} <;> (first | (solve_sub; {finish}) | ({finish}))")
+    return out
+
+
+def _introduced_factor(f: Facts) -> list[str]:
+    hyps, primes, finish = f.hyps, f.primes, f.finish
+    out: list[str] = []
     # A * B = N gives A ∣ N and B ∣ N without a model step. Measured on the
     # v7.93 repeats: the pass on each problem had the model write the `∣`
     # fact, the failure had only the product on the board.
@@ -810,6 +912,12 @@ def leaf_candidates(goal_text: str) -> list[str]:
                            f"(try simp only [{MEMBERSHIP}] at *); rw [hx] at {n}; norm_num at {n} <;> omega)")
             out.append(f"{primes}have hdvd : {factor} ∣ {m.group(3)} := {intro} _ {n}; "
                        f"divisor_cases hdvd <;> (first | (solve_sub; {finish}) | ({finish}))")
+    return out
+
+
+def _divisor_cases(f: Facts) -> list[str]:
+    hyps, primes, finish = f.hyps, f.primes, f.finish
+    out: list[str] = []
     # `p² + k·pq + q² = m²` (k > 2): (m - p - q)(m + p + q) = (k-2)pq, so m - p - q
     # divides a product of primes and the divisor leaf takes over. Measured on
     # rmo_2001_2 (frame119): the passes had these two facts written by a model,
@@ -832,21 +940,91 @@ def leaf_candidates(goal_text: str) -> list[str]:
             f"have hk' : {p} + {q} + k - {p} - {q} = k := (by omega); rw [hk']; ring_nf at {hn} ⊢; omega)\n"
             f"have hdvd : {mm} - {p} - {q} ∣ {c} * {p} * {q} := Dvd.intro _ hfac; {primes}"
             f"divisor_cases hdvd <;> (first | (solve_sub; {finish}) | ({finish}))")
+    return out
+
+
+def _bounded_arithmetic(f: Facts) -> list[str]:
+    goal_text, lowers = f.goal_text, f.lowers
+    out: list[str] = []
     # A bound below on a variable and ℕ subtraction or a polynomial: substitute.
     if lowers and ("-" in goal_text or "^" in goal_text):
         for hn, _, _ in lowers[:2]:
             out.append(f"obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le {hn}\nsubst hk\n"
                        "first | omega | nlinarith | (ring_nf at *; omega) | (ring_nf at *; nlinarith)")
+    return out
+
+
+def _interval_cases(f: Facts) -> list[str]:
+    bounds = f.bounds
+    out: list[str] = []
     # A variable bounded above by a small numeral: every value.
     for _, v, kind, c in bounds:
         if kind == "upper" and c <= CASES_MAX:
             out.append(f"interval_cases {v} <;> {FINISH}")
+    return out
+
+
+def _power_numeral(f: Facts) -> list[str]:
+    powers = f.powers
+    out: list[str] = []
     # v ^ n = numeral: v is bounded by the root.
     for _, v, n, rhs in powers:
         if NUM.match(rhs):
             root = int(round(int(rhs) ** (1 / int(n)))) + 1
             if root <= CASES_MAX:
                 out.append(f"bounded_cases {v} {root}")
+    return out
+
+
+LEAVES = (
+    _power_cycle,
+    _sum_induction,
+    _order_bound,
+    _whole_theorem,
+    _numeral_divides,
+    _antitone_block,
+    _block_bound,
+    _power_equation,
+    _listed_solution,
+    _variable_value,
+    _small_upper_bound,
+    _power_bounds,
+    _product_factors,
+    _solved_subtraction,
+    _case_split_hypothesis,
+    _truncated_subtraction,
+    _exact_subtraction,
+    _introduced_factor,
+    _divisor_cases,
+    _bounded_arithmetic,
+    _interval_cases,
+    _power_numeral,
+)
+
+
+def leaf_candidates(goal_text: str) -> list[str]:
+    """Tactic blocks for a goal, from its shape alone. Every rule that reads a
+    shape is one entry in LEAVES above; what is left here is the two ways a
+    goal is taken apart when no rule fires."""
+
+    hyps = _hyps(goal_text)
+    target = _target(goal_text)
+    for prefix, inner in _destructured(goal_text):
+        got = [f"{prefix}\n{_unwrapped(c)}" for c in leaf_candidates(inner)]
+        if got:
+            return _finalised(got)
+    named = _primes(hyps)
+    facts = Facts(
+        goal_text=goal_text, hyps=hyps, target=target, bounds=_bounds(hyps),
+        powers=_powers(hyps), primes=_prime_facts(hyps), named=named,
+        prime_vars=[t.split()[-1] for n, t in hyps if n in named],
+        finish=_finish(target, [t.split()[-1] for n, t in hyps if n in named]),
+        # The tightest bounds first; `0 < v` carries nothing a subtraction needs.
+        lowers=sorted(((n, v, c) for n, v, kind, c in _bounds(hyps)
+                       if kind == "lower" and c >= 2), key=lambda b: -b[2]))
+    out: list[str] = []
+    for leaf in LEAVES:
+        out.extend(leaf(facts))
     if out:
         return _finalised(out)
     head = _head(goal_text)
