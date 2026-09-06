@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "set": "sample",
+  "problems": [
+    {
+      "problem_id": "putnam_2020_a2",
+      "status": "passed",
+      "passed": true,
+      "points": 1,
+      "actual_cost_usd": 0.0,
+      "wall_s": 70.402,
+      "models_used": [],
+      "failure_reason": null
+    }
+  ],
+  "total_points": 1,
+  "max_points": 1,
+  "actual_cost_usd": 0.0,
+  "wall_s_sum": 70.402,
+  "run_id": "0b61a95337d345aeb861bd15d1ab59b8",
+  "wall_s": 70.599,
+  "finished_at": "2026-09-06T10:37:49.754535+00:00"
+}

@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "problem_id": "putnam_2018_a1",
+  "status": "passed",
+  "passed": true,
+  "points": 1,
+  "comparator": {
+    "passed": true,
+    "exit_code": 0,
+    "timed_out": false,
+    "duration_ms": 25872,
+    "output": {
+      "passed": true,
+      "exit_code": 0,
+      "stdout": "Building Challenge\n⚠ [8655/8656] Built Challenge (2.4s)\nwarning: Challenge.lean:3:8: declaration uses `sorry`\nBuild completed successfully (8656 jobs).\nExporting #[putnam_2018_a1, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge\nBuilding Solution\n⚠ [8655/8656] Built Solution (6.8s)\nwarning: Solution.lean:414:725: This simp argument is unused:\n  Finset.mem_insert\n\nHint: Omit it from the simp argument list.\n  simp only [Set.mem_insert_iff,\n  ̲  ̲ ̲ ̲Set.mem_singleton_iff, Prod.mk.injEq, F̵i̵n̵s̵e̵t̵.̵m̵e̵m̵_̵i̵n̵s̵e̵r̵t̵,̵ ̵Finset.mem_singleton] at *\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:414:744: This simp argument is unused:\n  Finset.mem_singleton\n\nHint: Omit it from the simp argument list.\n  simp only [Set.mem_insert_iff,\n  ̲  ̲ ̲ ̲Set.mem_singleton_iff, Prod.mk.injEq, F̵i̵n̵s̵e̵t̵.̵m̵e̵m̵_̵i̵n̵s̵e̵r̵t̵,̵ ̵F̵i̵n̵s̵e̵t̵.̵m̵e̵m̵_̵s̵i̵n̵g̵l̵e̵t̵o̵n̵]̵F̲i̲n̲s̲e̲t̲.̲m̲e̲m̲_̲i̲n̲s̲e̲r̲t̲]̲ at *\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:414:909: This simp argument is unused:\n  Finset.mem_insert\n\nHint: Omit it from the simp argument list.\n  simp only [Set.mem_insert_iff,\n  ̲  ̲ ̲ ̲Set.mem_singleton_iff, Prod.mk.injEq, F̵i̵n̵s̵e̵t̵.̵m̵e̵m̵_̵i̵n̵s̵e̵r̵t̵,̵ ̵Finset.mem_singleton] at vm_hm\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:414:928: This simp argument is unused:\n  Finset.mem_singleton\n\nHint: Omit it from the simp argument list.\n  simp only [Set.mem_insert_iff,\n  ̲  ̲ ̲ ̲Set.mem_singleton_iff, Prod.mk.injEq, F̵i̵n̵s̵e̵t̵.̵m̵e̵m̵_̵i̵n̵s̵e̵r̵t̵,̵ ̵F̵i̵n̵s̵e̵t̵.̵m̵e̵m̵_̵s̵i̵n̵g̵l̵e̵t̵o̵n̵]̵F̲i̲n̲s̲e̲t̲.̲m̲e̲m̲_̲i̲n̲s̲e̲r̲t̲]̲ at vm_hm\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nwarning: Solution.lean:414:811: Used `tac1 <;> tac2` where `(tac1; tac2)` would suffice\n\nNote: This linter can be disabled with `set_option linter.unnecessarySeqFocus false`\nBuild completed successfully (8656 jobs).\nExporting #[putnam_2018_a1, propext, Classical.choice, Quot.sound, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution\nRunning Lean default kernel on solution.\nLean default kernel accepts the solution\nYour solution is okay!\n",
+      "stderr": "WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Challenge\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Challenge -- putnam_2018_a1 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Solution\nWARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /opt/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Solution -- putnam_2018_a1 propext Classical.choice Quot.sound Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList\n"
+    }
+  },
+  "answer_shape": {
+    "passed": true,
+    "errors": []
+  },
+  "budget": {
+    "limit_usd": 1.0,
+    "spent_usd": 0.0,
+    "reserved_usd": 0,
+    "accounting_complete": true
+  },
+  "within_time": true,
+  "wall_s": 56.067,
+  "models_used": [],
+  "both_required_models_used": false,
+  "agent_error": null,
+  "agent_metadata": {
+    "strategy": "board",
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.0,
+    "wall_s": 29.6,
+    "turns": 7,
+    "events": [
+      {
+        "stage": "memory",
+        "checks": 42,
+        "mb": 702
+      },
+      {
+        "stage": "memory",
+        "checks": 44,
+        "mb": 720
+      },
+      {
+        "stage": "memory",
+        "checks": 48,
+        "mb": 752
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1546
+      },
+      {
+        "stage": "memory",
+        "checks": 52,
+        "mb": 890
+      },
+      {
+        "kind": "leaf",
+        "goal": " ↑b = 3 / 2018 ↔\n    (a, b) ∈ {(673, 1358114), (674, 340033), (1009, 2018), (2018, 1009), (340033, 674), (1358114, 673)}",
+        "block": "set_option maxHeartbeats 400000 in (obtain ⟨vm_h0, vm_h1⟩ := h; refine Iff.intro",
+        "accepted": true,
+        "ms": 7778
+      },
+      {
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 3848,
+        "slow": false,
+        "techniques": "kept"
+      }
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "strategy": "board",
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.000526,
+    "wall_s": 13.8,
+    "turns": 5,
+    "events": [
+      {
+        "stage": "memory",
+        "checks": 42,
+        "mb": 695
+      },
+      {
+        "stage": "probe",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "asked": [
+          "p07_answer"
+        ],
+        "printed": [
+          "19"
+        ],
+        "unfilled": []
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 90
+      },
+      {
+        "kind": "collapse",
+        "tactic": "trivial",
+        "accepted": true
+      },
+      {
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 22,
+        "slow": false,
+        "techniques": "dropped"
+      }
+    ]
+  }
+}

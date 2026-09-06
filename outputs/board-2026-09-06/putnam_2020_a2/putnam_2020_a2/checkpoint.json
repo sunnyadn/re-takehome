@@ -1,0 +1,99 @@
+{
+  "metadata": {
+    "strategy": "board",
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.0,
+    "wall_s": 47.8,
+    "turns": 14,
+    "events": [
+      {
+        "stage": "memory",
+        "checks": 43,
+        "mb": 702
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 563
+      },
+      {
+        "stage": "memory",
+        "checks": 47,
+        "mb": 722
+      },
+      {
+        "stage": "memory",
+        "checks": 48,
+        "mb": 823
+      },
+      {
+        "kind": "leaf",
+        "goal": "k : ℕ\n⊢ ∑ j ∈ Finset.Icc 0 k, 2 ^ (k - j) * (k + j).choose j = 4 ^ k",
+        "accepted": false,
+        "tried": 2,
+        "ms": 7180
+      },
+      {
+        "stage": "conjecture",
+        "goal": "∑ j ∈ Finset.Icc 0 k, 2 ^ (k - j) * (k + j).choose j = 4 ^ k",
+        "families": 3,
+        "fits": [
+          "∑ i ∈ Finset.range (k + 1), Nat.choose (n + k + 1) i",
+          "2 ^ (n + k + 1) - ∑ i ∈ Finset.range (n + 1), Nat.choose (n + k + 1) i"
+        ]
+      },
+      {
+        "stage": "generalise",
+        "lemma": "vm_conj_1",
+        "guess": "∑ i ∈ Finset.range (k + 1), Nat.choose (n + k + 1) i",
+        "rewritten": true
+      },
+      {
+        "stage": "memory",
+        "checks": 56,
+        "mb": 893
+      },
+      {
+        "stage": "proven",
+        "cell": 1,
+        "stmt": "∑ i ∈ Finset.range (k + (1 : ℕ)), ((2 : ℕ) * k + (1 : ℕ)).choose i = (4 : ℕ) ^ k",
+        "lines": 1
+      },
+      {
+        "kind": "library",
+        "goal": ").choose j = ∑ i ∈ Finset.range (k + 1), (2 * k + 1).choose i\n⊢ ∑ i ∈ Finset.range (k + 1), (2 * k + 1).choose i = 4 ^ k",
+        "found": 1,
+        "accepted": true,
+        "ms": 24025
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 769
+      },
+      {
+        "stage": "memory",
+        "checks": 61,
+        "mb": 2748
+      },
+      {
+        "kind": "leaf",
+        "goal": "n k : ℕ\n⊢ ∑ j ∈ Finset.Icc 0 k, 2 ^ (k - j) * (n + j).choose j = ∑ i ∈ Finset.range (k + 1), (n + k + 1).choose i",
+        "block": "set_option maxHeartbeats 400000 in (sum_induct k)",
+        "accepted": true,
+        "ms": 6271
+      },
+      {
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 3123,
+        "slow": false,
+        "techniques": "kept"
+      }
+    ]
+  }
+}

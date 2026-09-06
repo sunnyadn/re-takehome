@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "strategy": "board",
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.0,
+    "wall_s": 30.4,
+    "turns": 7,
+    "events": [
+      {
+        "stage": "memory",
+        "checks": 42,
+        "mb": 696
+      },
+      {
+        "stage": "memory",
+        "checks": 44,
+        "mb": 715
+      },
+      {
+        "stage": "memory",
+        "checks": 48,
+        "mb": 727
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 2046
+      },
+      {
+        "stage": "memory",
+        "checks": 52,
+        "mb": 838
+      },
+      {
+        "kind": "leaf",
+        "goal": " b ∧ 2000 ∣ a ^ 2 * b ^ 5 ∧ n = a * b} 10 ∧\n    IsLeast {n | ∃ a b, 0 < a ∧ 0 < b ∧ 2000 ∣ a ^ 3 * b ^ 4 ∧ n = a * b} 10",
+        "block": "set_option maxHeartbeats 400000 in (refine And.intro (by refine ⟨(by try simp on",
+        "accepted": true,
+        "ms": 6440
+      },
+      {
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 3223,
+        "slow": false,
+        "techniques": "kept"
+      }
+    ]
+  }
+}

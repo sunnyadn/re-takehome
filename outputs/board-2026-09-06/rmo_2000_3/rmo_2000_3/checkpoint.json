@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "strategy": "board",
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.0,
+    "wall_s": 19.9,
+    "turns": 7,
+    "events": [
+      {
+        "stage": "memory",
+        "checks": 42,
+        "mb": 699
+      },
+      {
+        "stage": "memory",
+        "checks": 44,
+        "mb": 708
+      },
+      {
+        "stage": "memory",
+        "checks": 50,
+        "mb": 721
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 1089
+      },
+      {
+        "stage": "memory",
+        "checks": 52,
+        "mb": 837
+      },
+      {
+        "kind": "leaf",
+        "goal": " x n ≥ x (n + 1)\nhsq : ∀ (N : ℕ), ∑ i ∈ Ico 1 (N + 1), x (i * i) / ↑i ≤ 1\n⊢ ∀ (k : ℕ), ∑ i ∈ Ico 1 (k + 1), x i / ↑i ≤ 3",
+        "block": "set_option maxHeartbeats 400000 in (intro k; have vm_anti : Antitone x := antito",
+        "accepted": true,
+        "ms": 6876
+      },
+      {
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 3456,
+        "slow": false,
+        "techniques": "kept"
+      }
+    ]
+  }
+}

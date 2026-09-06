@@ -1,0 +1,63 @@
+{
+  "metadata": {
+    "strategy": "board",
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.000291,
+    "wall_s": 9.2,
+    "turns": 9,
+    "events": [
+      {
+        "stage": "memory",
+        "checks": 43,
+        "mb": 705
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": false,
+        "ms": 406
+      },
+      {
+        "stage": "memory",
+        "checks": 47,
+        "mb": 711
+      },
+      {
+        "stage": "memory",
+        "checks": 50,
+        "mb": 717
+      },
+      {
+        "kind": "audit",
+        "by": "openai/gpt-oss-120b",
+        "goal": "(a - b) ^ (2 : ℕ) ≥ (0 : ℝ)",
+        "verdict": "holds",
+        "values": {}
+      },
+      {
+        "kind": "step",
+        "by": "qwen/qwen3.5-flash-02-23",
+        "accepted": true
+      },
+      {
+        "kind": "step",
+        "by": "openai/gpt-oss-120b",
+        "accepted": false,
+        "why": "error at {'line': 410, 'column': 2}: linarith failed to find a contradiction\na b : ℝ\na✝ : a ^ 2 + b ^ 2 < 2 * a * b\n⊢ False\nfailed\n\n- Every closer before nlinar"
+      },
+      {
+        "kind": "stale",
+        "by": "openai/gpt-oss-120b"
+      },
+      {
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 73,
+        "slow": false,
+        "techniques": "dropped"
+      }
+    ]
+  }
+}

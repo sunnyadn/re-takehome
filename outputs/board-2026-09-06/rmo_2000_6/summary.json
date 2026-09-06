@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "set": "sample",
+  "problems": [
+    {
+      "problem_id": "rmo_2000_6",
+      "status": "passed",
+      "passed": true,
+      "points": 1,
+      "actual_cost_usd": 0.0,
+      "wall_s": 45.875,
+      "models_used": [],
+      "failure_reason": null
+    }
+  ],
+  "total_points": 1,
+  "max_points": 1,
+  "actual_cost_usd": 0.0,
+  "wall_s_sum": 45.875,
+  "run_id": "2aa95f92fbea4da691eb00f56b29b851",
+  "wall_s": 46.055,
+  "finished_at": "2026-09-06T10:40:04.539012+00:00"
+}

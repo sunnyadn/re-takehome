@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "problem_id": "p04_sum_sq",
+  "description": "# p04_sum_sq\n\nReal numbers $x$ and $y$ satisfy $x + y = 13$ and $xy = 24$. Show that $x^2 + y^2 = 121$.\n",
+  "challenge": "import Mathlib\n\n/-- Real numbers `x` and `y` satisfy `x + y = 13` and `x * y = 24`.\nShow that `x ^ 2 + y ^ 2 = 121`. -/\ntheorem p04_sum_sq (x y : ℝ) (h1 : x + y = 13) (h2 : x * y = 24) : x ^ 2 + y ^ 2 = 121 := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "p04_sum_sq"
+  ],
+  "definition_names": [],
+  "numeric_answer_names": [],
+  "out_dir": "/home/sunny/frame146/out/p04_sum_sq/submission/20260906T102610Z/p04_sum_sq",
+  "budget_usd": 1.0,
+  "time_limit_s": 3600.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.agent:create_agent",
+  "session_id": "9e7d5e7df5c242fdbc21440c08b5b7de"
+}

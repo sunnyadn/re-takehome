@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "problem_id": "rmo_2000_3",
+  "description": "# rmo_2000_3\n\nSuppose $(x_1, x_2, \\ldots)$ is a nonincreasing sequence of positive real\nnumbers, and for all $N$,\n\n$$\\sum_{i=1}^N \\frac{x_{i^2}}{i} \\le 1.$$\n\nShow that for all $k$,\n\n$$\\sum_{i=1}^k \\frac{x_i}{i} \\le 3.$$\n",
+  "challenge": "import Mathlib.Data.Real.Basic\nimport Mathlib.Data.Finset.Basic\nimport Mathlib.Algebra.BigOperators.Group.Finset.Basic\nimport Mathlib.Order.Interval.Finset.Nat\n\nopen Finset\n\ntheorem rmo_2000_3\n  (x : ℕ → ℝ)\n  (hpos : ∀ n, 0 < x n)\n  (hmono : ∀ n, x n ≥ x (n + 1))\n  (hsq : ∀ N, (Ico 1 (N + 1)).sum (fun i => x (i * i) / (i : ℝ)) ≤ 1) :\n  ∀ k, (Ico 1 (k + 1)).sum (fun i => x i / (i : ℝ)) ≤ 3 := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "rmo_2000_3"
+  ],
+  "definition_names": [],
+  "numeric_answer_names": [],
+  "out_dir": "/home/sunny/frame146/out/rmo_2000_3/submission/20260906T103836Z/rmo_2000_3",
+  "budget_usd": 1.0,
+  "time_limit_s": 3600.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.agent:create_agent",
+  "session_id": "cca3ad459bf34e4d9bd0ce37bb5676e7"
+}

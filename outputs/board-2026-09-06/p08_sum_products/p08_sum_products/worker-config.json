@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "problem_id": "p08_sum_products",
+  "description": "# p08_sum_products\n\nPositive real numbers $a, b, c$ satisfy $a + b + c = 3$. Show that\n$ab + bc + ca \\le 3$.\n",
+  "challenge": "import Mathlib\n\n/-- Positive reals `a, b, c` with `a + b + c = 3` satisfy `a*b + b*c + c*a ≤ 3`. -/\ntheorem p08_sum_products (a b c : ℝ) (ha : 0 < a) (hb : 0 < b) (hc : 0 < c)\n    (h : a + b + c = 3) : a * b + b * c + c * a ≤ 3 := by\n  sorry\n",
+  "problem_metadata": {},
+  "theorem_names": [
+    "p08_sum_products"
+  ],
+  "definition_names": [],
+  "numeric_answer_names": [],
+  "out_dir": "/home/sunny/frame146/out/p08_sum_products/submission/20260906T102854Z/p08_sum_products",
+  "budget_usd": 1.0,
+  "time_limit_s": 3600.0,
+  "lean_image": "ghcr.io/verifiedmechanisms/re-takehome-lean@sha256:ee48287cd31c0a7df572093a879ed7289c2f01fec6c7af8716c605fc8c670c39",
+  "lean_check_timeout_s": 120,
+  "comparator_timeout_s": 180,
+  "verify_reserve_s": 120,
+  "agent": "submission.agent:create_agent",
+  "session_id": "26aa80d1b2b54f998f126a2c1a7a5207"
+}

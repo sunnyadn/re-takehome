@@ -1,0 +1,81 @@
+{
+  "metadata": {
+    "strategy": "board",
+    "solved_by": "board_loop",
+    "accepted_by_repl": true,
+    "spend_usd": 0.0,
+    "wall_s": 64.1,
+    "turns": 12,
+    "events": [
+      {
+        "stage": "memory",
+        "checks": 42,
+        "mb": 726
+      },
+      {
+        "stage": "probe",
+        "by": "harness",
+        "asked": [
+          "p06_answer"
+        ],
+        "printed": [
+          "49"
+        ],
+        "unfilled": []
+      },
+      {
+        "stage": "budget",
+        "decl": "p06_pow_mod"
+      },
+      {
+        "kind": "closers",
+        "by": "harness",
+        "accepted": true,
+        "ms": 204
+      },
+      {
+        "kind": "collapse",
+        "tactic": "rfl",
+        "accepted": false
+      },
+      {
+        "stage": "memory",
+        "checks": 49,
+        "mb": 800
+      },
+      {
+        "stage": "memory",
+        "checks": 52,
+        "mb": 973
+      },
+      {
+        "stage": "memory",
+        "checks": 56,
+        "mb": 1193
+      },
+      {
+        "stage": "memory",
+        "checks": 60,
+        "mb": 1412
+      },
+      {
+        "stage": "memory",
+        "checks": 64,
+        "mb": 1638
+      },
+      {
+        "stage": "memory",
+        "checks": 68,
+        "mb": 1850
+      },
+      {
+        "stage": "verify",
+        "accepted": true,
+        "faults": [],
+        "compile_ms": 42,
+        "slow": false,
+        "techniques": "dropped"
+      }
+    ]
+  }
+}

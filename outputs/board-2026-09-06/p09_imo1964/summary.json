@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "set": "sample",
+  "problems": [
+    {
+      "problem_id": "p09_imo1964",
+      "status": "passed",
+      "passed": true,
+      "points": 1,
+      "actual_cost_usd": 0.000408925,
+      "wall_s": 71.084,
+      "models_used": [
+        "openai/gpt-oss-120b",
+        "qwen/qwen3.5-flash-02-23"
+      ],
+      "failure_reason": null
+    }
+  ],
+  "total_points": 1,
+  "max_points": 1,
+  "actual_cost_usd": 0.000408925,
+  "wall_s_sum": 71.084,
+  "run_id": "5399d61f4bf04f2ba1283a841aadc110",
+  "wall_s": 71.283,
+  "finished_at": "2026-09-06T10:30:45.977645+00:00"
+}

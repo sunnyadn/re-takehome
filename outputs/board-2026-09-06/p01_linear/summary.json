@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "set": "sample",
+  "problems": [
+    {
+      "problem_id": "p01_linear",
+      "status": "passed",
+      "passed": true,
+      "points": 1,
+      "actual_cost_usd": 0.0,
+      "wall_s": 22.828,
+      "models_used": [],
+      "failure_reason": null
+    }
+  ],
+  "total_points": 1,
+  "max_points": 1,
+  "actual_cost_usd": 0.0,
+  "wall_s_sum": 22.828,
+  "run_id": "8e97c6fa47cc49fe9ceee8e5e5e94101",
+  "wall_s": 23.033,
+  "finished_at": "2026-09-06T10:25:15.315890+00:00"
+}
