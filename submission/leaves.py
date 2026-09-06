@@ -417,8 +417,8 @@ def _square_blocks(hyps: list[tuple[str, str]], target: str) -> str | None:
         f"| (field_simp; rw [div_le_div_iff₀ (by positivity) (by positivity)]; nlinarith) "
         f"| (field_simp; nlinarith [vm_xp, vm_j1r, mul_pos vm_xp vm_xp]) "
         f"| nlinarith [vm_xp, vm_j1r])",
-        f"have vm_sum := Finset.sum_le_sum vm_block",
-        f"rw [← Finset.mul_sum] at vm_sum",
+        "have vm_sum := Finset.sum_le_sum vm_block",
+        "rw [← Finset.mul_sum] at vm_sum",
         f"have vm_sq := {hb} {k}",
         "linarith",
     ]

@@ -1,6 +1,8 @@
 """Replay a recorded run through the agent loop, with no API calls and no Lean.
 
-Prompts the change invents are reported as misses, never answered."""
+Prompts the change invents are reported as misses, never answered. Measured on
+`outputs/board-2026-09-06/`: 14 of the 16 reach the recorded outcome with no
+miss at all; p10_factorial_pow and rmo_2001_2 diverge with 4 misses each."""
 from __future__ import annotations
 
 import argparse
@@ -11,7 +13,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -87,8 +88,10 @@ class ReplayLLM:
             raise ReplayExhausted("no recorded answer for this prompt")
         self.hits += 1
         choice = found["choices"][0]
+        message = choice.get("message") or {}
         return SimpleNamespace(
-            content=(choice.get("message") or {}).get("content") or "",
+            content=message.get("content") or "",
+            tool_calls=list(message.get("tool_calls") or []),
             finish_reason=choice.get("finish_reason"),
             usage=found["usage"],
         )
@@ -113,7 +116,11 @@ class ReplayLean:
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("run_dir", help="a .../<timestamp>/<problem_id>/ directory")
-    ap.add_argument("--time-limit", type=float, default=None)
+    # A replay pays no Lean or API time, so the agent burns its whole budget
+    # doing nothing and only the clock stops it. Measured on p03: with the
+    # old unbounded default the loop never returned.
+    ap.add_argument("--time-limit", type=float, default=60.0,
+                    help="seconds of agent budget (default 60)")
     args = ap.parse_args()
 
     from re_harness import Problem
@@ -130,8 +137,7 @@ async def main() -> int:
         description=(problems / "problem.md").read_text(),
         challenge=(problems / "challenge.lean").read_text(),
     )
-    limit = args.time_limit if args.time_limit else 10**9
-    agent = BoardAgent(Config(time_limit_s=limit))
+    agent = BoardAgent(Config(time_limit_s=args.time_limit))
     llm, lean = ReplayLLM(cache), ReplayLean(cache)
     seen: list[tuple[str, dict]] = []
     services = SimpleNamespace(

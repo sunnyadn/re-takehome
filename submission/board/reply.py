@@ -206,7 +206,7 @@ def interpret(reply: str, board: Board, goal: Goal, graded: Sequence[str]) -> li
             (current[1] if current else plain).append(line)
             continue
         if current:
-            name, body = current[0], "\n".join(current[1])
+            name = current[0]
             raw = "\n".join([current[2]] + current[1])
             if name in open_names(board.text):
                 edits.append(Edit("prove", proof_body(raw, name), name))

@@ -306,7 +306,7 @@ def view(source: str, decl: str) -> tuple[str, int]:
     Measured on p09: the last 8000 chars of the file cut the shared lemma's
     statement off the top, and the model cited a lemma it could not see."""
 
-    out, kept_lines = [], 0
+    out = []
     for name in root_names(source):
         span = proof_span(source, name)
         if not span or name == decl:

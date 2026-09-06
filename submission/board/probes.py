@@ -151,7 +151,7 @@ def read_suggestions(messages: Sequence[dict[str, Any]], line: int) -> list[tupl
 def have_extract_file(lines: Sequence[str], at: Sequence[int]) -> tuple[str, dict[int, int]]:
     """The file with these `have`s' bodies replaced by a request to state the
     claim; the map from each have's line index to the line Lean answers on."""
-    out, where, shift, i = [], {}, 0, 0
+    out, where, i = [], {}, 0
     marks = set(at)
     text_lines = render_all("\n".join(lines)).split("\n")
     while i < len(text_lines):
