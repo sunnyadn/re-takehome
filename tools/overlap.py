@@ -1,8 +1,11 @@
-"""How much model latency the second worker actually overlapped, per run.
+"""What a run set actually says, read off the run set.
 
-One worker issues one step call at a time, so two calls in flight is two
-workers. The exception is the plan pair, which one turn fires together, so
-two concurrent plan calls are not counted.
+Two numbers, both of which prose kept getting wrong. How much model latency
+the second worker overlapped: one worker issues one step call at a time, so
+two calls in flight is two workers, and the plan pair a single turn fires
+together is not counted. And the run set's own headline: median wall,
+count under a minute, slowest, on the agent's clock with the comparator
+excluded, which is the quantity `docs/ARCHITECTURE.md` defines.
 
     python tools/overlap.py outputs/board
 """
