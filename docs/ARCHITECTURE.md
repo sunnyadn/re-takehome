@@ -201,18 +201,15 @@ rather than an argument because it has to cover the commit as well as the
 checks. It lives on `Blackboard` because it is a policy about checking, not
 about money, and every part that touches it is to `Blackboard`'s right.
 
-`BoardAgent` inherits from `FrameworkAgent` (`submission/framework_agent.py`),
-which is a base class and nothing else: it is never instantiated. The board
-overrides `_share` and `_call`, adds `_define` and `solve`, and calls
-`_resolve_answers` itself; `_ask_plan`, `_probe` and `_finish` are inherited
-but reached from `run/loop.py` and `run/delivery.py` through the `agent`
-parameter those parts are handed, not from `board_agent.py`.
-
-Three things that used to sit in that file with it now have their own:
-`submission/prompts.py` is the text the models are sent, `submission/replies.py`
-reads one reply back, and `submission/state.py` holds the two records the rest
-of the agent passes around. Below all of them sits `submission/framework.py`,
-pure transforms over Lean text.
+`BoardAgent` is a plain class: `solve` is the program, and the setup it runs
+before the board opens (`_shared_lemma`, `_define`, `_resolve_answers`) are its
+own methods. What used to be a base class it was the only subclass of is gone.
+`submission/calls.py::Caller` is how a run talks to its models, one per run
+because the pacing it learns is per model and shared, and `Loop`, `Asking` and
+`Delivery` are handed it by type rather than reaching into the agent through a
+parameter typed `Any`. The pass that shrinks a finished proof for the
+comparator sits beside `Delivery`, its only caller. Below all of them sits
+`submission/framework.py`, pure transforms over Lean text.
 
 The hardest part of this is `Blackboard.look`, and it is worth stating on its
 own. A check with a focus shows Lean one cell and stubs the rest, so Lean

@@ -13,13 +13,18 @@ from re_harness import AgentResult, LLMCallError, Problem, Services
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
 from re_harness.lean import LeanRuntimeError
 
+from typing import Sequence
+from submission.framework import (answer_slots, as_goal, declaration_name, fill_answer,
+                                  insert_preamble, statement_probes)
+from submission.contract import declared_names
+from submission.replies import printed_numbers
+from submission.board.types import NARRATES, STEP_TOKENS
 from submission.techniques import without_techniques
 from submission.contract import format_messages, in_file_coordinates, scoring_faults
 from submission.sweep import split_files, sweep_files, usable_cocktail
 from submission.framework import (classify, definition_slots, fill_definition, graded_theorems, line_of, placeholders, proof_span, root_names)
 from submission.contract import strip_fences
-from submission.config import ANSWER_TOKENS, FEEDBACK_CHARS, FILE_CHARS, Ledger
-from submission.framework_agent import FrameworkAgent
+from submission.config import ANSWER_TOKENS, Config, FEEDBACK_CHARS, FILE_CHARS, Ledger
 from submission.board.types import Board, Goal, binder_names, narrates, owner, signature
 from submission.board.reply import dialect, set_elements
 from submission.run.budget import Budget
@@ -30,7 +35,7 @@ from submission.run.asking import AUDIT_SYSTEM, AUDIT_TOKENS, Asking
 from submission.run.ladder import Ladder
 from submission.run.loop import Loop
 from submission.board.text import drop_declaration, split_statement
-from submission.calls import RenewingLean
+from submission.calls import Caller, RenewingLean
 from submission.sampling import enumerated
 from submission.board.probes import CHECK_TIMEOUT_FLOOR_S, audit_prompt, extract_file, read_witness, statements, witness_file
 
@@ -45,10 +50,15 @@ LOOSE_DRAIN_S = 30.0
 TUPLE_IN = re.compile(r"[⟨(]\s*([A-Za-z_][\w']*(?:\s*,\s*[A-Za-z_][\w']*)+)\s*[⟩)]\s*∈")
 
 
-class BoardAgent(FrameworkAgent):
+class BoardAgent:
     """The board program. It overrides `_share` and `_call`, adds `_define` and
     `solve`, and borrows `_ask_plan`, `_probe`, `_resolve_answers` and `_finish`
     from `FrameworkAgent` unchanged."""
+
+    def __init__(self, config: Config | None = None) -> None:
+        self.config = config or Config.from_env()
+        self.caller = Caller(self.config)
+
 
     async def _define(self, problem: Problem, text: str, services: Services,
                       ledger: Ledger, events: list[dict[str, Any]]) -> str:
@@ -69,7 +79,7 @@ class BoardAgent(FrameworkAgent):
                        "elements, `({(1, 2), (3, 4)} : T)`, never as a set-builder." + note)
                 # Measured one23b: with reasoning on, qwen answered the term
                 # question with a page of derivation twice; gpt-oss alone offered.
-                said, _ = await self._call(model, ask, ANSWER_TOKENS, services, ledger,
+                said, _ = await self.caller.call(model, ask, ANSWER_TOKENS, services, ledger,
                                            think=not narrates(model))
                 term = dialect(" ".join(strip_fences(said).split("\n")))[:FEEDBACK_CHARS].strip()
                 if not term or term.startswith("by "):
@@ -103,13 +113,47 @@ class BoardAgent(FrameworkAgent):
                 text = chosen
         return text
 
+    async def _shared_lemma(self, problem: Problem, text: str, services: Services,
+                     ledger: Ledger, events: list[dict[str, Any]]) -> str:
+        """The fact several theorems need, hoisted above them before any step.
+        Both models are asked at once and every distinct statement that
+        elaborates is kept: a true lemma costs nothing, and which form the
+        proof wants (`%` or `[MOD]`) decided 4 of 6 p09 runs at t=50s."""
+
+        ask = (f"Problem: {problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
+               f"These {graded_theorems(problem.challenge)} theorems are "
+               "graded together and share their mathematics. Name the one fact "
+               "more than one of them needs, and state it as a standalone Lean 4 "
+               "`theorem` above them. Reply with one ```lean block holding that "
+               "declaration and nothing else. Leave its body `sorry`; proving it "
+               "is a later turn.")
+        # Measured on p09 (6 of 6 runs): with reasoning on, qwen answered this
+        # with a page of prose and no declaration; only gpt-oss's lemma stayed.
+        replies = await asyncio.gather(*(
+            self.caller.call(line, ask, STEP_TOKENS, services, ledger,
+                       think=not any(n in line for n in NARRATES))
+            for line in self.config.lines[:2]))
+        for said, _ in replies:
+            block = strip_fences(said).strip()
+            named = declaration_name(block)
+            if not named or named in declared_names(text):
+                events.append({"stage": "share", "name": named, "kept": False})
+                continue
+            candidate = insert_preamble(text, as_goal(block) or block)
+            check = await services.lean.check_file(candidate)
+            kept = not classify(check.messages).failures
+            events.append({"stage": "share", "name": named, "kept": kept})
+            if kept:
+                text = candidate
+        return text
+
     async def _share(self, problem: Problem, text: str, services: Services,
                      ledger: Ledger, events: list[dict[str, Any]]) -> str:
         """As the framework's, and each kept statement is audited: a shared
         lemma that a witness breaks does not enter the file."""
 
         before = set(root_names(text))
-        text = await super()._share(problem, text, services, ledger, events)
+        text = await self._shared_lemma(problem, text, services, ledger, events)
         seen: set[str] = {signature(text, n) for n in before}
         for name in [n for n in root_names(text) if n not in before]:
             sig = signature(text, name)
@@ -168,12 +212,79 @@ class BoardAgent(FrameworkAgent):
         if searched:
             return "holds", {}
         auditor = next((m for m in self.config.lines if not narrates(m)), self.config.lines[0])
-        reply, _ = await self._call(auditor, audit_prompt(stmt, without_techniques(prefix)[0].replace("import Mathlib", "")),
+        reply, _ = await self.caller.call(auditor, audit_prompt(stmt, without_techniques(prefix)[0].replace("import Mathlib", "")),
                                     AUDIT_TOKENS, services, ledger, system=AUDIT_SYSTEM)
         given = {n: v for n, v in (read_witness(reply) or {}).items() if n in names}
         if (given or not names) and await breaks(given):
             return "refuted", given
         return ("holds" if tries or given or "holds" in reply else "unverified"), {}
+
+    async def _resolve_answers(self, problem: Problem, text: str, names: Sequence[str],
+                               services: Services, ledger: Ledger,
+                               events: list[dict[str, Any]]) -> str:
+        """An answer slot is a number to compute, never a number to guess.
+
+        A slot left as `sorry` is unreachable by the cursor and banned by the
+        grader, so an unfilled one is reported and asked for again."""
+
+        # A slot left as `sorry` makes the theorem unprovable and the goal
+        # display empty, so the loop that follows is worth nothing. Measured on
+        # p10: 72 turns asked about a goal Lean could not print. Both models
+        # get a turn at it before that happens.
+        note = ""
+        # A slot the statement equates to a closed term is evaluated here, no
+        # model asked (measured on p06: both failed to write the `#eval`).
+        own = statement_probes(text, answer_slots(text))
+        if own:
+            check = await services.lean.check_file(insert_preamble(text, "\n".join(own)))
+            values = printed_numbers(check.messages)
+            missing = answer_slots(text)
+            for name, value in zip(missing, values):
+                text = fill_answer(text, name, value)
+            events.append({"stage": "probe", "by": "harness", "asked": list(missing),
+                           "printed": values[:len(missing)], "unfilled": list(answer_slots(text))})
+        for attempt in range(4):
+            missing = answer_slots(text)
+            if not missing:
+                break
+            ask = (f"Write one `#eval` line per name, in this order: {', '.join(missing)}.\n"
+                   "Each must compute the value, not state it: search a range, or "
+                   "evaluate the definition.\n\n"
+                   f"Problem: {problem.description}\n\nFile:\n{text[:FILE_CHARS]}\n\n"
+                   "Lean 4 with Mathlib. Output the `#eval` lines only. Each must print "
+                   "one natural number and nothing else, so the whole search goes in "
+                   "the expression: `#eval ((List.range 200).filter (fun n => P n))."
+                   "getLast?.getD 0` for a largest, `.head?.getD 0` for a least. A "
+                   "line that prints `true` or `some n` is not an answer." + note)
+            asking = self.config.lines[attempt % len(self.config.lines)]
+            reply, _ = await self.caller.call(
+                asking, ask, ANSWER_TOKENS, services, ledger, think=True)
+            probes = [l for l in strip_fences(reply).splitlines()
+                      if l.strip().startswith("#eval")]
+            if not probes:
+                note = "\n\nYour last reply contained no `#eval` line."
+                continue
+            # Measured on p07: three `#eval` lines for one name, the answer and
+            # two checks of it. The first printed value fills the slot, and a
+            # slot filled wrong is a false theorem no later step can recover.
+            if len(probes) != len(missing) and attempt < 2:
+                note = (f"\n\nYour last reply had {len(probes)} `#eval` lines for "
+                        f"{len(missing)}. Give exactly one per name, in that order, "
+                        "and nothing else.")
+                continue
+            probes = probes[:len(missing)]
+            check = await services.lean.check_file(insert_preamble(text, "\n".join(probes)))
+            values = printed_numbers(check.messages)
+            for name, value in zip(missing, values):
+                text = fill_answer(text, name, value)
+            left = answer_slots(text)
+            events.append({"stage": "probe", "by": asking, "asked": list(missing),
+                           "printed": values[:len(missing)], "unfilled": list(left)})
+            note = (f"\n\nThese slots are still unfilled: {', '.join(left)}. Each `#eval` "
+                    "must print one bare numeral." if left else "")
+            if left and check.messages:
+                note += "\nLean said:\n" + format_messages(check.messages)[:600]
+        return text
 
     async def solve(self, problem: Problem, services: Services) -> AgentResult:
         services = in_file_coordinates(services)
@@ -184,11 +295,11 @@ class BoardAgent(FrameworkAgent):
         run = Run(problem, services, cfg, events)
         ledger, names = run.ledger, run.names
         budget = Budget(run)
-        delivery = Delivery(self, run, budget)
+        delivery = Delivery(run, budget)
         bb = Blackboard(run, budget, delivery)
-        asking = Asking(self, run, budget, bb)
+        asking = Asking(self.caller, run, budget, bb)
         ladder = Ladder(run, budget, bb, asking)
-        loop = Loop(self, run, budget, bb, asking, ladder, delivery)
+        loop = Loop(self.caller, run, budget, bb, asking, ladder, delivery)
 
         try:
             ladder.cocktail = await usable_cocktail(services)

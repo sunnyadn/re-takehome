@@ -1886,7 +1886,7 @@ def test_the_technique_preamble_sits_after_the_header_and_the_models_are_told_ab
     assert hoisted.index(PREAMBLE_END) < hoisted.index("lemma aux") < hoisted.index("theorem demo")
     # The finishing tidy (lighten, prune) measures the proof, not the file: the
     # block is the same size in every file and a short proof must not be pruned.
-    from submission.framework_agent import below_header, TIDY_ABOVE_BYTES
+    from submission.run.delivery import below_header, TIDY_ABOVE_BYTES
     assert len(text) > TIDY_ABOVE_BYTES // 2 and len(below_header(text)) < 200
     result, lean, llm, _ = run(ONE, {"model-a": ["have key : True := by trivial\nexact key"] * 2},
                                lines=("model-a",))

@@ -9,12 +9,15 @@ from typing import Any, Sequence
 
 from re_harness import LLMCallError, Services
 
-from submission.config import Ledger, RETRY_BACKOFF_S
-from submission.contract import refused_before_generation
+from submission.config import Config, FEEDBACK_CHARS, GOAL_CHARS, Ledger, RETRY_BACKOFF_S
+from submission.contract import refused_before_generation, strip_fences
+from submission.framework import insert_preamble
 from submission.board.probes import container_memory_bytes
 from submission.board.types import NARRATES
-from submission.prompts import FRAMEWORK_SYSTEM
+from submission.prompts import FRAMEWORK_SYSTEM, PLANNER_SYSTEM, sheet_for
 from submission.replies import spoken, tool_lines
+from re_harness import Problem
+from submission.state import State
 
 
 # Measured on p09: qwen3.5-flash narrates its reasoning as ordinary content and
@@ -127,10 +130,15 @@ class RenewingLean:
         self.task = asyncio.ensure_future(run())
 
 
-class Caller:
-    """One per run, because the pacing it learns is per model and shared."""
+PLAN_TOKENS = 1500
 
-    def __init__(self) -> None:
+
+class Caller:
+    """How this run talks to its models: which lines it has, what a call costs
+    it, and the two asks that are one call and a parse."""
+
+    def __init__(self, config: Config) -> None:
+        self.config = config
         # Per model: (completion tokens, seconds) of each reply, for `paced`.
         self._pace: dict[str, list[tuple[int, float]]] = {}
 
@@ -188,3 +196,35 @@ class Caller:
         if len(rates) < 2:
             return want
         return max(PACE_FLOOR, min(want, int(min(rates) * LATENCY_BUDGET_S)))
+
+    async def probe(self, state: State, block: str, services: Services) -> str:
+        """A probe sits above the theorem, is read from its own check, and goes."""
+
+        check = await services.lean.check_file(insert_preamble(state.text, block))
+        printed = [str(m.get("data", "")).strip() for m in check.messages
+                   if isinstance(m, dict) and m.get("severity") in ("info", "information")]
+        return "\n".join(printed)[:FEEDBACK_CHARS] or "nothing"
+
+    async def ask_plan(self, problem: Problem, state: State, services: Services,
+                        ledger: Ledger, model: str = "", avoid: Sequence[str] = ()) -> str:
+        """The mathematics, from the model that answers in mathematics. Routes
+        already tried on this declaration are named so the next one differs."""
+
+        ask = (f"Problem: {problem.description}\n\nThe goal, as Lean reports it:\n"
+               f"{state.goal[:GOAL_CHARS]}\n\nHow do you prove this?")
+        sheet = sheet_for(state.goal)
+        if sheet:
+            # The route hints on the sheets (squeeze between powers, prime
+            # dividing a factor, block the sum) are for the planner as much as
+            # for the writer; the names tell it what Mathlib can do in one step.
+            ask += f"\n\nWhat the loaded Mathlib has for this goal's vocabulary:\n{sheet}"
+        if avoid:
+            tried = "\n".join(f"- {a[:300]}" for a in list(avoid)[-3:])
+            ask += ("\n\nRoutes already tried on this goal that did not work out. "
+                    f"Give a different one:\n{tried}")
+        # Measured on p10: with reasoning on, the plan came back as "The user is
+        # asking me to prove a theorem in Lean 4", which costs a call and enters
+        # every later prompt. Reasoning stays on only where it is the answer.
+        reply, _ = await self.call(model or self.config.lines[0], ask, PLAN_TOKENS,
+                                    services, ledger, PLANNER_SYSTEM)
+        return strip_fences(reply).strip()[:GOAL_CHARS]

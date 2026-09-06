@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from submission.config import Config, Ledger
+from submission.config import ANSWER_TOKENS, Config, Ledger
 
-from submission import framework_agent as fa
+from submission.board.types import STEP_TOKENS
 from submission import prompts as pr
 from submission import replies as rp
 from submission import calls as cl
@@ -85,7 +85,7 @@ def test_the_calls_the_loop_makes_satisfy_the_harness_policy():
     messages = [{"role": "system", "content": pr.FRAMEWORK_SYSTEM},
                 {"role": "user", "content": "Write the next step."}]
     LLMClient._validate_messages(messages)
-    for tokens in (fa.STEP_TOKENS, fa.ANSWER_TOKENS):
+    for tokens in (STEP_TOKENS, ANSWER_TOKENS):
         assert isinstance(tokens, int) and 1 <= tokens <= MAX_OUTPUT_TOKENS
 
 
@@ -124,9 +124,9 @@ def _called(**extra):
     """One `_call`, and the keyword arguments the provider saw."""
 
     llm = _Recording()
-    agent = fa.FrameworkAgent(Config(lines=("qwen/qwen3.5-flash-02-23",)))
+    caller = cl.Caller(Config(lines=("qwen/qwen3.5-flash-02-23",)))
     services = SimpleNamespace(llm=llm, lean=None)
-    asyncio.run(agent._call(extra.pop("model", "qwen/qwen3.5-flash-02-23"),
+    asyncio.run(caller.call(extra.pop("model", "qwen/qwen3.5-flash-02-23"),
                             "prompt", 6000, services, Ledger(), **extra))
     return llm.asked[0]
 

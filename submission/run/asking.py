@@ -32,6 +32,7 @@ from submission.board.types import (Board, Goal, HAVE_HEAD, binder_names, hyp_co
 from submission.sampling import enumerated
 from submission.run.blackboard import Blackboard
 from submission.run.budget import Budget
+from submission.calls import Caller
 from submission.run.context import Run
 
 # Lean's budgets are deterministic, so raising them is sound; it buys that
@@ -192,8 +193,8 @@ COMPLAINTS = (_unchanged, _shadowed_name, _false_from_nothing,
 
 
 class Asking:
-    def __init__(self, agent: Any, run: Run, budget: Budget, bb: Blackboard) -> None:
-        self.agent, self.run, self.budget, self.bb = agent, run, budget, bb
+    def __init__(self, caller: Caller, run: Run, budget: Budget, bb: Blackboard) -> None:
+        self.caller, self.run, self.budget, self.bb = caller, run, budget, bb
         # The block-relative line of the first error, kept for the prefix cut,
         # and the span the last judged block occupied.
         self.failed_at = 0
@@ -290,8 +291,9 @@ class Asking:
 
     async def judge_once(self, base: Board, goal: Goal, block: str) -> tuple[Board | None, str]:
         """The block is placed, then priced, then read for damage it did that
-        Lean raised no error about. `failed_at` keeps the block-relative line
-        of the first error, for the prefix cut."""
+        Lean raised no error about. The price depends on `bb.lenient`, which
+        `Ladder` opens around a leaf, so the same block can be judged two ways.
+        `failed_at` keeps the block-relative line of the first error."""
 
         span, nxt, closing = await self.place(base, goal, block)
         _, surplus, expensive, failures = classify(nxt.messages)
@@ -423,7 +425,7 @@ class Asking:
         # A claim the walk covered is settled: the auditor is asked about the rest.
         asked = [sub for sub in subjects
                  if sub["parsed"] and sub["parsed"][0] and not sub["found"] and not sub["searched"]]
-        pending_calls = [asyncio.ensure_future(self.agent._call(
+        pending_calls = [asyncio.ensure_future(self.caller.call(
             other, audit_prompt(sub["stmt"], shown_prefix),
             AUDIT_TOKENS, self.run.services, self.run.ledger, system=AUDIT_SYSTEM)) for sub in asked]
         for t in pending_calls:

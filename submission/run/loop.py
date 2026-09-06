@@ -6,7 +6,6 @@ each cheap rung guarded by its own flag. What is not a gate is named instead:
 
 from __future__ import annotations
 import asyncio
-from typing import Any
 
 from re_harness import LLMCallError
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
@@ -24,6 +23,7 @@ from submission.board.types import Board, Edit, Goal, step_tokens
 from submission.run.asking import Asking
 from submission.run.blackboard import BEAM, WITHDRAW_AFTER, Blackboard
 from submission.run.budget import Budget
+from submission.calls import Caller
 from submission.run.context import Run
 from submission.run.delivery import Delivery
 from submission.run.ladder import Ladder
@@ -54,9 +54,9 @@ IDLE_WAIT_S = 2.0
 
 
 class Loop:
-    def __init__(self, agent: Any, run: Run, budget: Budget, bb: Blackboard,
+    def __init__(self, caller: Caller, run: Run, budget: Budget, bb: Blackboard,
                  asking: Asking, ladder: Ladder, delivery: Delivery) -> None:
-        self.agent, self.run, self.budget = agent, run, budget
+        self.caller, self.run, self.budget = caller, run, budget
         self.bb, self.asking, self.ladder, self.delivery = bb, asking, ladder, delivery
         self.lock = asyncio.Lock()
         self.finished = False
@@ -87,7 +87,7 @@ class Loop:
         """What Lean prints for the expression the reply asked about, handed back
         to its author as this goal's feedback."""
 
-        printed = await self.agent._probe(State(text=self.bb.board.text), edit.body, self.run.services)
+        printed = await self.caller.probe(State(text=self.bb.board.text), edit.body, self.run.services)
         self.run.notes[goal.key].said = Feedback(author, printed, "probe")
         self.run.events.append({"kind": "probe", "by": author, "printed": printed[:80]})
 
@@ -292,7 +292,7 @@ class Loop:
         if goal is None:
             return False
         task = asyncio.ensure_future(
-            self.agent._call(model, prompt, step_tokens(model), self.run.services, self.run.ledger, system=BOARD_SYSTEM))
+            self.caller.call(model, prompt, step_tokens(model), self.run.services, self.run.ledger, system=BOARD_SYSTEM))
         self.run.loose.append(task)
         try:
             reply, why = await task
@@ -313,8 +313,8 @@ class Loop:
         state = State(text=self.bb.board.text, goal=goal.text)
         avoid = list(self.routes.get(goal.decl, []))
         plan, second = await asyncio.gather(
-            self.agent._ask_plan(self.run.problem, state, self.run.services, self.run.ledger, other, avoid=avoid),
-            self.agent._ask_plan(self.run.problem, state, self.run.services, self.run.ledger, model, avoid=avoid))
+            self.caller.ask_plan(self.run.problem, state, self.run.services, self.run.ledger, other, avoid=avoid),
+            self.caller.ask_plan(self.run.problem, state, self.run.services, self.run.ledger, model, avoid=avoid))
         ask_second, fork = "", None
         async with self.lock:
             self.run.notes[goal.key].plan = plan
@@ -337,7 +337,7 @@ class Loop:
                     ask_second = self.prompt_for(goal, model, skeleton=True, plan=second)
                 self.bb.focus(now)
         if ask_second and fork is not None:
-            reply_b, _ = await self.agent._call(model, ask_second, step_tokens(model),
+            reply_b, _ = await self.caller.call(model, ask_second, step_tokens(model),
                                           self.run.services, self.run.ledger, system=BOARD_SYSTEM)
             async with self.lock:
                 side = self.bb.live(fork.bid)

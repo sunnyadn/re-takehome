@@ -3,13 +3,16 @@ before handing anything in. Depends on `budget` for the clock."""
 
 from __future__ import annotations
 import re
-from typing import Any
 
 from re_harness import AgentResult
-from submission.contract import grade, scoring_faults
-from submission.cells import modular, strip_markers
-from submission.framework import axiom_probe, classify, is_done
+from re_harness import Services
+from submission.techniques import PREAMBLE_END
+from submission.framework import (alternatives, axiom_probe, classify, collapse, cursor_goal,
+                                  drop_lines, first_blocks, have_spans, is_done, placeholders, render)
+from submission.contract import grade, scoring_faults, suggested_tactics, suggestions
+from submission.replies import lighter_forms
 from submission.state import State
+from submission.cells import modular, strip_markers
 from submission.techniques import PREAMBLE_MARK, strip_techniques, uses_techniques
 from submission.board.types import Board
 from submission.board.text import shed_unreferenced
@@ -22,8 +25,8 @@ SLOW_COMPILE_MS = 150_000
 
 
 class Delivery:
-    def __init__(self, agent: Any, run: Run, budget: Budget) -> None:
-        self.agent, self.run, self.budget = agent, run, budget
+    def __init__(self, run: Run, budget: Budget) -> None:
+        self.run, self.budget = run, budget
         self.best = run.text
         self.shed_named: set[str] = set()
 
@@ -78,7 +81,7 @@ class Delivery:
         return delivered
 
     async def deliver_form(self, text: str, how: str) -> AgentResult | None:
-        state = await self.agent._finish(State(text=text, accepted=True), self.run.services, self.budget.time_left)
+        state = await finish(State(text=text, accepted=True), self.run.services, self.budget.time_left)
         final = state.text
         if not uses_techniques(final):
             # The judge compiles cold, 180 s on 4 cores; a proof that never
@@ -104,3 +107,121 @@ class Delivery:
             return None
         self.offer(final, True)
         return self.result(final, how, True)
+
+
+# The finish pass is free of tokens but not of clock, so it is bounded.
+MAX_COLLAPSE = 24
+
+
+# Measured on p08: a file the REPL checks in 570ms timed out at the comparator's
+# 180s, because the kernel there re-checks the term and nlinarith's are huge.
+MAX_LIGHTEN = 16
+
+
+# Below this a proof is already small; tidying it only risks it.
+TIDY_ABOVE_BYTES = 2000
+
+
+def below_header(text: str) -> str:
+    """The file without the technique block: the tidy threshold is about the
+    proof's size, and the block is the same 1.8 KB in every file."""
+    i = text.find(PREAMBLE_END)
+    return text[i + len(PREAMBLE_END):] if i >= 0 else text
+
+
+MAX_DELETIONS = 12
+
+
+# Each try is one check, and a check is 60ms against a reply's seconds.
+MAX_PREFIXES = 8
+
+
+FINISH_RESERVE_S = 300.0
+
+
+async def look(text: str, services: Services, focus: int = 0) -> State:
+    """One check does both jobs: it adjudicates, and it prints the next goal."""
+
+    open_goals = len(placeholders(text))
+    focus = min(max(focus, 0), open_goals - 1) if open_goals else 0
+    source, line = render(text, focus)
+    check = await services.lean.check_file(source)
+    return State(text=text, goal=cursor_goal(check.messages, line), line=line,
+                 messages=list(check.messages), accepted=check.accepted,
+                 focus=focus, goals=open_goals)
+
+
+async def finish(state: State, services: Services, time_left) -> State:
+    """Take the search out of a finished file: the comparator allows 180s."""
+
+    state = await substitute_search(state, services)
+    # Measured on p08: both passes turned a file the comparator accepted
+    # into one it timed out on, because deleting a fact a closer was using
+    # makes that closer redo the work in a term the kernel then re-checks.
+    # A short file has nothing to win here, and §4 says not to touch it.
+    if len(below_header(state.text)) > TIDY_ABOVE_BYTES:
+        state = await lighten(state, services, time_left)
+        state = await prune(state, services, time_left)
+    for _ in range(MAX_COLLAPSE):
+        blocks = first_blocks(state.text)
+        if not blocks or time_left() < FINISH_RESERVE_S:
+            break
+        collapsed = None
+        for tactic in alternatives(blocks[0].group(2)):
+            probe = await look(collapse(state.text, blocks[0], tactic), services)
+            if probe.accepted:
+                collapsed = probe
+                break
+        if collapsed is None:
+            break
+        state = collapsed
+    return state
+
+
+async def lighten(state: State, services: Services, time_left) -> State:
+    """Make the finished term small.
+
+    Measured on p08: `nlinarith` with three hints checks in 348ms here and
+    times out at the comparator's 180s, with one hint it passes."""
+
+    for rewrite in lighter_forms(state.text)[:MAX_LIGHTEN]:
+        if time_left() < FINISH_RESERVE_S:
+            break
+        probe = await look(rewrite, services)
+        if probe.accepted and is_done(probe.text):
+            state = probe
+    return state
+
+
+async def prune(state: State, services: Services, time_left) -> State:
+    """Delete facts the finished proof does not use.
+
+    Only sound now: while a `sorry` remains, no deletion can break anything."""
+
+    tried: set[str] = set()
+    for _ in range(MAX_DELETIONS):
+        if time_left() < FINISH_RESERVE_S:
+            break
+        spans = [s for s in have_spans(state.text) if s[2] not in tried]
+        if not spans:
+            break
+        start, end, statement = spans[0]
+        tried.add(statement)
+        probe = await look(
+            drop_lines(state.text, range(start, end + 1)), services)
+        if probe.accepted and is_done(probe.text):
+            state = probe
+    return state
+
+
+async def substitute_search(state: State, services: Services) -> State:
+    """Replace each `exact?` with the term it printed, keeping the search
+    call when the term does not re-elaborate."""
+
+    if "exact?" not in state.text and "apply?" not in state.text:
+        return state
+    for term in suggested_tactics(suggestions(state.messages))[:4]:
+        probe = await look(state.text.replace("exact?", term, 1), services)
+        if probe.accepted:
+            return probe
+    return state
