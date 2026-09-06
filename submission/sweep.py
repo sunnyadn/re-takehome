@@ -1,8 +1,8 @@
 """The first attempt, which costs nothing.
 
 One block of alternative tactics spliced into every placeholder, under three
-`set_option` preambles, and again behind four ways of splitting a goal. Ten of
-the sixteen sample problems close here with no model asked."""
+`set_option` preambles, and again behind four ways of splitting a goal. Four
+of the sixteen sample problems close here, before the board opens."""
 
 from __future__ import annotations
 

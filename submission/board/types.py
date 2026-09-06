@@ -206,7 +206,7 @@ class GoalRecord:
 
     def reject(self, author: str, why: str, kind: str = "rejected") -> None:
         """What the next model is told, and one more try against this goal.
-        The two always move together; nothing sets one without the other."""
+        Four other places set `said` alone, to report without costing a try."""
         self.said = Feedback(author, why, kind)
         self.tries += 1
 
