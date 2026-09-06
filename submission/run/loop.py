@@ -19,7 +19,7 @@ from submission.framework_agent import (FILE_CHARS, FRAMEWORK_SYSTEM, Feedback, 
                                         State, sheet_for)
 from submission.board.reply import interpret, salvage
 from submission.board.text import proved_facts, restates, settled_inside, view
-from submission.board.types import Edit, Goal, step_tokens
+from submission.board.types import Board, Edit, Goal, step_tokens
 from submission.run.asking import Asking
 from submission.run.blackboard import BEAM, WITHDRAW_AFTER, Blackboard
 from submission.run.budget import Budget
@@ -300,7 +300,7 @@ class Loop:
         await self.post_reply(model, goal, base, reply, why)
         return True
 
-    async def plan_and_fork(self, model: str, goal: Goal, base: Any) -> tuple[Goal, str]:
+    async def plan_and_fork(self, model: str, goal: Goal, base: Board) -> tuple[Goal, str]:
         """Two plans for a goal that has been refused twice, and a sibling branch
         carrying the second one. Returns the goal where it now sits and the prompt
         to send, or "" for a prompt when the goal is gone from the board."""
@@ -357,7 +357,7 @@ class Loop:
                     self.bb.focus(main)
         return goal, prompt
 
-    async def post_reply(self, model: str, goal: Goal, base: Any,
+    async def post_reply(self, model: str, goal: Goal, base: Board,
                          reply: str, why: str) -> None:
         """What a step reply does to the board: salvaged if it was cut, forked if
         the goal moved on under it, posted if it still fits, and the goal withdrawn
