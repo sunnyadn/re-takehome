@@ -66,113 +66,143 @@ class Loop:
         self.routes: dict[str, list[str]] = {}
 
     async def apply(self, author: str, goal: Goal, edits: list[Edit]) -> bool:
-        """Every edit a reply asked for, each against the board as it stands."""
+        """Every edit a reply asked for, each against the board as it stands.
+        Five kinds; only three of them can put anything on the board."""
 
         took = False
         for edit in edits:
             here = self.bb.board.find(goal.key)
             if edit.kind == "probe":
-                printed = await self.agent._probe(State(text=self.bb.board.text), edit.body, self.run.services)
-                self.run.notes[goal.key].said = Feedback(author, printed, "probe")
-                self.run.events.append({"kind": "probe", "by": author, "printed": printed[:80]})
-                continue
-            if edit.kind == "drop":
-                self.run.events.append({"kind": "drop", "by": author, "name": edit.name})
-                self.run.notes[goal.key].reject(
-                    author, f"`{edit.name}` is already declared; work the goal "
-                    "you were shown, do not restate it")
-                continue
-            if edit.kind == "step":
-                if here is None:
-                    self.run.events.append({"kind": "stale", "by": author})
-                    continue
-                if edit.body in self.run.notes[here.key].refused:
-                    # Measured on p10: five byte-identical replies in a row.
-                    self.run.events.append({"kind": "repeat", "by": author})
-                    self.run.notes[here.key].repeated.add(author)
-                    self.run.notes[goal.key].reject(
-                        author, "that is byte for byte the step already rejected "
-                        "on this goal; Lean will say the same thing. Try a "
-                        "different route: " + self.run.notes[goal.key].said.text[:600]
-                        if self.run.notes[goal.key].said else "that step was already rejected here")
-                    continue
-                # Measured on p09: a substring match locked a worker out for 19
-                # min once `n % 3 = 0` was withdrawn and the goal read `⊢ n % 3 = 0`.
-                # Only a `have` stating the claim again is a restatement.
-                if restates(edit.body, self.bb.withdrawn.get(here.decl, ())):
-                    self.run.events.append({"kind": "restated", "by": author})
-                    self.run.notes[goal.key].reject(author, "that step restates a fact "
-                                                    "already withdrawn from this declaration")
-                    continue
-                present = proved_facts(self.bb.board.text, here)
-                if restates(edit.body, present):
-                    # Measured on p09: the same claim proved twice in one declaration.
-                    names = [present[c] for c in present if restates(edit.body, [c])]
-                    self.run.events.append({"kind": "restated", "by": author, "of": names[:3]})
-                    self.run.notes[goal.key].reject(author, "that step states a fact already "
-                                                    "on the board as " + ", ".join(f"`{n}`" for n in names[:3])
-                                                    + "; use it, do not prove it again")
-                    continue
-                nxt, why = await self.ladder.lift_and_advance(self.bb.board, here, edit.body, author)
-                if nxt is None:
-                    self.run.notes[here.key].refused.add(edit.body)
-                self.run.events.append({"kind": "step", "by": author, "accepted": nxt is not None,
-                               **({} if nxt is not None else {"why": str(why)[:160]})})
-                if nxt is None:
-                    self.run.notes[goal.key].reject(author, why)
-                    continue
-                await self.bb.commit(nxt)
-                took = True
-                continue
-            if edit.kind == "hoist":
-                lifted = await self.bb.look(insert_above(self.bb.board.text, self.run.first_graded, edit.block))
-                kept = not classify(lifted.messages)[3]
-                # Measured on putnam_2020_a2: a hoisted lemma was false at j = 0;
-                # its statement is audited like a `have` before it enters the file.
-                bad = await self.asking.audit(author, self.bb.board, lifted) if kept else ""
-                kept = kept and not bad
-                self.run.events.append({"kind": "lemma", "by": author, "name": edit.name,
-                               "accepted": kept})
-                if not kept:
-                    self.run.notes[goal.key].reject(
-                        author, bad or format_messages(lifted.messages)[:FEEDBACK_CHARS])
-                    continue
-                await self.bb.commit(lifted)
-                took = True
-                fresh = next((g for g in self.bb.board.goals if g.decl == edit.name), None)
-                if fresh and edit.body.strip():
-                    nxt, why = await self.asking.advance(self.bb.board, fresh, edit.body, author)
-                    self.run.events.append({"kind": "step", "by": author, "accepted": nxt is not None,
-                               **({} if nxt is not None else {"why": str(why)[:160]})})
-                    if nxt is not None:
-                        await self.bb.commit(nxt)
-                    else:
-                        self.run.notes[fresh.key].said = Feedback(author, why)
-                continue
-            if edit.kind == "prove":
-                # The whole proof of a named declaration replaces what it had.
-                # Measured on p09: appended, it doubled its own opening; dropped,
-                # it was the best turn of the run.
-                fresh_text, at = restate(self.bb.board.text, edit.name)
-                if at < 0:
-                    continue
-                opened = await self.bb.look(fresh_text)
-                target = opened.goals[at] if at < len(opened.goals) else None
-                self.run.events.append({"kind": "route", "by": author, "to": edit.name})
-                if target is None:
-                    continue
-                nxt, why = await self.asking.advance(opened, target, edit.body, author)
-                if nxt is None and here is not None and edit.name == here.decl:
-                    # The header was an echo and the body continues from here.
-                    nxt, why = await self.asking.advance(self.bb.board, here, edit.body, author)
-                self.run.events.append({"kind": "step", "by": author, "accepted": nxt is not None,
-                               **({} if nxt is not None else {"why": str(why)[:160]})})
-                if nxt is None:
-                    self.run.notes[goal.key].reject(author, why)
-                    continue
-                await self.bb.commit(nxt)
-                took = True
+                await self.run_probe(author, goal, edit)
+            elif edit.kind == "drop":
+                self.refuse_redeclared(author, goal, edit)
+            elif edit.kind == "step":
+                took |= await self.post_step(author, goal, here, edit)
+            elif edit.kind == "hoist":
+                took |= await self.post_lemma(author, goal, edit)
+            elif edit.kind == "prove":
+                took |= await self.reroute(author, goal, here, edit)
         return took
+
+    async def run_probe(self, author: str, goal: Goal, edit: Edit) -> None:
+        """What Lean prints for the expression the reply asked about, handed back
+        to its author as this goal's feedback."""
+
+        printed = await self.agent._probe(State(text=self.bb.board.text), edit.body, self.run.services)
+        self.run.notes[goal.key].said = Feedback(author, printed, "probe")
+        self.run.events.append({"kind": "probe", "by": author, "printed": printed[:80]})
+
+    def refuse_redeclared(self, author: str, goal: Goal, edit: Edit) -> None:
+        """A name the file already declares. Nothing is written; the reply is told
+        to work the goal it was shown."""
+
+        self.run.events.append({"kind": "drop", "by": author, "name": edit.name})
+        self.run.notes[goal.key].reject(
+            author, f"`{edit.name}` is already declared; work the goal "
+            "you were shown, do not restate it")
+
+    async def post_step(self, author: str, goal: Goal, here: Goal | None, edit: Edit) -> bool:
+        """One step at the goal it was written for. Three things a step can be are
+        answered without asking Lean: a repeat, a withdrawn claim restated, and
+        a fact the declaration already proved."""
+
+        if here is None:
+            self.run.events.append({"kind": "stale", "by": author})
+            return False
+        if edit.body in self.run.notes[here.key].refused:
+            # Measured on p10: five byte-identical replies in a row.
+            self.run.events.append({"kind": "repeat", "by": author})
+            self.run.notes[here.key].repeated.add(author)
+            self.run.notes[goal.key].reject(
+                author, "that is byte for byte the step already rejected "
+                "on this goal; Lean will say the same thing. Try a "
+                "different route: " + self.run.notes[goal.key].said.text[:600]
+                if self.run.notes[goal.key].said else "that step was already rejected here")
+            return False
+        # Measured on p09: a substring match locked a worker out for 19
+        # min once `n % 3 = 0` was withdrawn and the goal read `⊢ n % 3 = 0`.
+        # Only a `have` stating the claim again is a restatement.
+        if restates(edit.body, self.bb.withdrawn.get(here.decl, ())):
+            self.run.events.append({"kind": "restated", "by": author})
+            self.run.notes[goal.key].reject(author, "that step restates a fact "
+                                            "already withdrawn from this declaration")
+            return False
+        present = proved_facts(self.bb.board.text, here)
+        if restates(edit.body, present):
+            # Measured on p09: the same claim proved twice in one declaration.
+            names = [present[c] for c in present if restates(edit.body, [c])]
+            self.run.events.append({"kind": "restated", "by": author, "of": names[:3]})
+            self.run.notes[goal.key].reject(author, "that step states a fact already "
+                                            "on the board as " + ", ".join(f"`{n}`" for n in names[:3])
+                                            + "; use it, do not prove it again")
+            return False
+        nxt, why = await self.ladder.lift_and_advance(self.bb.board, here, edit.body, author)
+        if nxt is None:
+            self.run.notes[here.key].refused.add(edit.body)
+        self.run.events.append({"kind": "step", "by": author, "accepted": nxt is not None,
+                       **({} if nxt is not None else {"why": str(why)[:160]})})
+        if nxt is None:
+            self.run.notes[goal.key].reject(author, why)
+            return False
+        await self.bb.commit(nxt)
+        return True
+
+    async def post_lemma(self, author: str, goal: Goal, edit: Edit) -> bool:
+        """A lemma lifted above the graded declaration, audited before it enters the
+        file, then its own first step if the reply sent one."""
+
+        took = False
+        lifted = await self.bb.look(insert_above(self.bb.board.text, self.run.first_graded, edit.block))
+        kept = not classify(lifted.messages)[3]
+        # Measured on putnam_2020_a2: a hoisted lemma was false at j = 0;
+        # its statement is audited like a `have` before it enters the file.
+        bad = await self.asking.audit(author, self.bb.board, lifted) if kept else ""
+        kept = kept and not bad
+        self.run.events.append({"kind": "lemma", "by": author, "name": edit.name,
+                       "accepted": kept})
+        if not kept:
+            self.run.notes[goal.key].reject(
+                author, bad or format_messages(lifted.messages)[:FEEDBACK_CHARS])
+            return took
+        await self.bb.commit(lifted)
+        took = True
+        fresh = next((g for g in self.bb.board.goals if g.decl == edit.name), None)
+        if fresh and edit.body.strip():
+            nxt, why = await self.asking.advance(self.bb.board, fresh, edit.body, author)
+            self.run.events.append({"kind": "step", "by": author, "accepted": nxt is not None,
+                       **({} if nxt is not None else {"why": str(why)[:160]})})
+            if nxt is not None:
+                await self.bb.commit(nxt)
+            else:
+                self.run.notes[fresh.key].said = Feedback(author, why)
+        return took
+
+    async def reroute(self, author: str, goal: Goal, here: Goal | None, edit: Edit) -> bool:
+        """A named declaration re-proved from its statement, and the fallback for a
+        header that was only an echo of the goal already in hand."""
+
+        # The whole proof of a named declaration replaces what it had.
+        # Measured on p09: appended, it doubled its own opening; dropped,
+        # it was the best turn of the run.
+        fresh_text, at = restate(self.bb.board.text, edit.name)
+        if at < 0:
+            return False
+        opened = await self.bb.look(fresh_text)
+        target = opened.goals[at] if at < len(opened.goals) else None
+        self.run.events.append({"kind": "route", "by": author, "to": edit.name})
+        if target is None:
+            return False
+        nxt, why = await self.asking.advance(opened, target, edit.body, author)
+        if nxt is None and here is not None and edit.name == here.decl:
+            # The header was an echo and the body continues from here.
+            nxt, why = await self.asking.advance(self.bb.board, here, edit.body, author)
+        self.run.events.append({"kind": "step", "by": author, "accepted": nxt is not None,
+                       **({} if nxt is not None else {"why": str(why)[:160]})})
+        if nxt is None:
+            self.run.notes[goal.key].reject(author, why)
+            return False
+        await self.bb.commit(nxt)
+        return True
 
     def prompt_for(self, goal: Goal, model: str, skeleton: bool = False,
                    plan: str | None = None) -> str:
