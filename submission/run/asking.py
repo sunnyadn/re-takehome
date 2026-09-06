@@ -173,12 +173,12 @@ class Asking:
         if expensive and not failures:
             return None, BUDGET_RETRY
         over_cap = nxt.ms > CHECK_CAP_MS and nxt.ms - base.ms > SLOW_STEP_MS // 5
-        if self.budget.heavy_leaf or closing:
+        if self.bb.lenient or closing:
             # A closed goal is never re-elaborated by a later focused check;
             # only the comparator's cold compile pays it (measured on
             # rmo_2001_2: seven closing steps refused at 12-13 s from 0.2 s).
             over_cap = nxt.ms > LEAF_CAP_MS
-        if not failures and ((nxt.ms - base.ms > SLOW_STEP_MS and not (self.budget.heavy_leaf or closing)) or over_cap):
+        if not failures and ((nxt.ms - base.ms > SLOW_STEP_MS and not (self.bb.lenient or closing)) or over_cap):
             self.run.events.append({"stage": "slow", "ms": nxt.ms, "was": base.ms})
             return None, (f"that step makes the file take {nxt.ms // 1000}s to "
                           f"check, up from {base.ms // 1000}s; every later step "

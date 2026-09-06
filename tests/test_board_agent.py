@@ -3019,3 +3019,23 @@ def test_a_worker_cannot_release_the_other_workers_claim():
     assert notes[key].claimed_by == "B", "A released a claim still in flight"
     notes.release(key, "B")
     assert notes[key].claimed_by is None
+
+
+def test_the_lenient_window_closes_even_when_the_leaf_raises():
+    from submission.run.blackboard import Blackboard
+
+    class _Stub:
+        lenient = False
+
+    board = _Stub()
+    with Blackboard.lenient_checks(board):
+        assert board.lenient is True
+    assert board.lenient is False
+
+    # `leaf_sweep` returns from inside the window and can raise from a check.
+    try:
+        with Blackboard.lenient_checks(board):
+            raise RuntimeError("a check blew up")
+    except RuntimeError:
+        pass
+    assert board.lenient is False, "a raised check left every later check lenient"

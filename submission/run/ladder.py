@@ -112,24 +112,25 @@ class Ladder:
             return False
         t0 = time.monotonic()
         tried = 0
-        self.budget.heavy_leaf = True
         try:
-            for block in candidates:
-                tried += 1
-                nxt, why = await self.asking.judge(base, goal, block)
-                if nxt is not None:
-                    self.run.events.append({"kind": "leaf", "goal": goal.text[-120:],
-                                   "block": block.split("\n")[-1][:80], "accepted": True,
-                                   "ms": int((time.monotonic() - t0) * 1000)})
-                    await self.bb.commit(nxt)
-                    return True
-                if why == TIMED_OUT or not self.budget.affordable("leaf"):
-                    break
-            self.run.events.append({"kind": "leaf", "goal": goal.text[-120:], "accepted": False,
-                           "tried": tried, "ms": int((time.monotonic() - t0) * 1000)})
-            return False
+            # The window covers the commit as well as the checks: a leaf that
+            # is accepted is settled under the same policy that judged it.
+            with self.bb.lenient_checks():
+                for block in candidates:
+                    tried += 1
+                    nxt, why = await self.asking.judge(base, goal, block)
+                    if nxt is not None:
+                        self.run.events.append({"kind": "leaf", "goal": goal.text[-120:],
+                                       "block": block.split("\n")[-1][:80], "accepted": True,
+                                       "ms": int((time.monotonic() - t0) * 1000)})
+                        await self.bb.commit(nxt)
+                        return True
+                    if why == TIMED_OUT or not self.budget.affordable("leaf"):
+                        break
+                self.run.events.append({"kind": "leaf", "goal": goal.text[-120:], "accepted": False,
+                               "tried": tried, "ms": int((time.monotonic() - t0) * 1000)})
+                return False
         finally:
-            self.budget.heavy_leaf = False
             self.budget.spent("leaf", time.monotonic() - t0)
 
     async def library_sweep(self, goal: Goal, force: bool = False) -> bool:

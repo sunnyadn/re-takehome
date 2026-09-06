@@ -7,6 +7,7 @@ back as goals."""
 
 from __future__ import annotations
 import asyncio
+import contextlib
 import re
 import time
 
@@ -63,6 +64,18 @@ class Blackboard:
         self.undone: dict[str, list[str]] = {}
         self.dissolved = 0
         self.next_bid = 1
+        self.lenient = False
+
+    @contextlib.contextmanager
+    def lenient_checks(self):
+        """While this is open a check may take the cap timeout and a slow step
+        is not held against its author. For work whose cost is paid once: a
+        leaf block, or a step that closes its goal."""
+        self.lenient = True
+        try:
+            yield
+        finally:
+            self.lenient = False
 
     def focus(self, b: Board) -> None:
         self.board = b
@@ -105,7 +118,7 @@ class Blackboard:
         if focus is not None and old is None:
             focus = None
         rendered = render_check(candidate, self.run.cells, focus)
-        timeout_s = CHECK_TIMEOUT_CAP_S if self.budget.heavy_leaf else check_timeout_s((base or self.board).ms)
+        timeout_s = CHECK_TIMEOUT_CAP_S if self.lenient else check_timeout_s((base or self.board).ms)
         check = await self.run.services.lean.check_file(blank_techniques(rendered.text), timeout_s=timeout_s)
         messages = remap(check.messages, rendered.lines)
         errors = [m for m in messages if isinstance(m, dict) and m.get("severity") == "error"]
