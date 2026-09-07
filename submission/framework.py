@@ -1,6 +1,6 @@
 """Reading and rewriting Lean text, with no state and no I/O: what a check's
 messages mean, where a proof begins and ends, what a file declares and what it
-still leaves open. The two agent classes above both build on this.
+still leaves open. Fifteen of the modules around it import from here.
 """
 
 from __future__ import annotations

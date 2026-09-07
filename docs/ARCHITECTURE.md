@@ -20,8 +20,9 @@ flowchart TD
     R2 -- miss --> R3["3 · shape leaf<br/>a tactic block built from the goal's shape"]
     R3 -- miss --> R4["4 · witness search<br/>decidable existential, searched in Lean"]
     R4 -- miss --> R5["5 · mechanical conjecture<br/>tabulate in Lean · fit in Python · verify in Lean"]
-    R5 -- miss --> R6["6 · library search<br/>apply? and a name scan"]
-    R6 -- miss --> ASK["7 · ask ONE model<br/>for ONE step"]
+    R5 -- miss --> ASK["6 · ask ONE model<br/>for ONE step"]
+    ASK -- "step refused" --> R6["7 · library search<br/>apply? and a name scan<br/>then ask again"]
+    R6 --> ASK
 
     ASK --> AUDIT{"audit the statement"}
     AUDIT -- "evaluate · sample · the other model" --> LEAN
@@ -167,8 +168,8 @@ of the package as submitted.
 | 3 · shape leaf | `run/ladder.py::leaf_sweep`, blocks in `submission/leaves.py` |
 | 4 · witness search | `run/ladder.py::witness_sweep`, files in `board/probes.py` |
 | 5 · mechanical conjecture | `run/ladder.py::generalise_sweep`, fit in `submission/conjecture.py` |
-| 6 · library search (`apply?`) | `run/ladder.py::library_sweep` |
-| 7 · ask ONE model for ONE step | `submission/run/asking.py` |
+| 6 · ask ONE model for ONE step | `submission/run/asking.py` |
+| 7 · library search (`apply?`), after a step was refused | `run/ladder.py::library_sweep` |
 | audit: evaluate · sample · the other model | `run/asking.py::audit`, `board_agent.py::_audit_root`, `submission/sampling.py` |
 | Lean checks the edit, accept or reject | `run/asking.py::judge_once` |
 | commit, and the branches beside it | `submission/run/blackboard.py` |

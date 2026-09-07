@@ -53,27 +53,29 @@ SEARCH_AFTER = 1
 
 
 class Rung(NamedTuple):
-    """One rung of the ladder. `calls` names methods instead of holding them
-    because `Ladder` is built per run and this table is not."""
+    """One rung of the ladder: the flag it spends, what it takes to reach it,
+    and the `Ladder` methods behind it, tried until one closes the goal."""
 
     flag: str
     ready: Callable[[Any, Goal, Any], bool]
-    calls: tuple[str, ...]
+    calls: tuple[Callable[..., Any], ...]
 
 
-# A goal gets past every rung here before a token is spent on it. Each row is
-# one flag on the goal's record, what it takes to reach that rung, and the
-# `Ladder` methods behind it, tried until one closes the goal. The flag is
-# spent once, so a rung that fails is not paid for twice.
+# The order a goal is worked in. The first two rungs are free and come before
+# any model is asked. The third does not: `tries` only rises when a model's
+# step was refused, so the library probes are what a goal gets after the first
+# paid ask failed. Each flag is spent once, so a rung that fails is not paid
+# for twice.
 LADDER = (
-    Rung("recalled", lambda note, goal, bb: goal.stmt in bb.proven, ("recall",)),
+    Rung("recalled", lambda note, goal, bb: goal.stmt in bb.proven,
+         (Ladder.recall,)),
     Rung("swept", lambda note, goal, bb: True,
-         ("sweep", "leaf_sweep", "witness_sweep", "generalise_sweep")),
+         (Ladder.sweep, Ladder.leaf_sweep, Ladder.witness_sweep,
+          Ladder.generalise_sweep)),
     # Measured over 70 runs: `apply?` and the name scan took 19% of the wall
     # clock under the lock (601 probes, 22 goals closed; 269 scans at 22 s).
-    # A goal the first step closes never pays for them.
     Rung("searched", lambda note, goal, bb: note.tries >= SEARCH_AFTER,
-         ("library_sweep", "consult")),
+         (Ladder.library_sweep, Ladder.consult)),
 )
 
 

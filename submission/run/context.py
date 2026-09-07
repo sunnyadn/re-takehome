@@ -1,8 +1,9 @@
 """What one problem's run settles before the board opens.
 
-Everything here is fixed for the run, or is an object the parts share by
-reference. Each part takes this rather than a list of the six or seven
-things it happens to read out of it."""
+`text`, `names`, `cells` and the config are settled before the board opens.
+`notes`, `events` and `loose` are the mutable ones the parts share, and five
+modules write them. Each part takes this rather than a list of the six or
+seven things it happens to read out of it."""
 
 from __future__ import annotations
 from typing import Any

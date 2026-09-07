@@ -291,8 +291,8 @@ class Loop:
             if getattr(note, rung.flag) or not rung.ready(note, goal, self.bb):
                 continue
             setattr(note, rung.flag, True)
-            for name in rung.calls:
-                if await getattr(self.ladder, name)(goal):
+            for call in rung.calls:
+                if await call(self.ladder, goal):
                     return True
         return False
 

@@ -85,7 +85,8 @@ class Blackboard:
 
     def fork(self, base: Board) -> Board | None:
         """A sibling branch from `base`, made current, or None if the beam is
-        full. Every branch bid comes from here, so no two can collide."""
+        full. Every bid but the root board's comes from here, so no two of
+        them can collide."""
         if len(self.branches) >= BEAM + 1:
             return None
         fresh = Board(base.text, list(base.goals), list(base.messages),

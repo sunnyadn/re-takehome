@@ -159,7 +159,7 @@ def test_the_ladder_in_the_table_is_the_ladder_the_docs_draw():
 
     doc = pathlib.Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
     drawn = re.findall(r"^\| \d+ · [^|]*\| `run/ladder\.py::(\w+)`", doc, re.M)
-    walked = [name for rung in LADDER for name in rung.calls]
+    walked = [call.__name__ for rung in LADDER for call in rung.calls]
     assert drawn == [n for n in walked if n != "consult"], (drawn, walked)
 
 
@@ -176,14 +176,16 @@ def test_a_goal_whose_statement_is_not_proved_yet_keeps_its_recall():
     board = SimpleNamespace(proven={})
     called: list[str] = []
 
-    class _Rungs:
-        def __getattr__(self, name):
-            async def rung(_goal):
-                called.append(name)
-                return False
-            return rung
+    def recorder(name):
+        async def rung(_ladder, _goal):
+            called.append(name)
+            return False
+        return rung
 
-    loop = SimpleNamespace(rungs=LADDER, bb=board, ladder=_Rungs(),
+    # The real flags and the real `ready`; only the work is stubbed out.
+    rungs = tuple(rung._replace(calls=tuple(recorder(c.__name__) for c in rung.calls))
+                  for rung in LADDER)
+    loop = SimpleNamespace(rungs=rungs, bb=board, ladder=None,
                            run=SimpleNamespace(notes=Notes()))
     asyncio.run(Loop.climb(loop, goal))
     assert "recall" not in called

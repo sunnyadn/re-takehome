@@ -1,4 +1,6 @@
-"""Files built to ask Lean one question, and readers for its answers."""
+"""Files built to ask Lean one question, and readers for its answers. Two
+things here ask the host instead: `container_memory_bytes` runs docker stats
+for `calls.py`, and `dump_check` writes a check out when VM_DUMP_DIR is set."""
 
 from __future__ import annotations
 import json

@@ -7,7 +7,7 @@ everything Lean can decide alone is tried before a token is spent.
 
 ```mermaid
 flowchart LR
-    G(["an open goal"]) --> FREE["six deterministic rungs<br/>recall · tactic cocktail · shape leaf<br/>witness search · conjecture · library search"]
+    G(["an open goal"]) --> FREE["five deterministic rungs<br/>recall · tactic cocktail · shape leaf<br/>witness search · conjecture"]
     FREE -- closed --> LEAN(["Lean decides"])
     FREE -- "still open" --> M["ask ONE model<br/>for ONE step"]
     M --> AUDIT["audit the claim<br/>evaluate · sample · the other model"]
