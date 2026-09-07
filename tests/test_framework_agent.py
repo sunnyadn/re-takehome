@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import pathlib
 from types import SimpleNamespace
 
 from submission.config import ANSWER_TOKENS, Config, Ledger
@@ -148,3 +149,48 @@ def test_a_call_with_tools_names_the_one_function_it_will_accept():
     asked = _called(tools=(tool,))
     assert asked["tools"] == [tool]
     assert asked["tool_choice"] == {"type": "function", "function": {"name": "answer"}}
+
+
+def test_the_ladder_in_the_table_is_the_ladder_the_docs_draw():
+    # The order lived in three places once. This is the one that can drift
+    # silently: docs/ARCHITECTURE.md numbers the rungs and names each method.
+    import re
+    from submission.board_agent import LADDER
+
+    doc = pathlib.Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    drawn = re.findall(r"^\| \d+ · [^|]*\| `run/ladder\.py::(\w+)`", doc, re.M)
+    walked = [name for rung in LADDER for name in rung.calls]
+    assert drawn == [n for n in walked if n != "consult"], (drawn, walked)
+
+
+def test_a_goal_whose_statement_is_not_proved_yet_keeps_its_recall():
+    # `recalled` is spent only once the statement is on the board somewhere
+    # else. Spending it earlier would cost the goal its one free close when a
+    # sibling branch proves the statement later, and no replay covers it: the
+    # 16 recorded runs fire `recall` zero times.
+    from submission.board_agent import LADDER
+    from submission.board.types import Goal, Notes
+    from submission.run.loop import Loop
+
+    goal = Goal(34, 2, "rmo_2000_6", "⊢ 10 ≤ a * b", "10 ≤ a * b", 0)
+    board = SimpleNamespace(proven={})
+    called: list[str] = []
+
+    class _Rungs:
+        def __getattr__(self, name):
+            async def rung(_goal):
+                called.append(name)
+                return False
+            return rung
+
+    loop = SimpleNamespace(rungs=LADDER, bb=board, ladder=_Rungs(),
+                           run=SimpleNamespace(notes=Notes()))
+    asyncio.run(Loop.climb(loop, goal))
+    assert "recall" not in called
+    assert loop.run.notes[goal.key].recalled is False
+    assert loop.run.notes[goal.key].swept is True
+
+    board.proven["10 ≤ a * b"] = "omega"
+    asyncio.run(Loop.climb(loop, goal))
+    assert called.count("recall") == 1
+    assert loop.run.notes[goal.key].recalled is True

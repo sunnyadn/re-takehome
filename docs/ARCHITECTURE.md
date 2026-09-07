@@ -159,9 +159,10 @@ of the package as submitted.
 | --- | --- |
 | the entry point the harness loads | `submission/agent.py` (16) |
 | the spine: setup, then two workers on the board | `submission/board_agent.py::solve` (66 of 356) |
-| one worker's turn, the `or` chain of rungs | `submission/run/loop.py::turn` |
+| the ladder, in order | `submission/board_agent.py::LADDER` |
+| one worker's turn, which walks that ladder | `submission/run/loop.py::turn`, `climb` |
 | the crux's two plans, and reading a reply back | `run/loop.py::plan_and_fork`, `post_reply` |
-| 1 · recall | `run/loop.py`, against `Blackboard.proven` |
+| 1 · recall | `run/ladder.py::recall`, against `Blackboard.proven` |
 | 2 · closing cocktail | `run/ladder.py::sweep`, tactic list in `submission/sweep.py` |
 | 3 · shape leaf | `run/ladder.py::leaf_sweep`, blocks in `submission/leaves.py` |
 | 4 · witness search | `run/ladder.py::witness_sweep`, files in `board/probes.py` |

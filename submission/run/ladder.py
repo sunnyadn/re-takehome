@@ -1,10 +1,10 @@
 """The cheap things tried before a model is asked.
 
 Each rung answers one shape of goal without spending a token: a cocktail of
-tactics, a leaf block, a witness, a generalisation, a library search. What
-decides when a rung runs is not here: the gates are in `loop.py::turn`, three
-of them for the five rungs. `unstick` is the rung of last resort: it takes an
-edit back and reopens what it closed."""
+tactics, a leaf block, a witness, a generalisation, a library search. The
+order they are tried in is not here either: it is `LADDER` in
+`board_agent.py`, which `loop.py::turn` walks. `unstick` is the rung of last
+resort: it takes an edit back and reopens what it closed."""
 
 from __future__ import annotations
 import re
@@ -39,6 +39,23 @@ class Ladder:
         self.run, self.budget, self.bb, self.asking = run, budget, bb, asking
         self.conjectured: dict[tuple[str, str], str] = {}
         self.cocktail: tuple[str, ...] = ()
+
+    async def recall(self, goal: Goal) -> bool:
+        """The block that closed this statement somewhere else on the board."""
+
+        nxt, _ = await self.asking.judge(self.bb.board, goal, self.bb.proven[goal.stmt])
+        if nxt is None:
+            return False
+        self.run.events.append({"kind": "recall", "goal": goal.text[-120:]})
+        await self.bb.commit(nxt)
+        return True
+
+    async def consult(self, goal: Goal) -> bool:
+        """The library scan, which answers into the prompt rather than the
+        board: always False, so the walk goes on to ask a model."""
+
+        await self.asking.consult(goal)
+        return False
 
     async def sweep(self, goal: Goal) -> bool:
         """The free closers, once per goal. (`exact?` used to follow: measured

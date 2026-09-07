@@ -6,6 +6,7 @@ each cheap rung guarded by its own flag. What is not a gate is named instead:
 
 from __future__ import annotations
 import asyncio
+from typing import Any, Sequence
 
 from re_harness import LLMCallError
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
@@ -47,17 +48,17 @@ BOARD_SYSTEM = BOARD_SYSTEM + "\n\n" + technique_card()
 assert "goal on the board" in BOARD_SYSTEM
 # Two rejections on a goal buy it a plan from the other model.
 PLAN_AFTER = 2
-# Library probes (`apply?`, the name scan) wait for one rejected step.
-SEARCH_AFTER = 1
 # A worker with no goal to take waits this long for the board to change.
 IDLE_WAIT_S = 2.0
 
 
 class Loop:
     def __init__(self, caller: Caller, run: Run, budget: Budget, bb: Blackboard,
-                 asking: Asking, ladder: Ladder, delivery: Delivery) -> None:
+                 asking: Asking, ladder: Ladder, delivery: Delivery,
+                 rungs: Sequence[Any]) -> None:
         self.caller, self.run, self.budget = caller, run, budget
         self.bb, self.asking, self.ladder, self.delivery = bb, asking, ladder, delivery
+        self.rungs = rungs
         self.lock = asyncio.Lock()
         self.finished = False
         # Every plan asked for a declaration, kept across restarts: the next
@@ -256,28 +257,8 @@ class Loop:
             if picked:
                 self.bb.focus(picked[0])
             base = self.bb.board
-            if goal is not None and goal.stmt in self.bb.proven and not self.run.notes[goal.key].recalled:
-                self.run.notes[goal.key].recalled = True
-                nxt, _ = await self.asking.judge(base, goal, self.bb.proven[goal.stmt])
-                if nxt is not None:
-                    self.run.events.append({"kind": "recall", "goal": goal.text[-120:]})
-                    await self.bb.commit(nxt)
-                    return True
-            if goal is not None and not self.run.notes[goal.key].swept:
-                self.run.notes[goal.key].swept = True
-                if await self.ladder.sweep(goal) or await self.ladder.leaf_sweep(goal) or await self.ladder.witness_sweep(goal) \
-                        or await self.ladder.generalise_sweep(goal):
-                    return True
-            if goal is not None and not self.run.notes[goal.key].searched \
-                    and self.run.notes[goal.key].tries >= SEARCH_AFTER:
-                # Measured over 70 runs: `apply?` and the name scan took
-                # 19% of the wall clock under the lock (601 probes, 22
-                # goals closed; 269 scans at 22 s), and Lean is busy
-                # 60-74% of a run. A goal the first step closes never pays.
-                self.run.notes[goal.key].searched = True
-                if await self.ladder.library_sweep(goal):
-                    return True
-                await self.asking.consult(goal)
+            if goal is not None and await self.climb(goal):
+                return True
             if goal is not None:
                 self.run.notes.claim(goal.key, model)
                 wants_plan = (self.run.notes[goal.key].tries >= PLAN_AFTER
@@ -300,6 +281,20 @@ class Loop:
             self.run.loose.remove(task)
         await self.post_reply(model, goal, base, reply, why)
         return True
+
+    async def climb(self, goal: Goal) -> bool:
+        """The ladder in `board_agent.py::LADDER`, rung by rung. True when one
+        of them closed the goal; the flag is spent whether or not it did."""
+
+        for rung in self.rungs:
+            note = self.run.notes[goal.key]
+            if getattr(note, rung.flag) or not rung.ready(note, goal, self.bb):
+                continue
+            setattr(note, rung.flag, True)
+            for name in rung.calls:
+                if await getattr(self.ladder, name)(goal):
+                    return True
+        return False
 
     async def plan_and_fork(self, model: str, goal: Goal, base: Board) -> tuple[Goal, str]:
         """Two plans for a goal that has been refused twice, and a sibling branch

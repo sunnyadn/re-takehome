@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import Any
+from typing import Any, Callable, NamedTuple
 
 from re_harness import AgentResult, LLMCallError, Problem, Services
 from re_harness.budget import BudgetAccountingError, BudgetExceeded
@@ -46,8 +46,35 @@ LOOSE_DRAIN_S = 30.0
 # proof by contradiction lives in an inconsistent one: on p09 the probe
 # "refuted" six true goals (`h1 : n % 3 = 1 ... ⊢ False`) and undid the proof.
 
-
 TUPLE_IN = re.compile(r"[⟨(]\s*([A-Za-z_][\w']*(?:\s*,\s*[A-Za-z_][\w']*)+)\s*[⟩)]\s*∈")
+
+# One rejected step buys a goal the library probes.
+SEARCH_AFTER = 1
+
+
+class Rung(NamedTuple):
+    """One rung of the ladder. `calls` names methods instead of holding them
+    because `Ladder` is built per run and this table is not."""
+
+    flag: str
+    ready: Callable[[Any, Goal, Any], bool]
+    calls: tuple[str, ...]
+
+
+# A goal gets past every rung here before a token is spent on it. Each row is
+# one flag on the goal's record, what it takes to reach that rung, and the
+# `Ladder` methods behind it, tried until one closes the goal. The flag is
+# spent once, so a rung that fails is not paid for twice.
+LADDER = (
+    Rung("recalled", lambda note, goal, bb: goal.stmt in bb.proven, ("recall",)),
+    Rung("swept", lambda note, goal, bb: True,
+         ("sweep", "leaf_sweep", "witness_sweep", "generalise_sweep")),
+    # Measured over 70 runs: `apply?` and the name scan took 19% of the wall
+    # clock under the lock (601 probes, 22 goals closed; 269 scans at 22 s).
+    # A goal the first step closes never pays for them.
+    Rung("searched", lambda note, goal, bb: note.tries >= SEARCH_AFTER,
+         ("library_sweep", "consult")),
+)
 
 
 class BoardAgent:
@@ -298,7 +325,7 @@ class BoardAgent:
         bb = Blackboard(run, budget, delivery)
         asking = Asking(self.caller, run, budget, bb)
         ladder = Ladder(run, budget, bb, asking)
-        loop = Loop(self.caller, run, budget, bb, asking, ladder, delivery)
+        loop = Loop(self.caller, run, budget, bb, asking, ladder, delivery, LADDER)
 
         try:
             ladder.cocktail = await usable_cocktail(services)
