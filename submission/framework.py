@@ -383,7 +383,8 @@ def step_spans(text: str) -> list[tuple[int, int, str]]:
 
 
 def have_spans(text: str) -> list[tuple[int, int, str]]:
-    """The steps §4 may delete: facts, never the moves that shaped the goal."""
+    """The steps `delivery.prune` may delete: facts, never the moves that
+    shaped the goal."""
 
     return [s for s in step_spans(text) if s[2].startswith("have ")]
 

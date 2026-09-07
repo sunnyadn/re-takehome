@@ -25,7 +25,8 @@ from submission.state import State
 # reasoning off halves the reply and every one of them begins with the block.
 # gpt-oss-120b answers HTTP 400 rather than turn it off, and that 400 is fatal:
 # the ledger marks accounting incomplete and never clears it, so the next call
-# aborts the problem. The setting is therefore decided by name, never probed.
+# aborts the problem. The setting is decided by the model's name, never probed,
+# and only `think` overrides that name.
 REASONING = {"effort": "low"}
 
 
@@ -152,9 +153,9 @@ class Caller:
                     tools: Sequence[Any] = ()) -> tuple[str, str]:
         """The reply and why the provider stopped, which is not always `stop`.
 
-        Reasoning is off for steps because it crowds the block out of the reply.
-        It stays on where thinking is the answer: the plan, and the arithmetic
-        behind a numeric slot."""
+        Reasoning is off for the models that narrate it, because it crowds the
+        block out of the reply. `think` turns it back on for the one ask where
+        the thinking is the answer: the number behind an answer slot."""
 
         lean = getattr(services, "lean", None)
         if isinstance(lean, RenewingLean) and lean.due():

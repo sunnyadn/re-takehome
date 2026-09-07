@@ -53,8 +53,8 @@ def is_probe(block: str) -> bool:
                                for l in lines)
 
 
-# A step is tactic text, except a whole auxiliary declaration, which §4 allows
-# and which is the only way to state a fact two theorems share.
+# A step is tactic text, except a whole auxiliary declaration, which the board
+# hoists on its own and which is the only way to state a fact two theorems share.
 STEP_BAN = re.compile(r"^\s*(import|example|axiom)\b|```|native_decide|admit", re.M)
 
 

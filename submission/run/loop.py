@@ -45,7 +45,7 @@ BOARD_SYSTEM = FRAMEWORK_SYSTEM.replace(
     "  a reply that runs past the token limit keeps only its complete steps.")
 BOARD_SYSTEM = BOARD_SYSTEM + "\n\n" + technique_card()
 assert "goal on the board" in BOARD_SYSTEM
-# Two rejections on a goal buy it a plan from the other model, as before.
+# Two rejections on a goal buy it a plan from the other model.
 PLAN_AFTER = 2
 # Library probes (`apply?`, the name scan) wait for one rejected step.
 SEARCH_AFTER = 1

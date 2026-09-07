@@ -157,7 +157,7 @@ async def finish(state: State, services: Services, time_left) -> State:
     # Measured on p08: both passes turned a file the comparator accepted
     # into one it timed out on, because deleting a fact a closer was using
     # makes that closer redo the work in a term the kernel then re-checks.
-    # A short file has nothing to win here, and §4 says not to touch it.
+    # A short file has nothing to win here, so it is left alone.
     if len(below_header(state.text)) > TIDY_ABOVE_BYTES:
         state = await lighten(state, services, time_left)
         state = await prune(state, services, time_left)
@@ -195,7 +195,8 @@ async def lighten(state: State, services: Services, time_left) -> State:
 async def prune(state: State, services: Services, time_left) -> State:
     """Delete facts the finished proof does not use.
 
-    Only sound now: while a `sorry` remains, no deletion can break anything."""
+    Sound only once the proof is finished: with a `sorry` still in the file,
+    Lean accepts it whatever the deletion broke."""
 
     tried: set[str] = set()
     for _ in range(MAX_DELETIONS):

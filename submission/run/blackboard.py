@@ -1,9 +1,9 @@
 """The live board: the current file, and the alternatives tried instead.
 
-`Board` in `submission/board/types.py` is one immutable snapshot. This holds
-the current snapshot, the branches racing beside it, and what each accepted
-edit did to them. `look` is where a snapshot comes from: one Lean check, read
-back as goals."""
+`Board` in `submission/board/types.py` is one snapshot. It is not frozen, but
+it is replaced rather than edited: the only writes to a board are here, on one
+`look` has just returned. This holds the current snapshot, the branches racing
+beside it, and what each accepted edit did to them."""
 
 from __future__ import annotations
 import asyncio

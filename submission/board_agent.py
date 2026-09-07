@@ -1,6 +1,6 @@
 """A board of open goals, two models asking for steps at the same time, Lean
 judging every edit against the whole file. Only the model calls overlap: every
-Lean check in a turn runs under one lock, measured at 19% of the wall clock."""
+Lean check in a turn is taken under one lock."""
 
 
 from __future__ import annotations

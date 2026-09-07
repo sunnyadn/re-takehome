@@ -1004,8 +1004,8 @@ LEAVES = (
 
 def leaf_candidates(goal_text: str) -> list[str]:
     """Tactic blocks for a goal, from its shape alone. Every rule that reads a
-    shape is one entry in LEAVES above; what is left here is the two ways a
-    goal is taken apart when no rule fires."""
+    shape is one entry in LEAVES above. The three ways a goal is taken apart are
+    here: destructuring first, then `intro` and `And.intro` if no rule fired."""
 
     hyps = _hyps(goal_text)
     target = _target(goal_text)

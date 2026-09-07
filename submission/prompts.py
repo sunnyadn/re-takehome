@@ -77,7 +77,7 @@ proof; branches of an `induction ... with` end in `sorry` where you have not
 worked yet."""
 
 
-# Section 3 of the framework: what Lean's message does not say. Sent only when
+# Added to the prompt: what Lean's message does not say. Sent only when
 # the message that triggers it appears, which keeps the prompt small.
 NOTES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"omega could not"),
@@ -124,7 +124,7 @@ NOTES: tuple[tuple[re.Pattern[str], str], ...] = (
 )
 
 
-# Section 4 of the framework: the names the loaded Mathlib has, given before
+# Added to the prompt: the names the loaded Mathlib has, given before
 # the first step to any goal whose vocabulary they fit. Every name and signature
 # below was printed by `#check` in the harness image; nothing is from memory.
 SHEETS: tuple[tuple[re.Pattern[str], str], ...] = (
